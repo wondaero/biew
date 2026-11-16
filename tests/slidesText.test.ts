@@ -19,3 +19,29 @@ describe('textToSlides', () => {
     expect(textToSlides(slidesToText(slides))).toEqual(slides)
   })
 })
+
+import { slideRanges, slideIndexAt } from '../shared/slidesText'
+
+describe('slideRanges', () => {
+  const cases = [
+    'Lorem\nipsum\n\nDolor\nsit',
+    '\n\nLorem  \n \n\n\nIpsum\n\n',
+    'Lorem\n\nLorem\n\n\n\nIpsum',
+    'A\r\n\r\nB',
+    'single',
+    '',
+  ]
+  it.each(cases)('슬라이드 개수와 내용이 textToSlides 와 일치: %j', (t) => {
+    const r = slideRanges(t)
+    const slides = textToSlides(t)
+    expect(r.length).toBe(slides.length)
+    r.forEach((x, i) => expect(textToSlides(t.slice(x.start, x.end))[0]).toBe(slides[i]))
+  })
+  it('커서 → 슬라이드 번호', () => {
+    const t = 'Lorem\n\nIpsum\n\nDolor'
+    const r = slideRanges(t)
+    expect(slideIndexAt(r, 0)).toBe(0)
+    expect(slideIndexAt(r, t.indexOf('Ipsum') + 2)).toBe(1)
+    expect(slideIndexAt(r, t.length)).toBe(2)
+  })
+})

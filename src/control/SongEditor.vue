@@ -3,9 +3,9 @@
  * 곡 추가/수정/삭제. 빈 줄 = 슬라이드 구분.
  * 오른쪽에 현재 출력 스타일 그대로 슬라이드 미리보기.
  */
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import type { Song } from '@shared/types'
-import { textToSlides, slidesToText } from '@shared/slidesText'
+import { textToSlides, slidesToText, slideRanges, slideIndexAt } from '@shared/slidesText'
 import { saveSong, deleteSong } from '@/library/library'
 import { useLive } from '@/live/liveStore'
 import SlideRender from '@/components/SlideRender.vue'
@@ -23,6 +23,30 @@ const busy = ref(false)
 const err = ref<string | null>(null)
 const titleInput = ref<HTMLInputElement>()
 const isNew = !props.song
+
+// 커서 위치 ↔ 미리보기 연결
+const ta = ref<HTMLTextAreaElement>()
+const preview = ref<HTMLElement>()
+const caret = ref(0)
+const ranges = computed(() => slideRanges(text.value))
+const activeSlide = computed(() => slideIndexAt(ranges.value, caret.value))
+function syncCaret() { caret.value = ta.value?.selectionStart ?? 0 }
+watch(activeSlide, async (i) => {
+  await nextTick()
+  preview.value?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' })
+})
+
+/** 미리보기 클릭 → 입력칸에서 그 슬라이드 선택 + 화면 안으로 스크롤 */
+function jumpTo(i: number) {
+  const r = ranges.value[i], el = ta.value
+  if (!r || !el) return
+  el.focus()
+  el.setSelectionRange(r.start, r.end)
+  const lineH = parseFloat(getComputedStyle(el).lineHeight) || 24
+  const line = text.value.slice(0, r.start).split('\n').length - 1
+  el.scrollTop = Math.max(0, line * lineH - el.clientHeight / 3)
+  caret.value = r.start
+}
 
 async function save() {
   if (busy.value) return
@@ -86,18 +110,29 @@ onBeforeUnmount(() => {
 
       <div class="body">
         <section class="edit">
-          <label>제목
+          <label>
+            <span>제목</span>
             <input ref="titleInput" v-model="title" placeholder="예: 001 곡 제목" />
           </label>
-          <label class="grow">가사 <small>빈 줄로 슬라이드를 나눕니다</small>
-            <textarea v-model="text" spellcheck="false" :placeholder="'첫 번째 슬라이드 첫 줄\n첫 번째 슬라이드 둘째 줄\n\n두 번째 슬라이드'" />
+          <label class="grow">
+            <span>가사 <small>빈 줄로 슬라이드를 나눕니다 · 오른쪽 미리보기를 누르면 해당 위치로 이동</small></span>
+            <textarea
+              ref="ta"
+              v-model="text"
+              spellcheck="false"
+              :placeholder="'첫 번째 슬라이드 첫 줄\n첫 번째 슬라이드 둘째 줄\n\n두 번째 슬라이드'"
+              @input="syncCaret"
+              @click="syncCaret"
+              @keyup="syncCaret"
+              @select="syncCaret"
+            />
           </label>
         </section>
 
         <section class="preview">
           <h3>미리보기 <small>{{ slides.length }}장</small></h3>
-          <div class="thumbs">
-            <div v-for="(s, i) in slides" :key="i" class="thumb">
+          <div ref="preview" class="thumbs">
+            <div v-for="(s, i) in slides" :key="i" class="thumb" :data-i="i" :class="{ active: i === activeSlide }" title="클릭하면 입력칸의 이 슬라이드로 이동" @click="jumpTo(i)">
               <span class="no">{{ i + 1 }}</span>
               <SlideRender :text="s" :style-cfg="live.state.style" :animate="false" />
             </div>
@@ -122,7 +157,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .6); display: grid; place-items: center; }
 .dialog {
-  width: min(1200px, 94vw); height: min(820px, 90vh); display: flex; flex-direction: column;
+  width: calc(100vw - 32px); height: calc(100vh - 32px); display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
 }
 header, footer { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
@@ -132,11 +167,12 @@ h2 { margin: 0; font-size: 16px; }
 .src { color: var(--muted); }
 .spacer { flex: 1; }
 .x { border: none; background: none; }
-.body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 .edit { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; min-height: 0; border-right: 1px solid var(--line); }
-label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
 label small { margin-left: 6px; }
-label.grow { flex: 1; min-height: 0; grid-template-rows: auto 1fr; }
+label.grow { flex: 1; min-height: 0; }
+label.grow textarea { flex: 1; }
 input { font-size: 15px; color: var(--text); }
 textarea {
   font: 15px/1.6 system-ui, 'Malgun Gothic', sans-serif; color: var(--text); background: var(--panel-2);
@@ -147,7 +183,9 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .preview h3 { margin: 0 0 10px; font-size: 13px; }
 .preview h3 small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .thumbs { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; align-content: start; }
-.thumb { position: relative; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.thumb { position: relative; aspect-ratio: 16 / 9; border: 2px solid var(--line); border-radius: 6px; overflow: hidden; cursor: pointer; }
+.thumb:hover { border-color: #5a5a68; }
+.thumb.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(79, 140, 255, .35); }
 .thumb .no { position: absolute; top: 4px; left: 6px; z-index: 1; font-size: 11px; color: #bbb; text-shadow: 0 0 3px #000; }
 .empty { color: var(--muted); font-size: 13px; }
 .del { color: var(--pgm); border-color: #5a2a2a; }
