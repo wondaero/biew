@@ -6,7 +6,9 @@ const live = useLive()
 const root = ref<HTMLElement>()
 
 const isLive = (i: number, j: number) => i === live.state.itemIndex && j === live.state.slideIndex
-const isNext = (i: number, j: number) => live.upcoming.value?.itemIndex === i && live.upcoming.value?.slideIndex === j
+/** 미리보기 표시는 PVW 모드에서 직접 고른 슬라이드에만 (즉시 모드에선 NEXT 모니터로 충분) */
+const isPreview = (i: number, j: number) =>
+  live.pvwMode.value && live.preview.value?.itemIndex === i && live.preview.value?.slideIndex === j
 
 function onClick(i: number, j: number) {
   live.actions.pick({ itemIndex: i, slideIndex: j })
@@ -46,7 +48,7 @@ defineExpose({ scrollToItem })
           v-for="(s, j) in it.slides"
           :key="j"
           class="card"
-          :class="{ live: isLive(i, j), next: isNext(i, j), blanked: isLive(i, j) && live.state.blank }"
+          :class="{ live: isLive(i, j), pvw: isPreview(i, j), blanked: isLive(i, j) && live.state.blank }"
           @click="onClick(i, j)"
           @dblclick="onDbl(i, j)"
         >
@@ -77,8 +79,9 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; }
   border: 2px solid var(--line); border-radius: 8px; overflow: hidden;
 }
 .card:hover { border-color: #5a5a68; }
-.card.next { border-color: var(--pvw); }
-.card.live { border-color: var(--pgm); box-shadow: 0 0 0 2px rgba(255, 59, 59, .35); }
+.card.pvw { border-style: dashed; border-color: rgba(46, 204, 113, .55); }
+.card.live { border-color: var(--pgm); background: #2a1215; box-shadow: 0 0 0 2px rgba(255, 59, 59, .35); }
+.card.live .txt { color: #fff; }
 .card.blanked .txt { opacity: .35; }
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }
 .card.live .idx { color: var(--pgm); font-weight: 700; }
