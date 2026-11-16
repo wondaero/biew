@@ -9,6 +9,8 @@ import SetlistPanel from './panels/SetlistPanel.vue'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import StylePanel from './panels/StylePanel.vue'
+import SharePopover from './panels/SharePopover.vue'
+import { shareStatus } from '@/live/share'
 
 const live = useLive()
 const libRef = ref<InstanceType<typeof LibraryPanel>>()
@@ -34,6 +36,7 @@ async function startOutput() {
 }
 
 const showHelp = ref(false)
+const showShare = ref(false)
 
 // 송출 중 실수로 컨트롤러를 닫는 것 방지(출력은 계속 유지되지만 조작 불가해짐)
 const onBeforeUnload = (e: BeforeUnloadEvent) => { if (outputOn.value) e.preventDefault() }
@@ -71,10 +74,12 @@ onBeforeUnmount(() => {
 
       <span class="conn" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
       <button class="primary" @click="startOutput">출력 시작</button>
+      <button class="share" :class="shareStatus" title="폰으로 보기 (QR)" @click="showShare = !showShare">📱 폰</button>
       <button title="단축키" @click="showHelp = !showHelp">?</button>
     </header>
 
     <div v-if="toast" class="toast" @click="toast = null">{{ toast }}</div>
+    <SharePopover v-if="showShare" @close="showShare = false" />
     <div v-if="showHelp" class="help" @click="showHelp = false">
       <table>
         <tr><td>→ / Space</td><td>다음 슬라이드 (PVW 모드: 미리보기 송출)</td></tr>
@@ -115,6 +120,8 @@ onBeforeUnmount(() => {
 }
 .top { grid-area: top; display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .brand { font-size: 15px; letter-spacing: .5px; }
+.share.live { border-color: var(--pvw); color: var(--pvw); }
+.share.error { border-color: var(--pgm); }
 .group { display: flex; gap: 4px; }
 .blank.on { background: var(--warn); border-color: var(--warn); color: #222; font-weight: 700; }
 .mode { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }

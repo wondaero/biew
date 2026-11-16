@@ -8,9 +8,11 @@ import { BroadcastChannelTransport } from '@/sync/BroadcastChannelTransport'
 import { SyncHub } from '@/sync/SyncHub'
 import { loadLive, saveLive } from './persistence'
 import * as nav from './nav'
+import { uid } from '@/lib/uid'
+import { bindShare, publish } from './share'
 import type { Cursor } from './nav'
 
-const ORIGIN = `pc-${crypto.randomUUID().slice(0, 8)}`
+const ORIGIN = `pc-${uid().slice(0, 8)}`
 const state = reactive<LiveState>(loadLive() ?? emptyLiveState(ORIGIN))
 
 /** PVW 모드 여부와 미리보기 커서는 컨트롤러 로컬 상태(송출 상태 아님) */
@@ -30,6 +32,7 @@ const hub = new SyncHub(
   },
 )
 hub.mark(state)
+bindShare(snapshot)
 
 function commit(mutate: (s: LiveState) => void) {
   mutate(state)
@@ -39,6 +42,7 @@ function commit(mutate: (s: LiveState) => void) {
   hub.mark(snap)
   saveLive(snap)
   hub.send({ type: 'state', state: snap })
+  publish(snap) // 폰 공유 중이면 Realtime 으로도
 }
 
 // 시작 시 한 번 방송 — 이미 열려 있는 출력 창이 즉시 맞춰지도록
@@ -96,7 +100,7 @@ function setSetlist(list: SetlistItem[]) {
 
 const setlist = {
   add(song: { id: string; title: string; slides: string[] }) {
-    setSetlist([...state.setlist, { key: crypto.randomUUID(), songId: song.id, title: song.title, slides: [...song.slides] }])
+    setSetlist([...state.setlist, { key: uid(), songId: song.id, title: song.title, slides: [...song.slides] }])
   },
   remove(key: string) {
     setSetlist(state.setlist.filter((x) => x.key !== key))

@@ -6,5 +6,6 @@ export const router = createRouter({
     { path: '/', redirect: '/control' },
     { path: '/control', component: () => import('./control/ControlView.vue') },
     { path: '/output', component: () => import('./output/OutputView.vue') },
+    { path: '/view/:code', component: () => import('./viewer/ViewerView.vue') },
   ],
 })

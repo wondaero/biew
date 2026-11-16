@@ -11,8 +11,9 @@ import { loadLive } from '@/live/persistence'
 import { currentText } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
 import { useWakeLock } from './useWakeLock'
+import { uid } from '@/lib/uid'
 
-const ID = `out-${crypto.randomUUID().slice(0, 8)}`
+const ID = `out-${uid().slice(0, 8)}`
 const state = ref<LiveState | null>(loadLive())
 const hub = new SyncHub([new BroadcastChannelTransport()], (s) => { state.value = s })
 if (state.value) hub.mark(state.value)
