@@ -1,0 +1,36 @@
+{
+  "name": "biew",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit",
+    "import": "tsx scripts/import.ts",
+    "fixture": "tsx scripts/make-fixture.ts",
+    "staff": "tsx scripts/create-staff.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
+    "idb": "^8.0.4",
+    "vue": "^3.5.45",
+    "vue-draggable-plus": "^0.6.1",
+    "vue-router": "^5.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "iconv-lite": "^0.7.3",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.8",
+    "vitest": "^4.1.12",
+    "vue-tsc": "^3.3.14"
+  }
+}

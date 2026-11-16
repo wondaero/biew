@@ -1,0 +1,81 @@
+export interface Song {
+  id: string
+  title: string
+  slides: string[]
+  source_file: string | null
+  updated_at: string
+  deleted_at: string | null
+}
+
+export interface SetlistItem {
+  /** 콘티 항목 고유키 — 같은 곡을 두 번 넣어도 구분 */
+  key: string
+  songId: string
+  title: string
+  /** 추가 시점 스냅샷. 예배 중 DB가 바뀌어도 슬라이드 번호가 흔들리지 않게 */
+  slides: string[]
+}
+
+export type TextPosition = 'bottom' | 'center'
+export type Background = 'black' | 'green'
+export type TransitionKind = 'cut' | 'fade'
+
+export interface OutputStyle {
+  fontFamily: string
+  /** 화면 높이 대비 % (cqh). 썸네일·출력이 같은 비율로 그려짐 */
+  fontSize: number
+  fontWeight: 400 | 700 | 800
+  lineHeight: number
+  color: string
+  outlineWidth: number // cqh
+  outlineColor: string
+  shadow: boolean
+  position: TextPosition
+  /** 하단 여백 (cqh) — position=bottom 일 때 */
+  bottomMargin: number
+  background: Background
+  transition: TransitionKind
+  fadeMs: number
+}
+
+export interface LiveState {
+  /** 증가하는 버전. 수신 측은 더 큰 version 만 반영 */
+  version: number
+  /** 마지막으로 바꾼 주체 (Phase 2: 여러 기기 구분/동률 판정) */
+  origin: string
+  setlist: SetlistItem[]
+  itemIndex: number
+  slideIndex: number
+  blank: boolean
+  style: OutputStyle
+}
+
+export const DEFAULT_STYLE: OutputStyle = {
+  fontFamily: 'Pretendard, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif',
+  fontSize: 7,
+  fontWeight: 700,
+  lineHeight: 1.35,
+  color: '#ffffff',
+  outlineWidth: 0.35,
+  outlineColor: '#000000',
+  shadow: true,
+  position: 'bottom',
+  bottomMargin: 6,
+  background: 'black',
+  transition: 'fade',
+  fadeMs: 250,
+}
+
+export function emptyLiveState(origin: string): LiveState {
+  return { version: 0, origin, setlist: [], itemIndex: 0, slideIndex: 0, blank: false, style: { ...DEFAULT_STYLE } }
+}
+
+/** 상태가 더 새로운지. version 동률이면 origin 사전순으로 결정(모든 기기가 같은 결론) */
+export function isNewer(a: Pick<LiveState, 'version' | 'origin'>, b: Pick<LiveState, 'version' | 'origin'> | null): boolean {
+  if (!b) return true
+  return a.version > b.version || (a.version === b.version && a.origin > b.origin)
+}
+
+export function nextVersion(prev: number): number {
+  return Math.max(prev + 1, Date.now())
+}

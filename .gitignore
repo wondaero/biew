@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+# 저작권 가사 원본 / 파싱 결과 — 커밋 금지
+doc/*/
+*.gcg
+*.gbk
+out/
+.DS_Store

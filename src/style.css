@@ -1,0 +1,16 @@
+:root {
+  --bg: #141418; --panel: #1d1d23; --panel-2: #25252d; --line: #33333d;
+  --text: #e7e7ea; --muted: #8b8b96; --accent: #4f8cff;
+  --pgm: #ff3b3b; --pvw: #2ecc71; --warn: #f5a524;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, 'Malgun Gothic', sans-serif; }
+html.is-output, html.is-output body { background: #000; overflow: hidden; }
+button { font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: #4a4a56; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { background: var(--pgm); border-color: var(--pgm); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+input, select { font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
