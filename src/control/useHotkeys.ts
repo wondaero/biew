@@ -10,6 +10,7 @@ type Live = ReturnType<typeof useLive>
 export function useHotkeys(live: Live, extra: { focusSearch: () => void }) {
   function onKey(e: KeyboardEvent) {
     if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return
+    if (live.hotkeysPaused.value) return
     const t = e.target as HTMLElement | null
     const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
     if (typing) {

@@ -88,10 +88,49 @@ export async function resetCache() {
   await syncNow()
 }
 
+function requireOnline() {
+  if (!supabase || !session.value) throw new Error('로그인이 필요합니다')
+  if (!navigator.onLine) throw new Error('인터넷 연결이 필요합니다 (곡 저장은 온라인에서만 가능)')
+  return supabase
+}
+
+function applyLocal(song: Song | null, removedId?: string) {
+  const map = new Map(songs.value.map((x) => [x.id, x]))
+  if (song) map.set(song.id, song)
+  if (removedId) map.delete(removedId)
+  setSongs([...map.values()])
+}
+
+/** 새 곡(id 없음) 또는 수정. 저장된 행을 돌려준다. */
+export async function saveSong(input: { id?: string; title: string; slides: string[] }): Promise<Song> {
+  const sb = requireOnline()
+  const title = input.title.trim()
+  if (!title) throw new Error('제목을 입력하세요')
+  if (!input.slides.length) throw new Error('가사를 입력하세요')
+  const row = { title, slides: input.slides }
+  const q = input.id ? sb.from('songs').update(row).eq('id', input.id) : sb.from('songs').insert(row)
+  const { data, error } = await q.select(COLS).single()
+  if (error) throw new Error(error.message)
+  const saved = data as Song
+  await db.putSong(saved)
+  applyLocal(saved)
+  return saved
+}
+
+/** 소프트 삭제(deleted_at). 다른 기기는 다음 동기화 때 목록에서 사라진다. */
+export async function deleteSong(id: string) {
+  const sb = requireOnline()
+  const { error } = await sb.from('songs').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw new Error(error.message)
+  await db.removeSong(id)
+  applyLocal(null, id)
+}
+
 export function useLibrary() {
   return {
     songs,
     count: computed(() => songs.value.length),
+    byId: computed(() => new Map(songs.value.map((x) => [x.id, x]))),
     search: (q: string, limit?: number) => search(index.value, q, limit),
   }
 }

@@ -3,8 +3,22 @@ import { computed } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { SetlistItem } from '@shared/types'
 import { useLive } from '@/live/liveStore'
+import { useLibrary } from '@/library/library'
 
 const live = useLive()
+const lib = useLibrary()
+
+/** 라이브러리의 곡이 콘티에 넣은 뒤 수정됐는지 */
+function latest(it: SetlistItem) {
+  const s = lib.byId.value.get(it.songId)
+  if (!s) return null
+  const changed = s.title !== it.title || s.slides.length !== it.slides.length || s.slides.some((x, i) => x !== it.slides[i])
+  return changed ? s : null
+}
+function refresh(it: SetlistItem) {
+  const s = latest(it)
+  if (s) live.setlist.refresh(it.key, s)
+}
 const emit = defineEmits<{ jump: [itemIndex: number] }>()
 
 // 드래그 결과를 그대로 store 에 반영(송출 중 곡 위치는 store 가 key 로 보정)
@@ -38,6 +52,7 @@ function clear() {
         <span class="grip" title="드래그해서 순서 변경">⋮⋮</span>
         <span class="no">{{ i + 1 }}</span>
         <span class="title">{{ it.title }}</span>
+        <button v-if="latest(it)" class="upd" title="라이브러리에서 수정된 최신 가사로 갱신" @click.stop="refresh(it)">↻ 최신</button>
         <span class="n">{{ it.slides.length }}</span>
         <button class="x" title="콘티에서 빼기" @click.stop="remove(it, i)">✕</button>
       </li>
@@ -60,6 +75,7 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .no { width: 18px; color: var(--muted); font-size: 12px; text-align: right; }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n { font-size: 11px; color: var(--muted); }
+.upd { padding: 0 6px; font-size: 11px; color: var(--warn); border-color: #5a4a1e; background: none; white-space: nowrap; }
 .x { padding: 0 6px; border: none; background: none; color: var(--muted); }
 .x:hover { color: var(--pgm); }
 .empty { color: var(--muted); font-size: 12px; margin: 0; }

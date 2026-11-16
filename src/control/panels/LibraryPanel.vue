@@ -4,6 +4,8 @@ import { useLibrary, syncStatus, syncError, lastSync, syncNow, resetCache } from
 import { session, signIn, signOut, authReady } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { useLive } from '@/live/liveStore'
+import type { Song } from '@shared/types'
+import SongEditor from '../SongEditor.vue'
 
 const lib = useLibrary()
 const live = useLive()
@@ -49,13 +51,22 @@ const statusText = computed(() => {
   }
 })
 
+// 편집기: undefined = 닫힘, null = 새 곡, Song = 수정
+const editing = ref<Song | null | undefined>(undefined)
+function onSaved(song: Song) {
+  q.value = song.title // 저장한 곡이 바로 보이도록
+}
+
 defineExpose({ focus: () => input.value?.focus() })
 </script>
 
 <template>
   <section class="lib">
     <header>
-      <h2>곡 라이브러리 <small>{{ lib.count.value }}곡</small></h2>
+      <div class="h">
+        <h2>곡 라이브러리 <small>{{ lib.count.value }}곡</small></h2>
+        <button v-if="session" class="new" title="새 곡 추가" @click="editing = null">+ 새 곡</button>
+      </div>
       <div class="status" :class="syncStatus">
         <span>{{ statusText }}</span>
         <template v-if="session">
@@ -93,15 +104,22 @@ defineExpose({ focus: () => input.value?.focus() })
         <span class="title">{{ h.song.title }}</span>
         <span v-if="!h.inTitle" class="badge">가사</span>
         <span class="n">{{ h.song.slides.length }}</span>
+        <button v-if="session" class="edit" title="곡 수정·삭제" @click.stop="editing = h.song">✎</button>
       </li>
       <li v-if="q && !hits.length" class="empty">결과 없음</li>
     </ol>
+    <SongEditor v-if="editing !== undefined" :song="editing" @close="editing = undefined" @saved="onSaved" />
   </section>
 </template>
 
 <style scoped>
 .lib { display: flex; flex-direction: column; min-height: 0; gap: 8px; }
-header h2 { margin: 0; font-size: 14px; }
+header .h { display: flex; align-items: center; gap: 6px; }
+header h2 { margin: 0; font-size: 14px; flex: 1; }
+.new { padding: 2px 8px; font-size: 12px; }
+.edit { padding: 0 6px; border: none; background: none; color: var(--muted); visibility: hidden; }
+.hits li:hover .edit, .hits li.sel .edit { visibility: visible; }
+.edit:hover { color: var(--accent); }
 header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .status { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .status span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

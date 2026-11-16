@@ -19,6 +19,8 @@ const state = reactive<LiveState>(loadLive() ?? emptyLiveState(ORIGIN))
 const pvwMode = ref(false)
 const preview = ref<Cursor | null>(null)
 const outputSeenAt = ref(0)
+/** 편집 창 등 모달이 열려 있으면 송출 단축키 중지 */
+const hotkeysPaused = ref(false)
 
 const snapshot = (): LiveState => JSON.parse(JSON.stringify(state))
 
@@ -106,6 +108,20 @@ const setlist = {
     setSetlist(state.setlist.filter((x) => x.key !== key))
   },
   replace: setSetlist,
+  /** 콘티 항목을 라이브러리의 최신 가사로 교체. 송출 중이면 슬라이드 번호를 범위 안으로 보정 */
+  refresh(key: string, song: { title: string; slides: string[] }) {
+    const i = state.setlist.findIndex((x) => x.key === key)
+    if (i < 0) return
+    commit((s) => {
+      const it = s.setlist[i]!
+      s.setlist[i] = { ...it, title: song.title, slides: [...song.slides] }
+      if (s.itemIndex === i) {
+        if (!song.slides.length) { s.blank = true; s.slideIndex = 0 }
+        else s.slideIndex = Math.min(s.slideIndex, song.slides.length - 1)
+      }
+    })
+    if (preview.value?.itemIndex === i) preview.value = null
+  },
   clear() {
     setSetlist([])
   },
@@ -122,6 +138,7 @@ export function useLive() {
     preview: readonly(preview),
     upcoming,
     outputSeenAt,
+    hotkeysPaused,
     actions,
     setlist,
     setStyle,
