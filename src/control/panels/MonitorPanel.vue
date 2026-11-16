@@ -21,10 +21,11 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
       </div>
       <div class="screen"><SlideRender :text="pgmText" :blank="s.blank" :style-cfg="s.style" :layer-key="`${s.itemIndex}:${s.slideIndex}`" /></div>
     </div>
-    <div class="mon">
+    <!-- 즉시 모드에선 PGM 하나만. PVW 모드에서만 'TAKE 하면 나갈 화면' 표시 -->
+    <div v-if="live.pvwMode.value" class="mon">
       <div class="bar pvw">
-        <b>{{ live.pvwMode.value ? 'PVW' : 'NEXT' }}</b> <span>{{ label(live.upcoming.value) }}</span>
-        <button v-if="live.pvwMode.value" class="take" :disabled="!live.upcoming.value" @click="live.actions.take()">TAKE ⏎</button>
+        <b>PVW</b> <span>{{ label(live.upcoming.value) }}</span>
+        <button class="take" :disabled="!live.upcoming.value" @click="live.actions.take()">TAKE ⏎</button>
       </div>
       <div class="screen"><SlideRender :text="nextText" :style-cfg="s.style" :animate="false" /></div>
     </div>
@@ -35,10 +36,10 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
 .monitors { display: grid; gap: 10px; }
 .bar { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 2px; }
 .bar b { padding: 1px 6px; border-radius: 4px; color: #fff; font-size: 11px; }
-.bar.pgm b { background: var(--pgm); }
-.bar.pvw b { background: var(--pvw); color: #062; }
+.bar.pgm b { background: var(--live); color: var(--live-ink); }
+.bar.pvw b { background: var(--preview); }
 .bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .bar em { font-style: normal; color: var(--warn); font-weight: 700; }
-.take { padding: 2px 8px; font-size: 12px; background: var(--pvw); border-color: var(--pvw); color: #062; font-weight: 700; }
+.take { padding: 2px 8px; font-size: 12px; background: var(--preview); border-color: var(--preview); color: #fff; font-weight: 700; }
 .screen { aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 </style>

@@ -68,7 +68,7 @@ h3 {
   position: sticky; top: 0; z-index: 1; margin: 0 0 8px; padding: 6px 8px; font-size: 14px;
   background: var(--bg); border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 8px;
 }
-h3.live { color: #fff; border-bottom-color: var(--pgm); }
+h3.live { color: #fff; border-bottom-color: var(--live); }
 h3 .no { color: var(--muted); font-size: 12px; }
 h3 small { color: var(--muted); font-weight: normal; font-size: 12px; }
 .noslide { color: var(--muted); font-size: 12px; margin: 0 8px; }
@@ -79,12 +79,12 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; }
   border: 2px solid var(--line); border-radius: 8px; overflow: hidden;
 }
 .card:hover { border-color: #5a5a68; }
-.card.pvw { border-style: dashed; border-color: rgba(46, 204, 113, .55); }
-.card.live { border-color: var(--pgm); background: #2a1215; box-shadow: 0 0 0 2px rgba(255, 59, 59, .35); }
+.card.pvw { border-style: dashed; border-color: var(--preview-soft); }
+.card.live { border-color: var(--live); background: var(--live-bg); box-shadow: 0 0 0 2px var(--live-glow); }
 .card.live .txt { color: #fff; }
 .card.blanked .txt { opacity: .35; }
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }
-.card.live .idx { color: var(--pgm); font-weight: 700; }
+.card.live .idx { color: var(--live); font-weight: 700; }
 .txt {
   font-size: 12.5px; line-height: 1.35; white-space: pre-line; color: #ddd;
   display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;

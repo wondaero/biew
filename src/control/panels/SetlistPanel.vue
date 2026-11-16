@@ -70,7 +70,7 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .items { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; flex: 1; }
 .items li { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 5px; cursor: pointer; border-left: 3px solid transparent; }
 .items li:hover { background: var(--panel-2); }
-.items li.live { border-left-color: var(--pgm); background: #2a1d20; }
+.items li.live { border-left-color: var(--live); background: var(--live-bg); }
 .grip { cursor: grab; color: var(--muted); letter-spacing: -3px; padding: 0 2px; }
 .no { width: 18px; color: var(--muted); font-size: 12px; text-align: right; }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
