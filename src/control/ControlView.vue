@@ -113,7 +113,8 @@ onBeforeUnmount(() => {
 .control {
   height: 100vh;
   display: grid;
-  grid-template-columns: 300px 1fr 400px;
+  /* minmax(0, …): 긴 제목/nowrap 텍스트가 열을 밀어내지 않도록 */
+  grid-template-columns: 300px minmax(0, 1fr) 400px;
   grid-template-rows: auto 1fr;
   grid-template-areas: 'top top top' 'left center right';
   overflow: hidden;
@@ -131,11 +132,11 @@ onBeforeUnmount(() => {
 .conn.on { color: var(--text); }
 .conn.on::before { background: var(--pvw); box-shadow: 0 0 6px var(--pvw); }
 
-.left { grid-area: left; display: grid; grid-template-rows: 1fr 1fr; gap: 12px; padding: 10px; border-right: 1px solid var(--line); min-height: 0; background: var(--panel); }
-.lib, .set { min-height: 0; }
+.left { grid-area: left; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; gap: 12px; padding: 10px; border-right: 1px solid var(--line); min-height: 0; background: var(--panel); }
+.lib, .set { min-height: 0; min-width: 0; }
 .center { grid-area: center; display: flex; flex-direction: column; min-height: 0; }
 .center > * { flex: 1; }
-.right { grid-area: right; display: flex; flex-direction: column; gap: 16px; padding: 10px; border-left: 1px solid var(--line); overflow-y: auto; background: var(--panel); }
+.right { grid-area: right; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 10px; border-left: 1px solid var(--line); overflow-y: auto; background: var(--panel); }
 
 .toast {
   position: fixed; left: 50%; top: 56px; transform: translateX(-50%); z-index: 20; max-width: 640px;
