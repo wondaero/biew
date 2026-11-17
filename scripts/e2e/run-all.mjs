@@ -13,7 +13,7 @@ const run = (cmd, args, shell = false) => spawnSync(cmd, args, { cwd: PROJ, stdi
 console.log('▶ 배포용 빌드(오프라인·업그레이드 검증용)')
 if (run(npm, ['run', 'build'], process.platform === 'win32').status !== 0) process.exit(1)
 
-const suites = ['internet', 'local', 'home', 'bg', 'ime', 'offline', 'upgrade']
+const suites = ['internet', 'local', 'home', 'bg', 'presets', 'ime', 'offline', 'upgrade']
 const results = []
 for (const s of suites) {
   console.log(`\n▶ ${s}`)

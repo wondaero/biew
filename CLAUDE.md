@@ -36,6 +36,7 @@ shared/            브라우저·Node 공용 순수 TS
   gcg/parse.ts     .gcg 파서 (doc/gcg_parse.py 기준, 1069곡 해시 일치 검증됨)
   slidesText.ts    편집기 텍스트 ↔ 슬라이드(빈 줄 = 구분)
   songCompare.ts   곡 중복 판정(가사 === / 제목 ===, 보이지 않는 차이만 통일)
+  outputStyle.ts   normalizeStyle(출력 설정 정규화·예전 값 이전 — 상태·저장된 설정·가져온 파일 공용)
 scripts/           import.ts, create-staff.ts, make-fixture.ts
 src/sync/          SyncTransport 인터페이스, BroadcastChannelTransport, SupabaseRealtimeTransport, SyncHub(version 필터)
 src/live/          liveStore(채널 하나를 연 동안의 상태 소유, commit 단일 경로. host/remote 역할), nav(이동·onAir — 서버 `_apply_command` 와 같은 규칙), persistence(채널별 localStorage·호스트/방문 기록·옛 키 정리)
@@ -68,6 +69,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - **FREEZE**(단축키 F 는 **걸기만**, 해제는 버튼 클릭으로만 — 가사 수정 중 실수로 풀리는 것 방지): `LiveState.frozen` = 걸 때의 송출 위치 + **텍스트 스냅샷**. 컨트롤러 이동/BLANK 는 그대로 동작하지만 출력·뷰어·PGM 모니터는 `nav.onAir(state)`(freeze 중이면 스냅샷)를 그린다. 해제하면 컨트롤러의 현재 위치가 바로 송출. 목적: 예배 중 오타 발견 시 송출은 유지한 채 가사 수정. 송출을 그리는 곳은 `currentText(state)` 대신 반드시 `onAir()` 를 쓸 것. 컨트롤러가 freeze 중 가리키는 위치는 SlideGrid 에서 파란 점선(`.ctl`).
 - 즉시 모드: 카드 클릭 = 송출, 그리드엔 송출 중만 표시. PVW 모드: 클릭 = 미리보기, Enter/TAKE = 송출.
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.
+- **저장된 출력 설정(프리셋)** = `src/live/stylePresets.ts`, localStorage `biew.stylePresets.v1` 하나(채널 무관). **서버에 절대 올리지 않는다**(사용자 결정). 옮기기·백업은 JSON 파일 내보내기/가져오기. 불러오기는 `setStyle` 한 번(송출에 즉시 반영). OutputStyle 필드를 바꾸면 `shared/outputStyle.ts` 의 `normalizeStyle` 도 같이.
 - **PWA**: 앱 파일 전체 precache, 새 버전은 **알림 후 적용**(자동 교체 금지 — 예배 중 화면이 바뀌면 안 됨). 알림은 /output 에 절대 띄우지 않는다. Supabase 요청은 캐시하지 않는다.
 - **로컬 송출 `/local`** = 채널 없는 PC 전용 송출(`LOCAL_CODE`). 예배의 기본. 서버 기능을 여기에 섞지 말 것. 콘티는 그날 하루 임시 — 송출 방식 간 콘티 가져오기·보관 기능은 만들지 않기로 함.
 - **곡 저장 규칙**: 온라인+로그인이면 서버에 바로, 아니면 PC(pending). 이미 pending 이 있는 곡은 온라인이어도 PC 에 이어서 저장(충돌 검사를 거쳐야 하므로). 서버에 올리기 전에 반드시 동기화 후 중복(새 곡)·충돌(수정, base.updated_at 비교) 검사. 삭제는 온라인만.

@@ -183,15 +183,19 @@ const build = __APP_BUILD__
     <!-- 공개 채널 -->
     <section v-if="supabase" class="card">
       <h2>공개 채널 <small>{{ pub.length }}</small></h2>
-      <p class="muted">보기 비밀번호가 있는 채널만 보입니다(최근 7일). 비밀번호가 없는 채널은 QR·링크·번호로 들어오세요.</p>
+      <p class="muted">보기 비밀번호가 있는 채널만 보입니다(최근 7일). 보기·컨트롤 모두 들어갈 때 비밀번호가 필요합니다. 비밀번호가 없는 채널은 QR·링크·번호로 들어오세요.</p>
       <p v-if="pubErr" class="err">{{ pubErr }}</p>
       <p v-else-if="pub.length && !fPub.length" class="muted">검색 결과 없음</p>
+      <!-- 공개 채널은 보기·컨트롤 비밀번호가 모두 있다(컨트롤은 생성 시 필수) → 입장 버튼 2개. 비밀번호 검사는 서버(join_view/join_control) -->
       <ul v-else-if="fPub.length" class="list">
-        <li v-for="c in fPub" :key="c.code" @click="router.push(`/view/${c.code}`)">
+        <li v-for="c in fPub" :key="c.code" class="pub-item">
           <span class="t">{{ c.title }}</span>
-          <span class="badge" title="들어갈 때 보기 비밀번호가 필요합니다">🔒 비밀번호</span>
-          <span />
+          <span class="badge" title="들어갈 때 비밀번호가 필요합니다">🔒 비밀번호</span>
           <span class="d">{{ fmt(c.updated_at) }} 사용</span>
+          <div class="row pub-go">
+            <button @click="router.push(`/view/${c.code}`)">보기로 입장</button>
+            <button @click="router.push(`/control/${c.code}`)">컨트롤로 입장</button>
+          </div>
         </li>
       </ul>
     </section>
@@ -283,6 +287,10 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
   padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
 }
 .list li:hover { border-color: #4a4a56; }
+/* 공개 채널: 줄 클릭 대신 입장 버튼 2개 */
+.list li.pub-item { grid-template-columns: 1fr auto; grid-template-areas: 't x' 'd d' 'g g'; cursor: default; }
+.pub-go { grid-area: g; margin-top: 6px; }
+.pub-go button { padding: 8px; }
 .t { grid-area: t; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c { grid-area: c; font: 12px ui-monospace, monospace; color: var(--muted); letter-spacing: 2px; }
 .d { grid-area: d; font-size: 11px; color: var(--muted); }

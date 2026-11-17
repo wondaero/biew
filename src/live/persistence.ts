@@ -1,6 +1,5 @@
 import type { LiveState } from '@shared/types'
-import { DEFAULT_STYLE } from '@shared/types'
-import { toBackdrop } from '@shared/backdrop'
+import { normalizeStyle } from '@shared/outputStyle'
 
 /** 오프라인 모드(/local)의 '채널' 이름. 실제 채널 번호(6자, A-Z2-9)와 겹치지 않는다 */
 export const LOCAL_CODE = 'LOCAL'
@@ -35,18 +34,9 @@ export function loadLive(code: string): LiveState | null {
 
 /** 저장본·받은 상태를 현재 형식으로 맞춘다(새 필드 추가·예전 값 이전) */
 export function normalizeLive(s: LiveState): LiveState {
-  const raw = (s.style ?? {}) as Partial<LiveState['style']>
-  // 잘못 잡았던 임시 기본값(위 60)은 leftMargin 이 생기기 전 버전에서만 저장됐다.
-  // 그 경우만 바로잡는다 — 사용자가 일부러 60(슬라이더 최대값)으로 둔 설정까지 매번 5로 되돌리면 안 되므로.
-  const legacyTop60 = raw.topMargin === 60 && raw.leftMargin === undefined
-  s.style = { ...DEFAULT_STYLE, ...s.style } // 새 스타일 필드 추가 대비
+  // 새 필드 추가·예전 값 이전(bottom·임시 위 60·background)·잘못된 값은 shared/outputStyle 한 곳에서
+  s.style = normalizeStyle(s.style)
   s.frozen ??= null
-  // 예전 값 'bottom'(하단 기준) → 상단 기준으로 이전
-  if ((s.style.position as string) === 'bottom') s.style.position = 'top'
-  if (legacyTop60) s.style.topMargin = DEFAULT_STYLE.topMargin
-  // 배경: 예전 background('black'|'green') → backdrop(단색), 잘못된 값은 검정
-  s.style.backdrop = toBackdrop(raw.backdrop, (raw as { background?: unknown }).background)
-  delete (s.style as { background?: unknown }).background
   return s
 }
 

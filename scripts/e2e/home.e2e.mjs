@@ -1,4 +1,4 @@
-// 홈 E2E(폰 화면): 공개 채널 목록(보기 비밀번호 있는 것만) · 제목 검색(대소문자·띄어쓰기 무시) · 이 기기의 채널(역할)
+// 홈 E2E(폰 화면): 공개 채널 목록(보기 비밀번호 있는 것만, 입장 버튼 보기·컨트롤) · 제목 검색(대소문자·띄어쓰기 무시) · 이 기기의 채널(역할)
 import puppeteer from 'puppeteer-core'
 import { randomBytes } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
@@ -40,8 +40,19 @@ try {
   await typeSearch('')
 
   // 공개 목록에서 A → 보기 비밀번호
-  await p.$$eval('section.card li', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.click(), `Lorem 주일 2부 ${tag}`)
-  check('공개 채널 누름 → 보기 비밀번호 화면', !!(await p.waitForSelector('input[type=password]', { timeout: 8000 }).catch(() => null)))
+  const pubBtn = (label) => p.$$eval('section.card li.pub-item', (lis, [t, label]) => {
+    const li = lis.find((x) => x.textContent?.includes(t))
+    const b = [...(li?.querySelectorAll('button') ?? [])].find((x) => x.textContent?.trim() === label)
+    b?.click(); return !!b
+  }, [`Lorem 주일 2부 ${tag}`, label])
+  check('공개 채널: 입장 버튼 2개(보기·컨트롤)', await p.$$eval('section.card li.pub-item', (lis, t) => {
+    const li = lis.find((x) => x.textContent?.includes(t)); return [...(li?.querySelectorAll('button') ?? [])].map((b) => b.textContent?.trim()).join('|')
+  }, `Lorem 주일 2부 ${tag}`) === '보기로 입장|컨트롤로 입장')
+  check('공개 채널 "컨트롤로 입장" → 컨트롤 비밀번호 화면', (await pubBtn('컨트롤로 입장')) && !!(await p.waitForSelector('input[placeholder="컨트롤 비밀번호"]', { timeout: 8000 }).catch(() => null)))
+  await p.goto(BASE + '/', { waitUntil: 'networkidle0' })
+  await until(async () => (await sectionText('공개 채널')).includes(`Lorem 주일 2부 ${tag}`))
+  await pubBtn('보기로 입장')
+  check('공개 채널 "보기로 입장" → 보기 비밀번호 화면', !!(await p.waitForSelector('input[type=password]', { timeout: 8000 }).catch(() => null)))
   await p.type('input[type=password]', 'viewpw1')
   await p.keyboard.press('Enter')
   check('비밀번호 입력 → 보기 화면', await until(async () => (await p.$eval('body', (b) => b.textContent ?? '')).includes('송출 대기 중')))

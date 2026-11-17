@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { DEFAULT_STYLE, type OutputStyle } from '@shared/types'
 import { useLive } from '@/live/liveStore'
 import { KEY_BLACK, KEY_GREEN, keyable, backdropCss, type Backdrop, type BgDirection } from '@shared/backdrop'
+import { normalizeStyle, sameStyle } from '@shared/outputStyle'
+import { presets, savePreset, deletePreset, findByName, exportJson, importJson, NAME_MAX, type StylePreset } from '@/live/stylePresets'
 
 const live = useLive()
 const st = computed(() => live.state.style)
@@ -47,11 +49,78 @@ const DIRS: { v: BgDirection; label: string; title: string }[] = [
   { v: 'to bottom right', label: '↘', title: '왼쪽 위 → 오른쪽 아래' },
   { v: 'to bottom left', label: '↙', title: '오른쪽 위 → 왼쪽 아래' },
 ]
+
+// ── 저장된 설정(이 PC 에만 — src/live/stylePresets.ts) ──
+const presetName = ref('')
+const presetMsg = ref<{ text: string; err?: boolean } | null>(null)
+const say = (text: string, err = false) => { presetMsg.value = { text, err } }
+const activeId = computed(() => presets.value.find((p) => sameStyle(p.style, st.value))?.id ?? null)
+function save() {
+  const name = presetName.value.trim()
+  if (findByName(name) && !confirm(`"${name}" 을(를) 지금 설정으로 덮어쓸까요?`)) return
+  const err = savePreset(name, st.value)
+  if (err) return say(err, true)
+  presetName.value = ''
+  say(`"${name}" 저장됨 (이 PC)`)
+}
+/** 불러오기 = 한 번의 변경으로 전체 교체 → 송출 화면도 한 번에 바뀐다 */
+function apply(p: StylePreset) {
+  live.setStyle(normalizeStyle(p.style))
+  say(`"${p.name}" 적용됨`)
+}
+function remove(p: StylePreset) {
+  if (!confirm(`저장된 설정 "${p.name}" 을(를) 지울까요?`)) return
+  deletePreset(p.id)
+  presetMsg.value = null
+}
+function exportFile() {
+  const blob = new Blob([exportJson()], { type: 'application/json' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `biew-출력설정-${new Date().toISOString().slice(0, 10)}.json`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+}
+async function importFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  input.value = ''
+  if (!f) return
+  if (f.size > 1_000_000) return say('파일이 너무 큽니다', true)
+  const r = importJson(await f.text())
+  if (r.error) return say(r.error, true)
+  say(`가져옴: 새로 ${r.added}개 · 같은 이름 바꿈 ${r.replaced}개`)
+}
 </script>
 
 <template>
   <section class="style">
     <h2>출력 설정</h2>
+
+    <!-- 저장된 설정: 이 PC 에만(서버로 안 보냄) -->
+    <div class="presets full">
+      <div class="p-head"><span>저장된 설정</span><small>이 PC 에만 저장</small></div>
+      <ul v-if="presets.length" class="p-list">
+        <li v-for="p in presets" :key="p.id" :class="{ on: p.id === activeId }">
+          <button class="p-apply" :title="`'${p.name}' 불러오기 — 송출 화면에 바로 적용됩니다`" @click="apply(p)">
+            <span class="p-swatch" :style="{ background: backdropCss(p.style.backdrop), color: p.style.color }">가</span>
+            <span class="p-name">{{ p.name }}</span>
+            <span v-if="p.id === activeId" class="p-cur">적용 중</span>
+          </button>
+          <button class="p-del" title="지우기" @click="remove(p)">✕</button>
+        </li>
+      </ul>
+      <p v-else class="muted">아직 없음 — 지금 설정에 이름을 붙여 저장해 두면 한 번에 불러올 수 있습니다.</p>
+      <form class="p-save" @submit.prevent="save">
+        <input v-model="presetName" :maxlength="NAME_MAX" placeholder="이름 (예: 본당 프로젝터)" />
+        <button :disabled="!presetName.trim()">현재 설정 저장</button>
+      </form>
+      <div class="p-file">
+        <button type="button" :disabled="!presets.length" title="다른 PC 로 옮기거나 백업할 때" @click="exportFile">파일로 내보내기</button>
+        <label class="p-import">파일에서 가져오기<input type="file" accept="application/json,.json" @change="importFile" /></label>
+      </div>
+      <p v-if="presetMsg" class="p-msg" :class="{ err: presetMsg.err }">{{ presetMsg.text }}</p>
+    </div>
 
     <label>폰트
       <select :value="isPreset ? st.fontFamily : '__custom'" @change="str($event) !== '__custom' && set('fontFamily', str($event))">
@@ -152,6 +221,27 @@ input[type='color'] { width: 100%; height: 28px; padding: 2px; }
 .grad button { padding: 4px 10px; }
 .swatch { height: 22px; border-radius: 4px; border: 1px solid var(--line); }
 .warn { margin: 0; font-size: 11px; color: var(--warn); }
+.presets { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.p-head { display: flex; align-items: baseline; justify-content: space-between; color: var(--muted); }
+.p-head small { font-size: 11px; }
+.p-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 180px; overflow-y: auto; }
+.p-list li { display: flex; gap: 4px; }
+.p-apply { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 8px; text-align: left; font-size: 12px; }
+.p-list li.on .p-apply { border-color: var(--accent); }
+.p-swatch { flex: none; width: 22px; height: 16px; border-radius: 3px; border: 1px solid var(--line); font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.p-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-cur { flex: none; font-size: 10px; color: var(--accent); }
+.p-del { flex: none; padding: 0 8px; color: var(--muted); }
+.p-save { display: flex; gap: 4px; }
+.p-save input { flex: 1; min-width: 0; }
+.p-save button, .p-file button, .p-import { font-size: 12px; padding: 4px 8px; white-space: nowrap; }
+.p-file { display: flex; gap: 4px; }
+.p-file > * { flex: 1; text-align: center; }
+.p-import { display: block; cursor: pointer; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); }
+.p-import input { display: none; }
+.p-msg { margin: 0; font-size: 11px; color: var(--muted); }
+.p-msg.err { color: var(--pgm); }
+.muted { margin: 0; font-size: 11px; color: var(--muted); }
 /* 좁은 화면: 한 줄에 하나씩 (2열이면 "줄 간격" 같은 라벨이 세로로 깨짐) */
 @media (max-width: 768px) {
   .style { grid-template-columns: minmax(0, 1fr); font-size: 13px; }
