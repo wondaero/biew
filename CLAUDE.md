@@ -89,7 +89,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 새 컴퓨터에서 이어서 할 때는 PROGRESS.md "새 컴퓨터에서 이어서 작업하기" 순서대로(.env → link → 확인 명령).
 - 배포 확인: 홈 하단 "버전 (빌드 시각) · (커밋)". 브라우저는 앱 파일을 저장(PWA)해서 새로고침만으론 새 버전이 안 열린다 — "새 버전 있음 — 적용" 또는 모든 Biew 탭을 닫고 다시 열기.
 - 변경 후 `npm run typecheck && npm test && npm run build` 통과 확인.
-- UI 확인은 headless Chrome(puppeteer-core, 스크래치 디렉터리에 설치)으로 Lorem 콘티를 localStorage `biew.live.v1` 에 심어서. 로그인 필요 기능은 service_role 로 임시 스태프 계정 생성 → 테스트 → 계정 삭제.
+- UI 확인은 브라우저 E2E(`scripts/e2e/`, `npm run e2e` 또는 `e2e:<이름>`). 새 확인이 필요하면 같은 방식으로 스크립트를 추가: Lorem 콘티를 localStorage `biew.live.v1:<코드>`(로컬은 `:LOCAL`)에 심고, 로그인 필요 기능은 service_role 로 임시 스태프 계정 생성 → 테스트 → 삭제. 공용 도우미 `scripts/e2e/_lib.mjs`(경로·Chrome·서버 자동).
 - 커밋 메시지는 영어, 본문에 이유. main 에 push 하면 Vercel 자동 배포.
 - 사용자는 한국어로 소통. 실무 권장 방식과 이유를 함께 설명하고 더 나은 구조가 있으면 먼저 제안.
 

@@ -15,7 +15,16 @@
     "import": "tsx scripts/import.ts",
     "fixture": "tsx scripts/make-fixture.ts",
     "staff": "tsx scripts/create-staff.ts",
-    "verify:channels": "tsx scripts/verify-channels.ts"
+    "verify:channels": "tsx scripts/verify-channels.ts",
+    "e2e": "node scripts/e2e/run-all.mjs",
+    "e2e:internet": "node scripts/e2e/internet.e2e.mjs",
+    "e2e:local": "node scripts/e2e/local.e2e.mjs",
+    "e2e:home": "node scripts/e2e/home.e2e.mjs",
+    "e2e:bg": "node scripts/e2e/bg.e2e.mjs",
+    "e2e:ime": "node scripts/e2e/ime.e2e.mjs",
+    "e2e:offline": "npm run build && node scripts/e2e/offline.e2e.mjs",
+    "e2e:upgrade": "npm run build && node scripts/e2e/upgrade.e2e.mjs",
+    "e2e:latency": "node scripts/e2e/latency.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
@@ -30,6 +39,7 @@
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.11",
     "iconv-lite": "^0.7.3",
+    "puppeteer-core": "^23.11.1",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vite": "^8.3.8",
