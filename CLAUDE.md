@@ -92,7 +92,8 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 
 ## 함정
 - **Vue scoped 스타일은 자식 컴포넌트의 최상위 요소에도 걸린다.** 부모에 `.backdrop { display:none }` 같은 범용 이름을 두면 같은 이름의 자식 대화창이 통째로 숨는다(겪음 — 인터넷 송출 전환 창). 부모 쪽은 접두사(`sheet-`)를 붙일 것.
-- 가려진(백그라운드) 탭은 브라우저가 타이머를 늦춘다 → 주기 확인(호스트 30초 주소 확인 등)이 늦어질 수 있음. E2E 에서 해당 탭을 `bringToFront()` 할 것.
+- 가려진(백그라운드) 탭은 브라우저가 타이머를 늦춘다 → 주기 확인(호스트 10초 주소 확인 등)이 늦어질 수 있음. E2E 에서 해당 탭을 `bringToFront()` 할 것.
+- 송출 배경은 `style.backdrop`(shared/backdrop.ts). 예전 `style.background` 는 normalizeLive 가 이전하고 지운다. ATEM 키잉은 검정·초록 단색만 가능.
 - 서비스 워커는 **배포용 빌드에서만** 동작(dev 서버는 꺼져 있음). 오프라인 확인은 `npm run build` 후 `vite preview` 로, 서버를 실제로 꺼서.
 - puppeteer: 다른 탭을 연 뒤 뒤로 간 탭은 렌더링이 멈춰 `locator().click()` 이 무한 대기 → `bringToFront()` 후 `page.click()`.
 - 테스트로 만든 곡은 **완전 삭제 말고 `deleted_at` 으로** 정리(완전 삭제하면 그 사이 곡을 받은 기기가 삭제를 모른다).

@@ -3,6 +3,7 @@
 import { computed } from 'vue'
 import type { OutputStyle } from '@shared/types'
 import FitText from './FitText.vue'
+import { backdropCss, toBackdrop } from '@shared/backdrop'
 
 const props = withDefaults(
   defineProps<{ text: string | null; blank?: boolean; styleCfg: OutputStyle; layerKey?: string | number; animate?: boolean }>(),
@@ -10,7 +11,8 @@ const props = withDefaults(
 )
 
 const shown = computed(() => (props.blank ? null : props.text))
-const bg = computed(() => (props.styleCfg.background === 'green' ? '#00b140' : '#000'))
+// 예전 형식(background: 'black'|'green')이 섞여 들어와도 안전하게
+const bg = computed(() => backdropCss(toBackdrop(props.styleCfg.backdrop, (props.styleCfg as { background?: unknown }).background)))
 const useFade = computed(() => props.animate && props.styleCfg.transition === 'fade')
 const key = computed(() => (shown.value == null ? 'blank' : `${props.layerKey}`))
 </script>

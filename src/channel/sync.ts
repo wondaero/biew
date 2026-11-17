@@ -39,7 +39,7 @@ let adopt: ((s: unknown) => void) | null = null
 let retryTimer: number | undefined
 let checkTimer: number | undefined
 let fetchTimer: number | undefined
-/** 지금 연결된 실시간 주소. 다른 기기에서 '리모컨 쫓아내기'·'보기 비밀번호 변경'을 하면 바뀐다 → 다시 연결 */
+/** 지금 연결된 실시간 주소(10초마다 확인). 다른 기기에서 '리모컨 쫓아내기'·'보기 비밀번호 변경'을 하면 바뀐다 → 다시 연결 */
 let curCtl: string | null = null
 let curView: string | null = null
 let gen = 0
@@ -176,8 +176,9 @@ export function startHostSync(code: string, opts: { getState: () => LiveState; a
   retryTimer = window.setInterval(() => {
     if (hostCode && hostLink.value === 'error' && !hostNeedsLogin.value) void connectHost()
   }, 15000)
-  // 30초마다 서버 확인: 바뀐 주소·놓친 리모컨 변경을 따라잡는다
-  checkTimer = window.setInterval(() => { if (hostCode && hostLink.value === 'live') scheduleFetch(0) }, 30000)
+  // 10초마다 서버 확인: 다른 기기에서 바꾼 주소(리모컨 쫓아내기·보기 비밀번호)와 놓친 리모컨 변경을 따라잡는다.
+  // 30초였을 때 타이밍에 따라 따라오기까지 21~42초로 들쭉날쭉했다 → 10초. 가벼운 조회 1회라 부담 없음
+  checkTimer = window.setInterval(() => { if (hostCode && hostLink.value === 'live') scheduleFetch(0) }, 10000)
   void connectHost()
 }
 

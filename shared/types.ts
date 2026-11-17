@@ -1,3 +1,5 @@
+import { DEFAULT_BACKDROP, type Backdrop } from './backdrop'
+
 export interface Song {
   id: string
   title: string
@@ -18,7 +20,6 @@ export interface SetlistItem {
 
 /** top = 첫 줄 위치를 고정하고 줄이 늘면 아래로 자람 / center = 세로 가운데 */
 export type TextPosition = 'top' | 'center'
-export type Background = 'black' | 'green'
 export type TransitionKind = 'cut' | 'fade'
 
 export interface OutputStyle {
@@ -35,7 +36,8 @@ export interface OutputStyle {
   /** 여백은 위·왼쪽만 쓴다(오른쪽·아래는 화면 끝까지). 글은 (leftMargin, topMargin) 에서 시작 */
   topMargin: number // cqh — position=top 일 때
   leftMargin: number // cqw
-  background: Background
+  /** 배경: 단색·2색 그라데이션(나중에 이미지 추가 가능) — shared/backdrop.ts. 예전 background: 'black'|'green' 은 불러올 때 이전 */
+  backdrop: Backdrop
   transition: TransitionKind
   fadeMs: number
 }
@@ -77,7 +79,7 @@ export const DEFAULT_STYLE: OutputStyle = {
   position: 'top',
   topMargin: 5,
   leftMargin: 5,
-  background: 'black',
+  backdrop: { ...DEFAULT_BACKDROP },
   transition: 'fade',
   fadeMs: 250,
 }

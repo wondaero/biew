@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { DEFAULT_STYLE, type OutputStyle } from '@shared/types'
 import { useLive } from '@/live/liveStore'
+import { KEY_BLACK, KEY_GREEN, keyable, backdropCss, type Backdrop, type BgDirection } from '@shared/backdrop'
 
 const live = useLive()
 const st = computed(() => live.state.style)
@@ -19,6 +20,33 @@ const FONTS: { label: string; value: string }[] = [
   { label: 'Noto Sans KR', value: '"Noto Sans KR", sans-serif' },
 ]
 const isPreset = computed(() => FONTS.some((f) => f.value === st.value.fontFamily))
+
+// ── 배경: 키잉용(검정·초록) · 단색 · 2색 그라데이션 ──
+const bd = computed(() => st.value.backdrop)
+const keyMode = computed(() => keyable(bd.value))
+const solidColor = computed(() => (bd.value.kind === 'solid' ? bd.value.color : null))
+const grad = computed(() => (bd.value.kind === 'gradient' ? bd.value : null))
+const setBd = (b: Backdrop) => set('backdrop', b)
+const solid = (color: string) => setBd({ kind: 'solid', color })
+/** 단색으로: 그라데이션이었으면 시작 색, 키잉용 색이었으면 무난한 남색에서 시작 */
+const toSolid = () => solid(grad.value ? grad.value.from : keyMode.value ? '#1e3a5f' : (solidColor.value ?? '#1e3a5f'))
+/** 그라데이션으로: 지금 색 → 검정, 위→아래에서 시작 */
+const toGradient = () => {
+  if (grad.value) return
+  const from = keyMode.value ? '#1e3a5f' : (solidColor.value ?? '#1e3a5f')
+  setBd({ kind: 'gradient', from, to: '#000000', direction: 'to bottom' })
+}
+const setGrad = (patch: Partial<{ from: string; to: string; direction: BgDirection }>) => {
+  if (grad.value) setBd({ ...grad.value, ...patch })
+}
+/** 두 색 바꾸기 — ↑ ← ↖ ↗ 방향도 이걸로 */
+const swap = () => { if (grad.value) setBd({ ...grad.value, from: grad.value.to, to: grad.value.from }) }
+const DIRS: { v: BgDirection; label: string; title: string }[] = [
+  { v: 'to bottom', label: '↓', title: '위 → 아래' },
+  { v: 'to right', label: '→', title: '왼쪽 → 오른쪽' },
+  { v: 'to bottom right', label: '↘', title: '왼쪽 위 → 오른쪽 아래' },
+  { v: 'to bottom left', label: '↙', title: '오른쪽 위 → 왼쪽 아래' },
+]
 </script>
 
 <template>
@@ -66,10 +94,31 @@ const isPreset = computed(() => FONTS.some((f) => f.value === st.value.fontFamil
       <input type="range" min="0" max="40" step="1" :value="st.leftMargin" @input="set('leftMargin', num($event))" />
     </label>
 
-    <div class="seg full">
-      <span>배경</span>
-      <button :class="{ on: st.background === 'black' }" @click="set('background', 'black')">검정 (루마키)</button>
-      <button :class="{ on: st.background === 'green' }" @click="set('background', 'green')">초록 (크로마키)</button>
+    <div class="bg full">
+      <div class="seg">
+        <span>배경</span>
+        <button :class="{ on: keyMode === 'luma' }" title="ATEM 루마키용" @click="solid(KEY_BLACK)">검정 (루마키)</button>
+        <button :class="{ on: keyMode === 'chroma' }" title="ATEM 크로마키용" @click="solid(KEY_GREEN)">초록 (크로마키)</button>
+      </div>
+      <div class="seg">
+        <span />
+        <button :class="{ on: !!solidColor && !keyMode }" @click="toSolid">단색</button>
+        <button :class="{ on: !!grad }" @click="toGradient">그라데이션</button>
+      </div>
+      <label v-if="solidColor && !keyMode">색 <input type="color" :value="solidColor" @input="solid(str($event))" /></label>
+      <template v-if="grad">
+        <div class="grad">
+          <input type="color" :value="grad.from" title="시작 색" @input="setGrad({ from: str($event) })" />
+          <button title="두 색 바꾸기(방향 반대로)" @click="swap">⇄</button>
+          <input type="color" :value="grad.to" title="끝 색" @input="setGrad({ to: str($event) })" />
+        </div>
+        <div class="seg">
+          <span>방향</span>
+          <button v-for="d in DIRS" :key="d.v" :class="{ on: grad.direction === d.v }" :title="d.title" @click="setGrad({ direction: d.v })">{{ d.label }}</button>
+        </div>
+      </template>
+      <div class="swatch" :style="{ background: backdropCss(bd) }" />
+      <p v-if="!keyMode" class="warn">이 배경은 ATEM 키잉(루마·크로마)에 쓸 수 없습니다. 프로젝터·TV 에 그대로 띄울 때만 쓰세요.</p>
     </div>
     <div class="seg full">
       <span>전환</span>
@@ -98,6 +147,11 @@ input[type='color'] { width: 100%; height: 28px; padding: 2px; }
 .seg button { flex: 1; padding: 4px; font-size: 12px; }
 .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .reset { font-size: 12px; }
+.bg { display: grid; gap: 6px; }
+.grad { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
+.grad button { padding: 4px 10px; }
+.swatch { height: 22px; border-radius: 4px; border: 1px solid var(--line); }
+.warn { margin: 0; font-size: 11px; color: var(--warn); }
 /* 좁은 화면: 한 줄에 하나씩 (2열이면 "줄 간격" 같은 라벨이 세로로 깨짐) */
 @media (max-width: 768px) {
   .style { grid-template-columns: minmax(0, 1fr); font-size: 13px; }

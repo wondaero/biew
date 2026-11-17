@@ -1,5 +1,6 @@
 import type { LiveState } from '@shared/types'
 import { DEFAULT_STYLE } from '@shared/types'
+import { toBackdrop } from '@shared/backdrop'
 
 /** 오프라인 모드(/local)의 '채널' 이름. 실제 채널 번호(6자, A-Z2-9)와 겹치지 않는다 */
 export const LOCAL_CODE = 'LOCAL'
@@ -43,6 +44,9 @@ export function normalizeLive(s: LiveState): LiveState {
   // 예전 값 'bottom'(하단 기준) → 상단 기준으로 이전
   if ((s.style.position as string) === 'bottom') s.style.position = 'top'
   if (legacyTop60) s.style.topMargin = DEFAULT_STYLE.topMargin
+  // 배경: 예전 background('black'|'green') → backdrop(단색), 잘못된 값은 검정
+  s.style.backdrop = toBackdrop(raw.backdrop, (raw as { background?: unknown }).background)
+  delete (s.style as { background?: unknown }).background
   return s
 }
 
