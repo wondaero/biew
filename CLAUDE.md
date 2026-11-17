@@ -37,7 +37,7 @@ shared/            브라우저·Node 공용 순수 TS
   songCompare.ts   곡 중복 판정(가사 === / 제목 ===, 보이지 않는 차이만 통일)
 scripts/           import.ts, create-staff.ts, make-fixture.ts
 src/sync/          SyncTransport 인터페이스, BroadcastChannelTransport, SupabaseRealtimeTransport, SyncHub(version 필터)
-src/live/          liveStore(채널 하나를 연 동안의 상태 소유, commit 단일 경로. host/remote 역할), nav(이동·onAir), commands(리모컨 명령 검사), persistence(채널별 localStorage)
+src/live/          liveStore(채널 하나를 연 동안의 상태 소유, commit 단일 경로. host/remote 역할), nav(이동·onAir — 서버 `_apply_command` 와 같은 규칙), persistence(채널별 localStorage·호스트/방문 기록·옛 키 정리)
 src/channel/       api(채널 RPC·기기 토큰 저장), sync(호스트/리모컨 Realtime 연결)
 src/home/          채널 만들기·목록·번호 입력(`/`)
 src/library/       IndexedDB 캐시(songs·pending), updated_at 델타 동기화, 검색, saveSong(오프라인이면 PC 에 저장)/deleteSong(온라인만), 서버에 올리기(pending.ts 분류)
@@ -46,7 +46,7 @@ src/control/       ControlGate(호스트/리모컨 분기·비밀번호 입력),
 src/pwa.ts         서비스 워커 등록·새 버전 알림(UpdateBanner)·영구 저장 요청
 src/output/        출력 화면(보기 전용, Wake Lock, 복구)
 src/viewer/        폰 뷰어(로그인 불필요)
-supabase/migrations/  songs, rooms(구), channels
+supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channels·cleanup). rooms(옛 폰 공유)는 삭제됨
 ```
 
 ## 핵심 설계 (바꾸기 전에 이유 확인)

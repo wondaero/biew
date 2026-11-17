@@ -11,7 +11,6 @@ export class SupabaseRealtimeTransport implements SyncTransport {
   readonly name = 'supabase-realtime'
   private ch: RealtimeChannel
   private handlers = new Set<(m: SyncMessage) => void>()
-  readonly ready: Promise<void>
 
   constructor(
     private sb: SupabaseClient,
@@ -24,12 +23,7 @@ export class SupabaseRealtimeTransport implements SyncTransport {
         for (const h of this.handlers) h(payload as SyncMessage)
       })
     }
-    this.ready = new Promise((resolve) => {
-      this.ch.subscribe((status) => {
-        opts.onStatus?.(status)
-        if (status === 'SUBSCRIBED') resolve()
-      })
-    })
+    this.ch.subscribe((status) => opts.onStatus?.(status))
   }
 
   send(msg: SyncMessage): void {

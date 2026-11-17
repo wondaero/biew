@@ -10,10 +10,3 @@ export function uid(): string {
   const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
-
-/** 방코드: 헷갈리는 글자(0,O,1,I,L) 제외 6자리 */
-const ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-export function roomCode(): string {
-  const b = crypto.getRandomValues(new Uint8Array(6))
-  return [...b].map((x) => ALPHA[x % ALPHA.length]).join('')
-}

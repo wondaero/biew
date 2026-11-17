@@ -144,7 +144,6 @@ const actions = {
   },
   /** FREEZE 풀기: 컨트롤러의 현재 위치가 바로 송출된다. 실수 방지로 단축키 없이 버튼으로만 */
   unfreeze: () => { if (state.frozen) commit((s) => { s.frozen = null }) },
-  setPreview: (c: Cursor | null) => { preview.value = c },
   /** 카드 클릭: 즉시 모드면 바로 송출, PVW 모드면 미리보기 지정 */
   pick: (c: Cursor) => (pvwMode.value ? (preview.value = c) : actions.go(c)),
 }

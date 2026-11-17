@@ -8,6 +8,18 @@ export const LOCAL_CODE = 'LOCAL'
 const KEY = 'biew.live.v1'
 const keyOf = (code: string) => `${KEY}:${code}`
 
+/**
+ * 예전 버전이 남긴 브라우저 저장값 정리(시작할 때 한 번, 여러 번 돌아도 무해).
+ *  - biew.live.v1 (채널 번호 없는 옛 단일 콘티) · biew.room.v1 (옛 폰 공유 코드) · biew.hosted.* (옛 호스트 표시)
+ */
+export function cleanupLegacyStorage() {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k === KEY || k === 'biew.room.v1' || k.startsWith('biew.hosted.')) localStorage.removeItem(k)
+    }
+  } catch { /* private mode */ }
+}
+
 export function loadLive(code: string): LiveState | null {
   try {
     const raw = localStorage.getItem(keyOf(code))

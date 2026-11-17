@@ -28,5 +28,3 @@ export function findDuplicates<T extends SongLike>(candidate: SongLike, pool: T[
   }
   return { sameLyrics, sameTitle }
 }
-
-export const hasDuplicates = (d: Duplicates<unknown>) => d.sameLyrics.length > 0 || d.sameTitle.length > 0

@@ -9,7 +9,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { randomBytes } from 'node:crypto'
 import * as nav from '../src/live/nav'
-import { parseCommand } from '../src/live/commands'
 import { emptyLiveState, type LiveState, type SetlistItem } from '../shared/types'
 
 process.loadEnvFile()
@@ -78,10 +77,10 @@ try {
   check('비로그인은 channels 를 수정할 수 없음', !guestUpd.error ? (guestUpd.data ?? []).length === 0 : true)
 
   // ── 호스트 topic ──
-  const tp = first<{ control_topic: string; view_topic: string }>((await rpc(owner, 'channel_topics', { p_code: code })).data)
-  check('소유자는 topic 을 받음', !!tp?.control_topic && !!tp?.view_topic && tp.control_topic !== tp.view_topic)
-  const tpGuest = first((await rpc(guest, 'channel_topics', { p_code: code })).data)
-  check('비로그인은 topic 을 못 받음', !tpGuest)
+  const tp = first<{ control_topic: string; view_topic: string }>((await rpc(owner, 'issue_host_token', { p_code: code })).data)
+  check('소유자는 호스트 주소(topic)를 받음', !!tp?.control_topic && !!tp?.view_topic && tp.control_topic !== tp.view_topic)
+  check('비로그인은 호스트 주소를 못 받음', !!(await rpc(guest, 'issue_host_token', { p_code: code })).error)
+  check('정리된 옛 DB 객체는 없음(rooms·get_room·channel_topics)', !!(await rpc(owner, 'get_room', { p_code: 'AAAAAA' })).error && !!(await rpc(owner, 'channel_topics', { p_code: code })).error && !!(await admin.from('rooms').select('code').limit(1)).error)
 
   // ── 컨트롤 입장 ──
   const g = async (args: Record<string, unknown>) => first<J>((await rpc(guest, 'join_control', { p_code: code, ...args })).data)
@@ -164,9 +163,13 @@ try {
   const rnd = (n: number) => { seedN = (seedN * 1103515245 + 12345) & 0x7fffffff; return seedN % n }
   const tsApply = (st: LiveState, cmd: Record<string, unknown>) => {
     if (cmd.cmd === 'blank') return { ...st, blank: !st.blank }
-    const c = parseCommand(cmd, st)
-    if (!c || c.cmd === 'blank') return null
-    const cur = c.cmd === 'go' ? { itemIndex: c.itemIndex, slideIndex: c.slideIndex } : nav[c.cmd](st)
+    let cur: { itemIndex: number; slideIndex: number } | null = null
+    if (cmd.cmd === 'go') {
+      const i = cmd.itemIndex as number, j = cmd.slideIndex as number
+      const ok = Number.isInteger(i) && Number.isInteger(j) && j >= 0 && j < (st.setlist[i]?.slides.length ?? 0)
+      cur = ok ? { itemIndex: i, slideIndex: j } : null
+    } else if (cmd.cmd === 'next' || cmd.cmd === 'prev' || cmd.cmd === 'nextSong' || cmd.cmd === 'prevSong') cur = nav[cmd.cmd](st)
+    else return null
     return cur ? { ...st, ...cur, blank: false } : null
   }
   let mismatch = ''
