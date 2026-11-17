@@ -5,6 +5,8 @@
  *  - 이 기기의 채널: 이 PC 가 호스트로 연 채널(로그인·인터넷 불필요, 예배 당일 여기서 바로 들어감)
  *  - 새 채널: 누를 때 로그인(로그인은 저장되지 않음)
  *  - 로그인 중이면 내 계정의 전체 채널(다른 PC 에서 만든 것 포함)도 보이고, 열면 이 PC 가 호스트로 등록된다
+ *  - 오프라인 모드(/local): 채널·서버 없이 이 PC 하나에서만 송출
+ *  - 곡 다운로드: 곡 전체를 PC 에 저장(그때 로그인). PC 에서 고친 곡은 '서버에 올리기'
  */
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -13,6 +15,8 @@ import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
 import { listHosts, saveHost, forgetChannelLocal } from '@/live/persistence'
 import LoginForm from '@/components/LoginForm.vue'
+import UploadDialog from '@/control/UploadDialog.vue'
+import { useLibrary, loadCache, syncNow, resetCache, syncStatus, syncError, lastSync } from '@/library/library'
 
 const router = useRouter()
 
@@ -35,7 +39,21 @@ async function loadServer() {
   listErr.value = r.error ?? null
 }
 watch(session, loadServer)
-onMounted(() => { document.title = 'Biew'; void loadServer() })
+onMounted(() => { document.title = 'Biew'; void loadServer(); void loadCache() })
+
+// 곡 다운로드(오프라인용). 로그인하면 library 가 자동으로 받는다(바뀐 곡만)
+const lib = useLibrary()
+const dlOpen = ref(false)
+const showUpload = ref(false)
+const dlText = computed(() => {
+  switch (syncStatus.value) {
+    case 'loading': return '저장된 곡 불러오는 중…'
+    case 'syncing': return '서버에서 받는 중…'
+    case 'offline': return '오프라인 — 저장된 곡 사용 중'
+    case 'error': return `받기 실패: ${syncError.value}`
+    default: return lastSync.value ? `마지막 다운로드 ${new Date(lastSync.value).toLocaleString('ko-KR')}` : '아직 받지 않음'
+  }
+})
 
 // 새 채널
 const creatingOpen = ref(false)
@@ -88,6 +106,31 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
         </li>
       </ul>
     </section>
+
+    <!-- 오프라인 모드 -->
+    <section class="card">
+      <h2>오프라인 모드</h2>
+      <p class="muted">채널 없이 이 PC 하나에서만 송출합니다(컨트롤러 + 출력 창). 인터넷·로그인 불필요 — 미리 곡을 다운로드해 두세요.</p>
+      <button @click="router.push('/local')">오프라인 모드 열기</button>
+    </section>
+
+    <!-- 곡 다운로드 -->
+    <section class="card">
+      <h2>곡 <small>{{ lib.count.value }}곡 저장됨</small></h2>
+      <p class="muted" :class="{ err: syncStatus === 'error' }">{{ dlText }}</p>
+      <template v-if="session">
+        <div class="row">
+          <button :disabled="syncStatus === 'syncing'" @click="syncNow()">바뀐 곡 받기</button>
+          <button :disabled="syncStatus === 'syncing'" @click="resetCache()">전체 다시 받기</button>
+        </div>
+      </template>
+      <template v-else>
+        <button v-if="!dlOpen" class="primary" @click="dlOpen = true">곡 다운로드</button>
+        <LoginForm v-else hint="곡은 저작권 데이터라 로그인해야 받을 수 있습니다. 받은 곡은 로그인·인터넷 없이 계속 쓸 수 있습니다." />
+      </template>
+      <button v-if="lib.pendingCount.value" class="upload" @click="showUpload = true">↑ PC 에서 고친 곡 서버에 올리기 {{ lib.pendingCount.value }}건</button>
+    </section>
+    <UploadDialog v-if="showUpload" @close="showUpload = false" />
 
     <!-- 새 채널 -->
     <section class="card">
@@ -174,4 +217,5 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .x { grid-area: x; padding: 0 6px; border: none; background: none; color: var(--muted); }
 .x:hover { color: var(--pgm); }
 .badge { grid-area: x; font-size: 11px; color: var(--muted); }
+.upload { padding: 8px; color: var(--warn); border-color: #5a4a1e; background: #3a3014; }
 </style>

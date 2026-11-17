@@ -2,18 +2,33 @@
 /**
  * 곡 추가/수정/삭제. 빈 줄 = 슬라이드 구분.
  * 오른쪽에 현재 출력 스타일 그대로 슬라이드 미리보기.
+ * 오프라인/로그인 없이 저장하면 PC 에 저장되고(나중에 '서버에 올리기'), 삭제는 온라인에서만.
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import type { Song } from '@shared/types'
 import { textToSlides, slidesToText, slideRanges, slideIndexAt } from '@shared/slidesText'
-import { saveSong, deleteSong } from '@/library/library'
+import { saveSong, deleteSong, useLibrary, isLocalNewId } from '@/library/library'
+import { findDuplicates } from '@shared/songCompare'
 import { useLive } from '@/live/liveStore'
 import SlideRender from '@/components/SlideRender.vue'
 
 const props = defineProps<{ song: Song | null }>() // null = 새 곡
-const emit = defineEmits<{ close: []; saved: [song: Song] }>()
+const emit = defineEmits<{ close: []; saved: [song: Song, local: boolean] }>()
 
 const live = useLive()
+const lib = useLibrary()
+/** 이 곡이 PC 에만 있는 변경인지(아직 서버에 안 올라감) */
+const localKind = computed(() => (props.song ? lib.localKind.value.get(props.song.id) : undefined))
+
+/** 새 곡이 이미 있는 곡과 겹치는지(시스템 비교 ===). 겹치면 안내 문구, 아니면 null */
+function duplicateWarning(): string | null {
+  const d = findDuplicates({ title: title.value, slides: slides.value }, lib.songs.value)
+  const names = (list: Song[]) => list.slice(0, 3).map((s) => `"${s.title}"`).join(', ')
+  const lines: string[] = []
+  if (d.sameLyrics.length) lines.push(`가사가 같은 곡: ${names(d.sameLyrics)}`)
+  if (d.sameTitle.length) lines.push(`제목이 같은 곡: ${names(d.sameTitle)}`)
+  return lines.length ? lines.join('\n') : null
+}
 const title = ref(props.song?.title ?? '')
 const text = ref(props.song ? slidesToText(props.song.slides) : '')
 const initial = { title: title.value, text: text.value }
@@ -53,8 +68,10 @@ async function save() {
   busy.value = true
   err.value = null
   try {
-    const s = await saveSong({ id: props.song?.id, title: title.value, slides: slides.value })
-    emit('saved', s)
+    const dup = isNew ? duplicateWarning() : null
+    if (dup && !confirm(`이미 있는 곡과 겹칩니다.\n${dup}\n\n그래도 새 곡으로 저장할까요?`)) return
+    const r = await saveSong({ id: props.song?.id, title: title.value, slides: slides.value })
+    emit('saved', r.song, r.local)
     emit('close')
   } catch (e) {
     err.value = (e as Error).message
@@ -65,7 +82,9 @@ async function save() {
 
 async function remove() {
   if (!props.song) return
-  if (!confirm(`"${props.song.title}"을(를) 삭제할까요?\n이미 콘티에 들어간 곡은 이번 예배 동안 그대로 남습니다.`)) return
+  if (isLocalNewId(props.song.id)) {
+    if (!confirm(`PC 에만 있는 새 곡 "${props.song.title}"을(를) 지울까요?`)) return
+  } else if (!confirm(`"${props.song.title}"을(를) 삭제할까요?\n이미 콘티에 들어간 곡은 이번 예배 동안 그대로 남습니다.`)) return
   busy.value = true
   try {
     await deleteSong(props.song.id)
@@ -104,6 +123,7 @@ onBeforeUnmount(() => {
       <header>
         <h2>{{ isNew ? '새 곡' : '곡 수정' }}</h2>
         <small v-if="song?.source_file" class="src">원본: {{ song.source_file }}</small>
+        <small v-if="localKind" class="local">PC 에서 {{ localKind === 'new' ? '등록한' : '고친' }} 곡 — 아직 서버에 안 올라감</small>
         <span class="spacer" />
         <button class="x" title="닫기 (Esc)" @click="close">✕</button>
       </header>
@@ -165,6 +185,7 @@ header { border-bottom: 1px solid var(--line); }
 footer { border-top: 1px solid var(--line); }
 h2 { margin: 0; font-size: 16px; }
 .src { color: var(--muted); }
+.local { color: var(--warn); }
 .spacer { flex: 1; }
 .x { border: none; background: none; }
 .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }

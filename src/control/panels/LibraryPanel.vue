@@ -7,6 +7,7 @@ import LoginForm from '@/components/LoginForm.vue'
 import { useLive } from '@/live/liveStore'
 import type { Song } from '@shared/types'
 import SongEditor from '../SongEditor.vue'
+import UploadDialog from '../UploadDialog.vue'
 
 const lib = useLibrary()
 const live = useLive()
@@ -43,11 +44,17 @@ const statusText = computed(() => {
   }
 })
 
-// 편집기: undefined = 닫힘, null = 새 곡, Song = 수정
+// 편집기: undefined = 닫힘, null = 새 곡, Song = 수정. 오프라인·로그인 없이도 열 수 있다(PC 에 저장)
 const editing = ref<Song | null | undefined>(undefined)
-function onSaved(song: Song) {
+const notice = ref<string | null>(null)
+function onSaved(song: Song, local: boolean) {
   q.value = song.title // 저장한 곡이 바로 보이도록
+  notice.value = local ? 'PC 에 저장했습니다. 인터넷이 될 때 "↑ 서버에 올리기"로 올리세요.' : null
 }
+const showUpload = ref(false)
+const online = ref(navigator.onLine)
+window.addEventListener('online', () => (online.value = true))
+window.addEventListener('offline', () => (online.value = false))
 
 defineExpose({ focus: () => input.value?.focus() })
 </script>
@@ -57,8 +64,12 @@ defineExpose({ focus: () => input.value?.focus() })
     <header>
       <div class="h">
         <h2>곡 라이브러리 <small>{{ lib.count.value }}곡</small></h2>
-        <button v-if="session" class="new" title="새 곡 추가" @click="editing = null">+ 새 곡</button>
+        <button class="new" title="새 곡 추가(오프라인이면 PC 에 저장)" @click="editing = null">+ 새 곡</button>
       </div>
+      <button v-if="lib.pendingCount.value" class="upload" :class="{ ready: online }" title="PC 에서 고치거나 등록한 곡을 서버로" @click="showUpload = true">
+        ↑ 서버에 올리기 {{ lib.pendingCount.value }}건{{ online ? '' : ' (인터넷 연결 후)' }}
+      </button>
+      <p v-if="notice" class="notice" @click="notice = null">{{ notice }}</p>
       <div class="status" :class="syncStatus">
         <span>{{ statusText }}</span>
         <template v-if="session">
@@ -93,13 +104,15 @@ defineExpose({ focus: () => input.value?.focus() })
         @click="add(i)"
       >
         <span class="title">{{ h.song.title }}</span>
+        <span v-if="lib.localKind.value.get(h.song.id)" class="badge pc" title="PC 에만 있는 변경(아직 서버에 안 올라감)">PC</span>
         <span v-if="!h.inTitle" class="badge">가사</span>
         <span class="n">{{ h.song.slides.length }}</span>
-        <button v-if="session" class="edit" title="곡 수정·삭제" @click.stop="editing = h.song">✎</button>
+        <button class="edit" title="곡 수정·삭제" @click.stop="editing = h.song">✎</button>
       </li>
       <li v-if="q && !hits.length" class="empty">결과 없음</li>
     </ol>
     <SongEditor v-if="editing !== undefined" :song="editing" @close="editing = undefined" @saved="onSaved" />
+    <UploadDialog v-if="showUpload" @close="showUpload = false" />
   </section>
 </template>
 
@@ -125,6 +138,10 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .hits li.sel { background: var(--panel-2); }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #3a3a46; color: #bbb; }
+.badge.pc { background: #5a4a1e; color: #f5d27a; }
+.upload { margin-top: 6px; width: 100%; padding: 5px 8px; font-size: 12px; color: var(--warn); border-color: #5a4a1e; background: none; }
+.upload.ready { background: #3a3014; }
+.notice { margin: 6px 0 0; font-size: 12px; color: var(--warn); cursor: pointer; }
 .n { font-size: 11px; color: var(--muted); }
 .empty { color: var(--muted); cursor: default !important; }
 </style>

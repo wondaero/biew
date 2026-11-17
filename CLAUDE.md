@@ -34,14 +34,16 @@ shared/            브라우저·Node 공용 순수 TS
   types.ts         Song, SetlistItem, OutputStyle, LiveState, isNewer/nextVersion
   gcg/parse.ts     .gcg 파서 (doc/gcg_parse.py 기준, 1069곡 해시 일치 검증됨)
   slidesText.ts    편집기 텍스트 ↔ 슬라이드(빈 줄 = 구분)
+  songCompare.ts   곡 중복 판정(가사 === / 제목 ===, 보이지 않는 차이만 통일)
 scripts/           import.ts, create-staff.ts, make-fixture.ts
 src/sync/          SyncTransport 인터페이스, BroadcastChannelTransport, SupabaseRealtimeTransport, SyncHub(version 필터)
 src/live/          liveStore(채널 하나를 연 동안의 상태 소유, commit 단일 경로. host/remote 역할), nav(이동·onAir), commands(리모컨 명령 검사), persistence(채널별 localStorage)
 src/channel/       api(채널 RPC·기기 토큰 저장), sync(호스트/리모컨 Realtime 연결)
 src/home/          채널 만들기·목록·번호 입력(`/`)
-src/library/       IndexedDB 캐시, updated_at 델타 동기화, 검색, saveSong/deleteSong
+src/library/       IndexedDB 캐시(songs·pending), updated_at 델타 동기화, 검색, saveSong(오프라인이면 PC 에 저장)/deleteSong(온라인만), 서버에 올리기(pending.ts 분류)
 src/components/    SlideRender/FitText — 출력·미리보기 공용 렌더러(cqh 단위, 자동 축소)
-src/control/       ControlGate(호스트/리모컨 분기·비밀번호 입력), ControlView, panels/*, SongEditor, 단축키, 출력창 열기
+src/control/       ControlGate(호스트/리모컨 분기·비밀번호 입력), LocalView(/local 오프라인 모드), ControlView, panels/*, SongEditor, UploadDialog, 단축키, 출력창 열기
+src/pwa.ts         서비스 워커 등록·새 버전 알림(UpdateBanner)·영구 저장 요청
 src/output/        출력 화면(보기 전용, Wake Lock, 복구)
 src/viewer/        폰 뷰어(로그인 불필요)
 supabase/migrations/  songs, rooms(구), channels
@@ -64,6 +66,9 @@ supabase/migrations/  songs, rooms(구), channels
 - **FREEZE**(단축키 F 는 **걸기만**, 해제는 버튼 클릭으로만 — 가사 수정 중 실수로 풀리는 것 방지): `LiveState.frozen` = 걸 때의 송출 위치 + **텍스트 스냅샷**. 컨트롤러 이동/BLANK 는 그대로 동작하지만 출력·뷰어·PGM 모니터는 `nav.onAir(state)`(freeze 중이면 스냅샷)를 그린다. 해제하면 컨트롤러의 현재 위치가 바로 송출. 목적: 예배 중 오타 발견 시 송출은 유지한 채 가사 수정. 송출을 그리는 곳은 `currentText(state)` 대신 반드시 `onAir()` 를 쓸 것. 컨트롤러가 freeze 중 가리키는 위치는 SlideGrid 에서 파란 점선(`.ctl`).
 - 즉시 모드: 카드 클릭 = 송출, 그리드엔 송출 중만 표시. PVW 모드: 클릭 = 미리보기, Enter/TAKE = 송출.
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.
+- **PWA**: 앱 파일 전체 precache, 새 버전은 **알림 후 적용**(자동 교체 금지 — 예배 중 화면이 바뀌면 안 됨). 알림은 /output 에 절대 띄우지 않는다. Supabase 요청은 캐시하지 않는다.
+- **오프라인 모드 `/local`** = 채널 없는 PC 전용 송출(`LOCAL_CODE`). 채널 기능과 별개로 유지.
+- **곡 저장 규칙**: 온라인+로그인이면 서버에 바로, 아니면 PC(pending). 이미 pending 이 있는 곡은 온라인이어도 PC 에 이어서 저장(충돌 검사를 거쳐야 하므로). 서버에 올리기 전에 반드시 동기화 후 중복(새 곡)·충돌(수정, base.updated_at 비교) 검사. 삭제는 온라인만.
 
 ## 출력 여백 · 정렬 (사용자가 나중에 수치 조절을 요청하면 바로 여기를 수정)
 - **여백은 위·왼쪽만 쓴다.** 오른쪽·아래는 화면 끝까지(넘치면 글자 축소). 글은 왼쪽 정렬, (왼쪽 여백, 위 여백)에서 시작하고 줄이 늘면 아래로 자란다. 가운데 정렬/하단 기준으로 되돌리지 말 것.
@@ -85,6 +90,9 @@ supabase/migrations/  songs, rooms(구), channels
 - 사용자는 한국어로 소통. 실무 권장 방식과 이유를 함께 설명하고 더 나은 구조가 있으면 먼저 제안.
 
 ## 함정
+- 서비스 워커는 **배포용 빌드에서만** 동작(dev 서버는 꺼져 있음). 오프라인 확인은 `npm run build` 후 `vite preview` 로, 서버를 실제로 꺼서.
+- puppeteer: 다른 탭을 연 뒤 뒤로 간 탭은 렌더링이 멈춰 `locator().click()` 이 무한 대기 → `bringToFront()` 후 `page.click()`.
+- 테스트로 만든 곡은 **완전 삭제 말고 `deleted_at` 으로** 정리(완전 삭제하면 그 사이 곡을 받은 기기가 삭제를 모른다).
 - `supabase config push` 는 **확인 프롬프트에 n 을 넣어도 적용된다**(겪음). 원격 auth 설정 변경은 대시보드에서 하거나, 로컬 config.toml 을 원격 값과 정확히 맞춘 뒤에만.
 - `supabase projects api-keys` 는 새 `secret` 키를 마스킹해서 준다 → import 용으로는 레거시 `service_role` 사용 중. `.env` 는 이 출력에서 값을 화면에 내지 않고 바로 파일로 기록할 것.
 - Supabase CLI 3.x 는 config.toml 의 `[inbucket]` 때문에 실행을 거부한다 → `npx supabase@2 ...` 로 실행(config.toml 을 고치지 말 것 — config push 사고와 얽힘).

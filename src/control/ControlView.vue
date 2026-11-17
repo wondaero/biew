@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useLive } from '@/live/liveStore'
 import { hostLink, remoteLink } from '@/channel/sync'
 import { forgetToken } from '@/channel/api'
+import { LOCAL_CODE } from '@/live/persistence'
 import { loadCache, syncNow } from '@/library/library'
 import { openOutputWindow } from './outputWindow'
 import { useHotkeys } from './useHotkeys'
@@ -20,6 +21,8 @@ const live = useLive()
 /** host = 이 PC(전체 기능) / remote = 폰 리모컨(이동·BLANK·점프만) */
 const isHost = computed(() => live.role.value === 'host')
 const code = computed(() => live.channelCode.value ?? '')
+/** 오프라인 모드(/local): 채널이 없으니 📡·번호 표시 없음 */
+const isLocalMode = computed(() => code.value === LOCAL_CODE)
 const link = computed(() => (isHost.value ? hostLink.value : remoteLink.value))
 const libRef = ref<InstanceType<typeof LibraryPanel>>()
 const gridRef = ref<InstanceType<typeof SlideGrid>>()
@@ -91,7 +94,7 @@ onBeforeUnmount(() => {
   <div class="control" :class="{ remote: !isHost }">
     <header class="top">
       <button class="brand" title="채널 목록" @click="goHome">Biew</button>
-      <span class="ch"><b>{{ title }}</b> <code>{{ code }}</code></span>
+      <span class="ch"><b>{{ title }}</b> <code v-if="!isLocalMode">{{ code }}</code><small v-else>이 PC 전용 · 인터넷 불필요</small></span>
 
       <div class="group">
         <button title="이전 (←)" @click="live.actions.prev()">◀</button>
@@ -119,7 +122,7 @@ onBeforeUnmount(() => {
       <template v-if="isHost">
         <span class="conn desk-only" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
         <button class="primary desk-only" @click="startOutput">출력 시작</button>
-        <button class="share" :class="link" title="채널 번호 · QR · 접속 관리" @click="showChannel = !showChannel">📡 채널</button>
+        <button v-if="!isLocalMode" class="share" :class="link" title="채널 번호 · QR · 접속 관리" @click="showChannel = !showChannel">📡 채널</button>
         <button class="desk-only" title="단축키" @click="showHelp = !showHelp">?</button>
       </template>
       <template v-else>
@@ -194,7 +197,7 @@ onBeforeUnmount(() => {
 .brand { font-size: 15px; font-weight: 700; letter-spacing: .5px; background: none; border: none; padding: 0; }
 .ch { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 13px; }
 .ch b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 26ch; }
-.ch code { color: var(--muted); font-size: 12px; }
+.ch code, .ch small { color: var(--muted); font-size: 12px; }
 .share.live { border-color: var(--pvw); color: var(--pvw); }
 .share.error { border-color: var(--pgm); }
 .group { display: flex; gap: 4px; }

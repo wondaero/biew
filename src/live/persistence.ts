@@ -1,6 +1,9 @@
 import type { LiveState } from '@shared/types'
 import { DEFAULT_STYLE } from '@shared/types'
 
+/** 오프라인 모드(/local)의 '채널' 이름. 실제 채널 번호(6자, A-Z2-9)와 겹치지 않는다 */
+export const LOCAL_CODE = 'LOCAL'
+
 /** 채널마다 따로 저장: biew.live.v1:<CODE>. (도메인별 localStorage 라 localhost 와 배포 주소는 별개) */
 const KEY = 'biew.live.v1'
 const keyOf = (code: string) => `${KEY}:${code}`
