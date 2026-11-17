@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
- * 폰 뷰어 /view/:code — 로그인 불필요, 보기 전용.
- * 접속 시 get_room RPC 로 현재 상태를 받고, 이후 Realtime Broadcast 로 따라간다.
- * 탭이 다시 보이거나 재연결되면 RPC 로 한 번 더 따라잡는다(끊긴 동안 놓친 변경 보정).
+ * 보기 /view/:code — 로그인 불필요, 보기 전용.
+ * join_view RPC 로 입장(보기 비밀번호가 있으면 입력, 한 번 맞으면 이 브라우저가 토큰을 기억) → 현재 상태 + view topic 을 받고,
+ * 이후 Realtime Broadcast 로 따라간다. 탭이 다시 보이거나 재연결되면 RPC 로 한 번 더 따라잡는다(끊긴 동안 놓친 변경 보정).
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import type { LiveState } from '@shared/types'
 import { supabase } from '@/lib/supabase'
+import * as api from '@/channel/api'
 import { SyncHub } from '@/sync/SyncHub'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import { onAir } from '@/live/nav'
@@ -20,20 +21,63 @@ const onMq = () => { wide.value = mq.matches }
 mq.addEventListener('change', onMq)
 
 const route = useRoute()
-const code = computed(() => String(route.params.code ?? '').toUpperCase())
+const code = computed(() => api.normalizeCode(String(route.params.code ?? '')))
 const state = ref<LiveState | null>(null)
-const status = ref<'loading' | 'live' | 'reconnecting' | 'notfound' | 'error'>('loading')
+const status = ref<'loading' | 'live' | 'reconnecting' | 'notfound' | 'error' | 'password'>('loading')
+const title = ref('')
+const pw = ref('')
+const pwErr = ref<string | null>(null)
+const busy = ref(false)
 const list = ref<HTMLElement>()
 
 let hub: SyncHub | null = null
 
+/** 서버에서 현재 상태를 다시 받아 따라잡는다. 토큰이 거부되면(보기 비밀번호 변경 등) 입력 화면으로 */
 async function catchUp() {
+  const j = await api.joinView(code.value)
+  if (j.status === 'ok') { if (j.state) hub?.receive(j.state); return }
+  if (j.status === 'password_required' || j.status === 'token_rejected') { teardown(); status.value = 'password'; return }
+  if (j.status === 'not_found') { status.value = 'notfound'; state.value = null; return }
+  if (!state.value) status.value = 'error'
+}
+
+function teardown() {
+  document.removeEventListener('visibilitychange', onVis)
+  clearInterval(timer)
+  hub?.close()
+  hub = null
+}
+
+let timer: number | undefined
+async function enter(password?: string) {
+  teardown()
+  pwErr.value = null
   if (!supabase) { status.value = 'error'; return }
-  const { data, error } = await supabase.rpc('get_room', { p_code: code.value })
-  if (error) { status.value = 'error'; return }
-  const row = (data as { state: LiveState; version: number }[] | null)?.[0]
-  if (!row) { status.value = 'notfound'; state.value = null; return }
-  hub?.receive(row.state)
+  if (!api.isCode(code.value)) { status.value = 'notfound'; return }
+  busy.value = true
+  status.value = 'loading'
+  const j = await api.joinView(code.value, password)
+  busy.value = false
+  switch (j.status) {
+    case 'ok': break
+    case 'password_required': case 'token_rejected': title.value = j.title ?? ''; status.value = 'password'; return
+    case 'bad_password': status.value = 'password'; pwErr.value = '비밀번호가 맞지 않습니다'; return
+    case 'locked': status.value = 'password'; pwErr.value = '시도가 너무 많습니다. 잠시 후 다시 시도하세요'; return
+    case 'not_found': status.value = 'notfound'; return
+    default: status.value = 'error'; return
+  }
+  title.value = j.title ?? ''
+  const rt = new SupabaseRealtimeTransport(supabase, j.viewTopic!, {
+    onStatus: (st) => {
+      if (st === 'SUBSCRIBED') { if (status.value !== 'notfound') status.value = 'live'; void catchUp() }
+      else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') status.value = 'reconnecting'
+    },
+  })
+  hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live' })
+  if (j.state) hub.receive(j.state)
+  else status.value = 'live'
+  document.addEventListener('visibilitychange', onVis)
+  timer = window.setInterval(() => void catchUp(), 30000)
 }
 
 // 컨트롤러가 FREEZE 중이면 고정된 화면을 따라간다(실제 송출과 같게)
@@ -54,31 +98,32 @@ watch(
 
 const onVis = () => { if (document.visibilityState === 'visible') void catchUp() }
 
-onMounted(async () => {
+onMounted(() => {
   document.title = `${code.value} — 실시간 가사`
-  if (!supabase) { status.value = 'error'; return }
-  const rt = new SupabaseRealtimeTransport(supabase, code.value, {
-    onStatus: (st) => {
-      if (st === 'SUBSCRIBED') { if (status.value !== 'notfound') status.value = 'live'; void catchUp() }
-      else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') status.value = 'reconnecting'
-    },
-  })
-  hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live' })
-  await catchUp()
-  document.addEventListener('visibilitychange', onVis)
+  void enter()
 })
 onBeforeUnmount(() => {
   mq.removeEventListener('change', onMq)
-  document.removeEventListener('visibilitychange', onVis)
-  hub?.close()
+  teardown()
 })
 </script>
 
 <template>
+  <!-- 보기 비밀번호가 필요한 채널 -->
+  <main v-if="status === 'password'" class="join">
+    <form @submit.prevent="enter(pw)">
+      <h1>{{ title || '채널' }}</h1>
+      <p>보기 비밀번호를 입력하세요.</p>
+      <input v-model="pw" type="password" autocomplete="off" autofocus placeholder="비밀번호" />
+      <button class="primary" :disabled="busy || !pw">입장</button>
+      <p v-if="pwErr" class="err">{{ pwErr }}</p>
+    </form>
+  </main>
+
   <!-- 넓은 화면: 송출 화면(출력과 같은 렌더러)만 전체로 -->
-  <div v-if="wide" class="stage">
+  <div v-else-if="wide" class="stage">
     <SlideRender v-if="state" :text="text" :blank="air?.blank ?? false" :style-cfg="state.style" :layer-key="layerKey" />
-    <p v-if="status === 'notfound'" class="wmsg">방을 찾을 수 없습니다 — 코드 <b>{{ code }}</b> 가 종료되었거나 잘못되었습니다.</p>
+    <p v-if="status === 'notfound'" class="wmsg">채널을 찾을 수 없습니다 — 번호 <b>{{ code }}</b> 가 삭제되었거나 잘못되었습니다.</p>
     <p v-else-if="!state" class="wmsg">{{ status === 'error' ? '연결할 수 없습니다.' : '불러오는 중…' }}</p>
     <span class="dot wdot" :class="status" :title="status" />
   </div>
@@ -86,15 +131,15 @@ onBeforeUnmount(() => {
   <div v-else class="viewer">
     <header>
       <div class="t">
-        <strong>{{ item?.title ?? '실시간 가사' }}</strong>
+        <strong>{{ item?.title ?? (title || '실시간 가사') }}</strong>
         <small v-if="item && air">{{ air.slideIndex + 1 }} / {{ item.slides.length }}</small>
       </div>
       <span class="dot" :class="status" :title="status" />
     </header>
 
     <main v-if="status === 'notfound'" class="msg">
-      <p>방을 찾을 수 없습니다.</p>
-      <small>코드 <b>{{ code }}</b> 가 종료되었거나 잘못되었습니다.</small>
+      <p>채널을 찾을 수 없습니다.</p>
+      <small>번호 <b>{{ code }}</b> 가 삭제되었거나 잘못되었습니다.</small>
     </main>
     <main v-else-if="status === 'error' && !state" class="msg"><p>연결할 수 없습니다.</p></main>
     <main v-else-if="!state" class="msg"><p>불러오는 중…</p></main>
@@ -113,6 +158,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.join { min-height: 100dvh; display: grid; place-content: center; padding: 24px; background: #0e0e11; color: #eee; }
+.join form { display: grid; gap: 12px; width: min(320px, 100%); text-align: center; }
+.join h1 { margin: 0; font-size: 20px; }
+.join p { margin: 0; color: #999; font-size: 13px; }
+.join .err { color: var(--pgm); }
+.join button { padding: 12px; font-size: 16px; }
 .stage { position: fixed; inset: 0; background: #000; color: #aaa; }
 .wmsg { position: absolute; inset: 0; display: grid; place-content: center; margin: 0; font-size: 18px; text-align: center; }
 .wdot { position: absolute; top: 12px; right: 12px; opacity: .6; }

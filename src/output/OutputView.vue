@@ -4,6 +4,7 @@
  * 복구 순서: localStorage 마지막 상태로 즉시 그림 → 컨트롤러에 request-state → 더 새 version 이 오면 반영.
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import type { LiveState } from '@shared/types'
 import { BroadcastChannelTransport } from '@/sync/BroadcastChannelTransport'
 import { SyncHub } from '@/sync/SyncHub'
@@ -13,9 +14,11 @@ import SlideRender from '@/components/SlideRender.vue'
 import { useWakeLock } from './useWakeLock'
 import { uid } from '@/lib/uid'
 
+// 채널별 출력: 같은 PC 의 해당 채널 컨트롤러와만 BroadcastChannel 로 연결된다(네트워크 불필요 → 인터넷이 끊겨도 동작)
+const code = String(useRoute().params.code ?? '').toUpperCase()
 const ID = `out-${uid().slice(0, 8)}`
-const state = ref<LiveState | null>(loadLive())
-const hub = new SyncHub([new BroadcastChannelTransport()], (s) => { state.value = s })
+const state = ref<LiveState | null>(loadLive(code))
+const hub = new SyncHub([new BroadcastChannelTransport(`biew-live:${code}`)], (s) => { state.value = s })
 if (state.value) hub.mark(state.value)
 
 // FREEZE 중이면 고정된 화면(onAir)을 그린다 — 컨트롤러 조작이 출력에 새지 않게

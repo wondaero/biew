@@ -1,10 +1,12 @@
 # Biew — 교회 예배 가사 자막 웹앱 (GenCG 대체)
 
 방송실 담당자가 예배 중 **수동으로** 가사 자막을 송출하는 앱. 인도자가 후렴 반복·되돌아가기를 자주 하므로 **원하는 슬라이드로 바로 점프**가 핵심.
-PC 한 대 듀얼모니터: 왼쪽 = 컨트롤러(`/control`), 오른쪽 = 출력(`/output`, 전체화면 → 빔/ATEM). 폰은 `/view/:code` 로 보기.
+**채널** 구조(예배 하나 = 채널 하나, 6자 번호): `/`(채널 만들기·목록·번호 입력) → `/control/:code`(호스트=만든 계정의 PC, 또는 폰 리모컨=컨트롤 비밀번호) · `/output/:code`(전체화면 → 빔/ATEM) · `/view/:code`(보기, 비밀번호 선택).
+PC 한 대 듀얼모니터: 왼쪽 = 호스트 컨트롤러, 오른쪽 = 출력.
 
 - 원래 명세: [docs/SPEC.md](docs/SPEC.md)
 - 진행 상황 · 다음 할 일 · 새 컴퓨터 세팅: [docs/PROGRESS.md](docs/PROGRESS.md) ← **세션 시작 시 먼저 읽을 것**
+- ⚠️ PROGRESS.md 맨 위 **"인계: 채널 구조"** 가 미완료면(마이그레이션 미적용·서버 미검증) DB 가 되는 환경에서 그 순서대로 이어서 진행한다. 해당 코드는 **`feat/channels` 브랜치**에 있고, DB 적용 전에 main 에 합치면 운영 배포가 깨진다.
 
 ## ⚠️ 절대 규칙
 - **가사는 저작권 데이터.** 개발/디버깅 중 가사 본문을 콘솔·로그·답변·스크린샷에 출력하지 않는다. 검증은 글자 수/줄 수/슬라이드 수/해시 같은 구조 정보만. 브라우저 확인은 Lorem ipsum 더미 콘티로.
@@ -18,11 +20,12 @@ Vite + Vue 3 + TypeScript · Supabase(Postgres/Auth/Realtime) · IndexedDB(idb) 
 
 ```bash
 npm run dev            # http://localhost:5173/control
-npm test               # vitest (34개)
+npm test               # vitest
 npm run typecheck      # vue-tsc
 npm run build
 npm run import -- "<gcg폴더>" [--dry-run]   # .gcg → songs upsert (key: source_file)
 npm run staff -- <email>                    # 스태프 계정 생성(비번 숨김 입력) — 일반 터미널에서
+npm run verify:channels                     # 채널 마이그레이션 적용 후 RLS/비밀번호/토큰/잠금 자동 검증(임시 계정·Lorem 채널, 끝나면 삭제)
 ```
 
 ## 구조
@@ -33,13 +36,15 @@ shared/            브라우저·Node 공용 순수 TS
   slidesText.ts    편집기 텍스트 ↔ 슬라이드(빈 줄 = 구분)
 scripts/           import.ts, create-staff.ts, make-fixture.ts
 src/sync/          SyncTransport 인터페이스, BroadcastChannelTransport, SupabaseRealtimeTransport, SyncHub(version 필터)
-src/live/          liveStore(컨트롤러 상태 소유, commit 단일 경로), nav(이동 로직), persistence(localStorage), share(폰 공유)
+src/live/          liveStore(채널 하나를 연 동안의 상태 소유, commit 단일 경로. host/remote 역할), nav(이동·onAir), commands(리모컨 명령 검사), persistence(채널별 localStorage)
+src/channel/       api(채널 RPC·기기 토큰 저장), sync(호스트/리모컨 Realtime 연결)
+src/home/          채널 만들기·목록·번호 입력(`/`)
 src/library/       IndexedDB 캐시, updated_at 델타 동기화, 검색, saveSong/deleteSong
 src/components/    SlideRender/FitText — 출력·미리보기 공용 렌더러(cqh 단위, 자동 축소)
-src/control/       컨트롤러 화면, panels/*, SongEditor, 단축키, 출력창 열기
+src/control/       ControlGate(호스트/리모컨 분기·비밀번호 입력), ControlView, panels/*, SongEditor, 단축키, 출력창 열기
 src/output/        출력 화면(보기 전용, Wake Lock, 복구)
 src/viewer/        폰 뷰어(로그인 불필요)
-supabase/migrations/  songs, rooms
+supabase/migrations/  songs, rooms(구), channels
 ```
 
 ## 핵심 설계 (바꾸기 전에 이유 확인)
@@ -48,7 +53,8 @@ supabase/migrations/  songs, rooms
 - **출력 복구**: 출력 창은 localStorage 마지막 상태로 즉시 그림 → `request-state` → 컨트롤러가 스냅샷 응답.
 - **콘티 항목은 슬라이드 스냅샷**(곡 추가 시 복사). 예배 중 DB 수정이 송출 번호를 흔들지 않게. 최신화는 콘티의 "↻ 최신" 버튼으로만.
 - **콘티 순서 변경 시** 송출 중 곡을 `key` 로 추적해 itemIndex 보정. 송출 중 곡 삭제 → blank.
-- **폰 공유 보안**: 컨트롤러는 Realtime **송신 전용**(수신 안 함) → 가짜 상태가 송출에 못 들어옴. 뷰어(anon)는 `rooms` 직접 조회 불가, `get_room(code)` RPC 로 정확한 코드 한 방만.
+- **채널 보안**(자세한 확정 설계는 PROGRESS.md): 컨트롤 비밀번호(필수, 폰 리모컨 = 송출 조작만)와 보기 비밀번호(선택)가 별개. 비밀번호는 bcrypt 해시만, 맞으면 서버(RPC `join_control`/`join_view`)가 기기 토큰과 **추측 불가 Realtime topic** 을 준다. 호스트(PC)만 상태를 바꾸고 리모컨 명령은 `live/commands.ts` 허용 목록+범위 검사 뒤에 적용 → 폰/네트워크가 상태를 직접 못 바꾼다. 곡·콘티·스타일 수정, FREEZE, 채널 삭제는 호스트(계정)만.
+- 송출은 항상 호스트 PC 를 거친다. 호스트↔출력 창은 BroadcastChannel `biew-live:<code>` 라 인터넷이 끊겨도 동작. 호스트로 연 적 있는 브라우저는 오프라인 새로고침에도 호스트로 열린다.
 - **songs.updated_at 트리거**는 내용이 바뀐 경우에만 갱신(재import 시 전 기기 재다운로드 방지). 삭제는 `deleted_at` 소프트 삭제(델타 동기화가 삭제를 알 수 있게).
 - 델타 동기화는 `updated_at >= lastSync`(gte, 멱등). 단건 저장은 lastSync 를 건드리지 않는다.
 - 연속 중복 슬라이드는 의도된 것 — 지우지 않는다.

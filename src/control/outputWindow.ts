@@ -10,8 +10,10 @@ type ScreenDetails = { screens: ScreenDetailed[]; currentScreen: ScreenDetailed 
 export interface OpenResult { ok: boolean; placed: boolean; message: string }
 
 let win: Window | null = null
+let winCode: string | null = null
 
-export async function openOutputWindow(): Promise<OpenResult> {
+/** 채널별 출력 창(/output/<번호>). 이미 다른 채널 출력 창이 열려 있으면 그 창을 이 채널로 바꾼다 */
+export async function openOutputWindow(code: string): Promise<OpenResult> {
   let features = 'popup,width=1280,height=720'
   let placed = false
   const w = window as Window & { getScreenDetails?: () => Promise<ScreenDetails> }
@@ -27,10 +29,12 @@ export async function openOutputWindow(): Promise<OpenResult> {
   }
 
   if (win && !win.closed) {
+    if (winCode !== code) { win.location.href = `/output/${code}`; winCode = code }
     win.focus()
     return { ok: true, placed, message: '이미 열려 있는 출력 창으로 이동했습니다.' }
   }
-  win = window.open('/output', 'biew-output', features)
+  win = window.open(`/output/${code}`, 'biew-output', features)
+  winCode = code
   if (!win) return { ok: false, placed: false, message: '팝업이 차단되었습니다. 주소창의 팝업 차단 아이콘에서 허용해 주세요.' }
   return {
     ok: true,

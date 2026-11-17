@@ -1,21 +1,31 @@
 /**
  * 컨트롤러 측 LiveState 소유자.
  * 모든 변경은 commit() 하나를 거친다 → version 증가 → localStorage 저장 → 전송.
+ *
+ * 채널 하나를 연 동안만 의미가 있다(openHost / openRemote → closeChannel).
+ *  - host   : 이 PC 가 상태의 원본. 변경은 commit() 으로, 폰 리모컨 명령은 handleCommand() 로 받는다.
+ *  - remote : 폰 리모컨. 상태는 호스트가 보내준 것을 그대로 비추기만 하고(commit 불가),
+ *             actions 는 명령(Command)으로 바뀌어 호스트에 전달된다. 곡/콘티/스타일 변경 권한 없음.
  */
 import { reactive, ref, computed, readonly } from 'vue'
 import { emptyLiveState, nextVersion, type LiveState, type OutputStyle, type SetlistItem } from '@shared/types'
 import { BroadcastChannelTransport } from '@/sync/BroadcastChannelTransport'
 import { SyncHub } from '@/sync/SyncHub'
-import { loadLive, saveLive } from './persistence'
+import type { Command } from '@/sync/SyncTransport'
+import { loadLive, saveLive, isLiveState, normalizeLive } from './persistence'
 import * as nav from './nav'
+import { parseCommand } from './commands'
 import { uid } from '@/lib/uid'
-import { bindShare, publish } from './share'
 import type { Cursor } from './nav'
 
-const ORIGIN = `pc-${uid().slice(0, 8)}`
-const state = reactive<LiveState>(loadLive() ?? emptyLiveState(ORIGIN))
+export type Role = 'host' | 'remote'
 
-/** PVW 모드 여부와 미리보기 커서는 컨트롤러 로컬 상태(송출 상태 아님) */
+const ORIGIN = `pc-${uid().slice(0, 8)}`
+const state = reactive<LiveState>(emptyLiveState(ORIGIN))
+const role = ref<Role>('host')
+const channelCode = ref<string | null>(null)
+
+/** PVW 모드 여부와 미리보기 커서는 컨트롤러 로컬 상태(송출 상태 아님). 리모컨엔 PVW 가 없다 */
 const pvwMode = ref(false)
 const preview = ref<Cursor | null>(null)
 const outputSeenAt = ref(0)
@@ -24,31 +34,71 @@ const hotkeysPaused = ref(false)
 
 const snapshot = (): LiveState => JSON.parse(JSON.stringify(state))
 
-const hub = new SyncHub(
-  [new BroadcastChannelTransport()],
-  // 다른 컨트롤러 탭(또는 Phase 2 폰)이 더 새 상태를 보냈으면 따라간다
-  (s) => { Object.assign(state, s); saveLive(snapshot()) },
-  (m) => {
-    if (m.type === 'request-state') hub.send({ type: 'state', state: snapshot() })
-    if (m.type === 'output-alive') outputSeenAt.value = Date.now()
-  },
-)
-hub.mark(state)
-bindShare(snapshot)
+let hub: SyncHub | null = null
+let remoteSend: ((c: Command) => void) | null = null
+let publishHook: ((s: LiveState) => void) | null = null
+
+/** 호스트로 채널 열기. 같은 PC 의 출력 창과는 BroadcastChannel(채널별 이름)로 */
+export function openHost(code: string, hooks: { publish: (s: LiveState) => void }) {
+  closeChannel()
+  role.value = 'host'
+  channelCode.value = code
+  Object.assign(state, loadLive(code) ?? emptyLiveState(ORIGIN))
+  publishHook = hooks.publish
+  hub = new SyncHub(
+    [new BroadcastChannelTransport(`biew-live:${code}`)],
+    // 같은 채널의 다른 호스트 탭이 더 새 상태를 보냈으면 따라간다
+    (s) => { Object.assign(state, s); saveLive(code, snapshot()) },
+    (m) => {
+      if (m.type === 'request-state') hub?.send({ type: 'state', state: snapshot() })
+      if (m.type === 'output-alive') outputSeenAt.value = Date.now()
+    },
+  )
+  hub.mark(state)
+  // 시작 시 한 번 방송 — 이미 열려 있는 출력 창이 즉시 맞춰지도록
+  hub.send({ type: 'state', state: snapshot() })
+}
+
+/** 폰 리모컨으로 채널 열기. send 는 control topic 으로 명령을 보내는 함수 */
+export function openRemote(code: string, send: (c: Command) => void) {
+  closeChannel()
+  role.value = 'remote'
+  channelCode.value = code
+  Object.assign(state, emptyLiveState(ORIGIN))
+  remoteSend = send
+  hub = new SyncHub([], (s) => { Object.assign(state, s) })
+}
+
+export function closeChannel() {
+  hub?.close()
+  hub = null; remoteSend = null; publishHook = null
+  channelCode.value = null
+  preview.value = null
+  pvwMode.value = false
+  outputSeenAt.value = 0
+}
+
+/** 서버(channels.state) 또는 호스트가 보낸 상태가 지금보다 새로우면 따라간다. 호스트면 출력 창에도 알림 */
+export function adoptState(s: unknown) {
+  if (!isLiveState(s) || !hub) return
+  if (hub.receive(normalizeLive(s)) && role.value === 'host') {
+    if (channelCode.value) saveLive(channelCode.value, snapshot())
+    hub.send({ type: 'state', state: snapshot() })
+  }
+}
 
 function commit(mutate: (s: LiveState) => void) {
+  const code = channelCode.value
+  if (role.value !== 'host' || !code || !hub) return // 리모컨·미연결 상태에선 상태를 바꿀 수 없다
   mutate(state)
   state.version = nextVersion(state.version)
   state.origin = ORIGIN
   const snap = snapshot()
   hub.mark(snap)
-  saveLive(snap)
+  saveLive(code, snap)
   hub.send({ type: 'state', state: snap })
-  publish(snap) // 폰 공유 중이면 Realtime 으로도
+  publishHook?.(snap) // 채널 서버(보는 기기·리모컨)로도. 실패해도 로컬 송출엔 영향 없음
 }
-
-// 시작 시 한 번 방송 — 이미 열려 있는 출력 창이 즉시 맞춰지도록
-hub.send({ type: 'state', state: snapshot() })
 
 // ── 송출 ────────────────────────────────────────────
 function go(c: Cursor | null) {
@@ -60,16 +110,41 @@ function go(c: Cursor | null) {
 /** 다음 송출될 위치: PVW 에서 고른 것 or 자동 다음 장 */
 const upcoming = computed<Cursor | null>(() => preview.value ?? nav.next(state))
 
+/** 호스트가 리모컨 명령을 실제로 적용 */
+function applyCommand(c: Command) {
+  switch (c.cmd) {
+    case 'next': go(nav.next(state)); break
+    case 'prev': go(nav.prev(state)); break
+    case 'nextSong': go(nav.nextSong(state)); break
+    case 'prevSong': go(nav.prevSong(state)); break
+    case 'blank': commit((s) => { s.blank = !s.blank }); break
+    case 'go': go({ itemIndex: c.itemIndex, slideIndex: c.slideIndex }); break
+  }
+}
+
+/** 리모컨에서 온 원본 메시지: 허용된 명령만 통과(live/commands.ts) */
+export function handleCommand(raw: unknown) {
+  if (role.value !== 'host') return
+  const c = parseCommand(raw, state)
+  if (c) applyCommand(c)
+}
+
+/** 리모컨이면 명령으로 보내고, 호스트면 바로 적용 */
+function dispatch(c: Command) {
+  if (role.value === 'remote') remoteSend?.(c)
+  else applyCommand(c)
+}
+
 const actions = {
-  go,
-  next: () => (pvwMode.value && preview.value ? go(preview.value) : go(nav.next(state))),
-  prev: () => go(nav.prev(state)),
-  nextSong: () => go(nav.nextSong(state)),
-  prevSong: () => go(nav.prevSong(state)),
-  nth: (n: number) => go(nav.nth(state, n)),
+  go: (c: Cursor | null) => { if (c) dispatch({ cmd: 'go', itemIndex: c.itemIndex, slideIndex: c.slideIndex }) },
+  next: () => (role.value === 'host' && pvwMode.value && preview.value ? go(preview.value) : dispatch({ cmd: 'next' })),
+  prev: () => dispatch({ cmd: 'prev' }),
+  nextSong: () => dispatch({ cmd: 'nextSong' }),
+  prevSong: () => dispatch({ cmd: 'prevSong' }),
+  nth: (n: number) => actions.go(nav.nth(state, n)),
   take: () => go(upcoming.value),
-  toggleBlank: () => commit((s) => { s.blank = !s.blank }),
-  /** FREEZE 걸기: 지금 송출 화면을 고정(컨트롤러 조작은 계속 가능). 이미 걸려 있으면 아무것도 안 함 — 단축키용 */
+  toggleBlank: () => dispatch({ cmd: 'blank' }),
+  /** FREEZE 걸기: 지금 송출 화면을 고정(컨트롤러 조작은 계속 가능). 이미 걸려 있으면 아무것도 안 함 — 단축키용. 호스트 전용 */
   freeze: () => {
     if (state.frozen) return
     commit((s) => { s.frozen = { itemIndex: s.itemIndex, slideIndex: s.slideIndex, blank: s.blank, text: nav.currentText(s) } })
@@ -78,10 +153,10 @@ const actions = {
   unfreeze: () => { if (state.frozen) commit((s) => { s.frozen = null }) },
   setPreview: (c: Cursor | null) => { preview.value = c },
   /** 카드 클릭: 즉시 모드면 바로 송출, PVW 모드면 미리보기 지정 */
-  pick: (c: Cursor) => (pvwMode.value ? (preview.value = c) : go(c)),
+  pick: (c: Cursor) => (pvwMode.value ? (preview.value = c) : actions.go(c)),
 }
 
-// ── 콘티 ────────────────────────────────────────────
+// ── 콘티 (호스트 전용: commit 이 리모컨에선 동작하지 않는다) ─────────────
 function liveKey(): string | undefined {
   return state.setlist[state.itemIndex]?.key
 }
@@ -141,6 +216,8 @@ function setStyle(patch: Partial<OutputStyle>) {
 export function useLive() {
   return {
     state: readonly(state) as LiveState,
+    role: readonly(role),
+    channelCode: readonly(channelCode),
     pvwMode,
     preview: readonly(preview),
     upcoming,

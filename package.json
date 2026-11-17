@@ -14,7 +14,8 @@
     "typecheck": "vue-tsc --noEmit",
     "import": "tsx scripts/import.ts",
     "fixture": "tsx scripts/make-fixture.ts",
-    "staff": "tsx scripts/create-staff.ts"
+    "staff": "tsx scripts/create-staff.ts",
+    "verify:channels": "tsx scripts/verify-channels.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

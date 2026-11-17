@@ -2,10 +2,10 @@ import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import type { SyncMessage, SyncTransport } from './SyncTransport'
 
 /**
- * Supabase Realtime Broadcast 경로. 채널: room:<CODE>
- * - 컨트롤러는 sendOnly 로 사용(수신하지 않음) → 방코드를 아는 사람이 가짜 상태를 보내도 송출에 영향 없음
- * - 뷰어는 수신만
- * 끊김/재연결은 supabase-js 가 처리. 끊겨 있는 동안의 send 는 버려지고, 뷰어는 재연결 시 get_room 으로 따라잡는다.
+ * Supabase Realtime Broadcast 경로. 채널 이름: ch:<topic>
+ * topic 은 채널 번호가 아니라 서버(RPC)가 비밀번호 확인 후에만 내주는 추측 불가 토큰이다 → 번호만으로는 연결할 수 없다.
+ * (채널당 control topic = 리모컨→호스트 명령, view topic = 호스트→보는 기기 상태)
+ * 끊김/재연결은 supabase-js 가 처리. 끊겨 있는 동안의 send 는 버려지고, 받는 쪽은 재연결 시 join RPC 로 따라잡는다.
  */
 export class SupabaseRealtimeTransport implements SyncTransport {
   readonly name = 'supabase-realtime'
@@ -15,10 +15,10 @@ export class SupabaseRealtimeTransport implements SyncTransport {
 
   constructor(
     sb: SupabaseClient,
-    code: string,
+    topic: string,
     opts: { sendOnly?: boolean; onStatus?: (status: string) => void } = {},
   ) {
-    this.ch = sb.channel(`room:${code}`, { config: { broadcast: { self: false, ack: false } } })
+    this.ch = sb.channel(`ch:${topic}`, { config: { broadcast: { self: false, ack: false } } })
     if (!opts.sendOnly) {
       this.ch.on('broadcast', { event: 'msg' }, ({ payload }) => {
         for (const h of this.handlers) h(payload as SyncMessage)
