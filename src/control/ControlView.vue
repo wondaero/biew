@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLive } from '@/live/liveStore'
-import { hostLink, remoteLink } from '@/channel/sync'
+import { hostLink, hostNeedsLogin, remoteLink } from '@/channel/sync'
 import { forgetToken } from '@/channel/api'
 import { LOCAL_CODE } from '@/live/persistence'
 import { loadCache, syncNow } from '@/library/library'
@@ -23,6 +23,13 @@ const isHost = computed(() => live.role.value === 'host')
 const code = computed(() => live.channelCode.value ?? '')
 /** 오프라인 모드(/local): 채널이 없으니 📡·번호 표시 없음 */
 const isLocalMode = computed(() => code.value === LOCAL_CODE)
+/** 인터넷 송출 호스트의 서버 연결 문제 — PC 송출(출력 창)은 어느 경우에도 계속된다 */
+const netWarn = computed(() => {
+  if (!isHost.value || isLocalMode.value) return null
+  if (hostNeedsLogin.value) return '인터넷 송출 권한 만료 — 📡 관리에서 로그인하세요 (PC 송출은 계속)'
+  if (hostLink.value === 'error') return '인터넷 끊김 — PC 송출은 계속, 폰·보기는 멈춤 (다시 연결되면 PC 기준으로 맞춤)'
+  return null
+})
 const link = computed(() => (isHost.value ? hostLink.value : remoteLink.value))
 const libRef = ref<InstanceType<typeof LibraryPanel>>()
 const gridRef = ref<InstanceType<typeof SlideGrid>>()
@@ -119,6 +126,7 @@ onBeforeUnmount(() => {
 
       <span class="spacer" />
 
+      <span v-if="netWarn" class="netwarn" role="status">{{ netWarn }}</span>
       <template v-if="isHost">
         <span class="conn desk-only" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
         <button class="primary desk-only" @click="startOutput">출력 시작</button>
@@ -198,6 +206,7 @@ onBeforeUnmount(() => {
 .ch { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 13px; }
 .ch b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 26ch; }
 .ch code, .ch small { color: var(--muted); font-size: 12px; }
+.netwarn { font-size: 12px; color: var(--warn); padding: 3px 8px; border: 1px solid #5a4a1e; border-radius: 6px; background: #3a3014; }
 .share.live { border-color: var(--pvw); color: var(--pvw); }
 .share.error { border-color: var(--pgm); }
 .group { display: flex; gap: 4px; }

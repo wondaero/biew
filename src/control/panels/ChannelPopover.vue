@@ -9,7 +9,7 @@ import QRCode from 'qrcode'
 import * as api from '@/channel/api'
 import { hostLink, hostNeedsLogin, reconnectHost } from '@/channel/sync'
 import { session } from '@/lib/auth'
-import { loadHost, saveHost, forgetChannelLocal } from '@/live/persistence'
+import { saveHost, forgetChannelLocal } from '@/live/persistence'
 import LoginForm from '@/components/LoginForm.vue'
 
 const props = defineProps<{ code: string; title: string }>()
@@ -28,7 +28,7 @@ async function copy(label: string, text: string) {
 }
 
 const linkText = computed(() =>
-  hostNeedsLogin.value ? '폰·보기 연결 주소가 이 PC 에 없습니다 — 로그인하면 연결됩니다 (송출은 정상)'
+  hostNeedsLogin.value ? '이 PC 의 인터넷 송출 권한이 만료됐습니다 — 아래 관리에서 로그인하면 다시 연결됩니다 (PC 송출은 정상)'
     : hostLink.value === 'live' ? '● 폰·보기 연결 준비됨'
       : hostLink.value === 'connecting' ? '연결 중…'
         : hostLink.value === 'error' ? '폰·보기 연결 안 됨 (송출은 정상) — 자동 재시도 중' : '',
@@ -44,11 +44,12 @@ const busy = ref(false)
 async function reset() {
   if (!confirm('모든 기기의 접속을 끊습니다. 폰은 비밀번호를 다시 입력해야 하고, 이 채널을 연 다른 PC 도 다시 로그인해야 합니다. 계속할까요?')) return
   busy.value = true
-  const r = await api.resetAccess(props.code, { controlPassword: newControl.value, viewPassword: newView.value, removeViewPassword: removeView.value })
+  const err = await api.resetAccess(props.code, { controlPassword: newControl.value, viewPassword: newView.value, removeViewPassword: removeView.value })
+  if (err) { busy.value = false; msg.value = err; return }
+  // 이 PC 의 호스트 토큰도 지워졌으므로 새로 받아 다시 연결
+  const g = await api.issueHostToken(props.code)
   busy.value = false
-  if (r.error || !r.topics) { msg.value = r.error ?? '실패했습니다'; return }
-  // 이 PC 는 새 주소를 기억하고 다시 연결
-  saveHost(props.code, { title: loadHost(props.code)?.title ?? props.title, ...r.topics })
+  if (g.grant) saveHost(props.code, { title: g.grant.title, token: g.grant.token, controlTopic: g.grant.controlTopic, viewTopic: g.grant.viewTopic })
   reconnectHost()
   newControl.value = ''; newView.value = ''; removeView.value = false
   msg.value = '모든 기기의 접속을 끊었습니다.'

@@ -5,7 +5,7 @@
  *  - 이 기기의 채널: 이 PC 가 호스트로 연 채널(로그인·인터넷 불필요, 예배 당일 여기서 바로 들어감)
  *  - 새 채널: 누를 때 로그인(로그인은 저장되지 않음)
  *  - 로그인 중이면 내 계정의 전체 채널(다른 PC 에서 만든 것 포함)도 보이고, 열면 이 PC 가 호스트로 등록된다
- *  - 오프라인 모드(/local): 채널·서버 없이 이 PC 하나에서만 송출
+ *  - 로컬 송출(/local): 채널·서버 없이 이 PC 하나에서만 송출(예배용 기본). 그 외는 전부 인터넷 송출(채널)
  *  - 곡 다운로드: 곡 전체를 PC 에 저장(그때 로그인). PC 에서 고친 곡은 '서버에 올리기'
  */
 import { ref, computed, watch, onMounted } from 'vue'
@@ -16,6 +16,7 @@ import * as api from '@/channel/api'
 import { listHosts, saveHost, forgetChannelLocal } from '@/live/persistence'
 import LoginForm from '@/components/LoginForm.vue'
 import UploadDialog from '@/control/UploadDialog.vue'
+import { dbNotice } from '@/library/db'
 import { useLibrary, loadCache, syncNow, resetCache, syncStatus, syncError, lastSync } from '@/library/library'
 
 const router = useRouter()
@@ -70,9 +71,9 @@ async function create() {
   creating.value = true
   const r = await api.createChannel(title.value.trim(), controlPw.value, viewPw.value)
   if (r.error || !r.code) { creating.value = false; createErr.value = r.error ?? '만들지 못했습니다'; return }
-  // 이 PC 를 호스트로 기억(주소). 이후 이 PC 에서는 로그인 없이 열린다
-  const t = await api.channelTopics(r.code)
-  saveHost(r.code, { title: title.value.trim(), controlTopic: t?.controlTopic ?? null, viewTopic: t?.viewTopic ?? null })
+  // 이 PC 를 호스트로 등록(채널 전용 호스트 토큰). 이후 이 PC 에서는 로그인 없이 열린다
+  const g = await api.issueHostToken(r.code)
+  saveHost(r.code, { title: title.value.trim(), token: g.grant?.token ?? null, controlTopic: g.grant?.controlTopic ?? null, viewTopic: g.grant?.viewTopic ?? null })
   creating.value = false
   router.push(`/control/${r.code}`)
 }
@@ -93,31 +94,18 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
       <button v-if="session" class="ghost" @click="signOut()">로그아웃</button>
     </header>
 
-    <!-- 이 기기의 채널 -->
-    <section class="card">
-      <h2>이 기기의 채널 <small>{{ local.length }}</small></h2>
-      <p v-if="!local.length" class="muted">이 PC 에서 만들거나 연 채널이 여기에 표시됩니다. 로그인 없이 바로 들어갈 수 있습니다.</p>
-      <ul v-else class="list">
-        <li v-for="r in local" :key="r.code" @click="router.push(`/control/${r.code}`)">
-          <span class="t">{{ r.title }}</span>
-          <span class="c">{{ r.code }}</span>
-          <button class="x" title="이 기기 목록에서 지우기" @click.stop="forget(r.code, r.title)">✕</button>
-          <span class="d">{{ r.openedAt ? fmt(r.openedAt) : '' }}<template v-if="!r.controlTopic"> · 폰 연결하려면 로그인 필요</template></span>
-        </li>
-      </ul>
-    </section>
-
-    <!-- 오프라인 모드 -->
-    <section class="card">
-      <h2>오프라인 모드</h2>
-      <p class="muted">채널 없이 이 PC 하나에서만 송출합니다(컨트롤러 + 출력 창). 인터넷·로그인 불필요 — 미리 곡을 다운로드해 두세요.</p>
-      <button @click="router.push('/local')">오프라인 모드 열기</button>
+    <!-- ── 로컬 송출 ── -->
+    <section class="card local">
+      <h2>로컬 송출 <small>예배용 기본</small></h2>
+      <p class="muted">이 PC 하나에서만 송출합니다(컨트롤러 + 출력 창). 인터넷·로그인·서버가 전혀 필요 없고, 다른 PC·폰은 접근할 수 없습니다. 곡은 아래에서 미리 다운로드해 두세요.</p>
+      <button class="primary" @click="router.push('/local')">로컬 송출 열기</button>
     </section>
 
     <!-- 곡 다운로드 -->
     <section class="card">
       <h2>곡 <small>{{ lib.count.value }}곡 저장됨</small></h2>
       <p class="muted" :class="{ err: syncStatus === 'error' }">{{ dlText }}</p>
+      <p v-if="dbNotice" class="warn">{{ dbNotice }}</p>
       <template v-if="session">
         <div class="row">
           <button :disabled="syncStatus === 'syncing'" @click="syncNow()">바뀐 곡 받기</button>
@@ -132,9 +120,26 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
     </section>
     <UploadDialog v-if="showUpload" @close="showUpload = false" />
 
+    <!-- ── 인터넷 송출 ── -->
+    <h2 class="group">인터넷 송출 <small>폰 리모컨·보기 기기 · 서버를 거침 · 가끔 쓸 때</small></h2>
+
+    <!-- 이 기기의 채널 -->
+    <section class="card">
+      <h2>이 기기의 채널 <small>{{ local.length }}</small></h2>
+      <p v-if="!local.length" class="muted">이 PC 에서 만들거나 연 인터넷 송출 채널이 여기에 표시됩니다. 로그인 없이 바로 들어갈 수 있습니다.</p>
+      <ul v-else class="list">
+        <li v-for="r in local" :key="r.code" @click="router.push(`/control/${r.code}`)">
+          <span class="t">{{ r.title }}</span>
+          <span class="c">{{ r.code }}</span>
+          <button class="x" title="이 기기 목록에서 지우기" @click.stop="forget(r.code, r.title)">✕</button>
+          <span class="d">{{ r.openedAt ? fmt(r.openedAt) : '' }}<template v-if="!r.token"> · 폰·보기 연결하려면 로그인 필요</template></span>
+        </li>
+      </ul>
+    </section>
+
     <!-- 새 채널 -->
     <section class="card">
-      <button v-if="!creatingOpen" class="primary" @click="creatingOpen = true">＋ 새 채널</button>
+      <button v-if="!creatingOpen" @click="creatingOpen = true">＋ 인터넷 송출 채널 만들기</button>
       <template v-else>
         <h2>새 채널 <button class="ghost" @click="creatingOpen = false">닫기</button></h2>
         <LoginForm v-if="!session" hint="채널을 만들려면 로그인하세요. (로그인은 저장되지 않습니다)" />
@@ -195,6 +200,8 @@ header { display: flex; align-items: center; }
 h1 { margin: 0; font-size: 22px; letter-spacing: .5px; flex: 1; }
 h2 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px; }
 h2 small { color: var(--muted); font-weight: normal; flex: 1; }
+.group { margin: 8px 0 -6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.card.local { border-color: var(--live); }
 .card { display: grid; gap: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .form { display: grid; gap: 8px; }
 .muted { margin: 0; color: var(--muted); font-size: 12px; }

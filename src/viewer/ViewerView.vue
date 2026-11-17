@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * 보기 /view/:code — 로그인 불필요, 보기 전용.
- * join_view RPC 로 입장(보기 비밀번호가 있으면 입력, 한 번 맞으면 이 브라우저가 토큰을 기억) → view topic 을 받아 연결하고,
- * 호스트 PC 에 'request-state' 를 보내 현재 화면을 받는다(서버엔 상태가 없다). 이후 Realtime Broadcast 로 따라간다.
- * 탭이 다시 보이거나 재연결되면 토큰을 다시 확인하고 상태를 다시 요청한다(끊긴 동안 놓친 변경 보정).
+ * join_view RPC 로 입장(보기 비밀번호가 있으면 입력, 한 번 맞으면 이 브라우저가 토큰을 기억) → 서버의 현재 상태 + view topic.
+ * 이후 Realtime Broadcast 로 따라간다. 탭이 다시 보이거나 재연결되면 서버에서 다시 읽는다(끊긴 동안 놓친 변경 보정).
+ * 송출 상태의 원본은 서버라 호스트 PC 가 꺼져 있어도 리모컨이 넘기면 따라간다.
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
@@ -32,13 +32,17 @@ const busy = ref(false)
 const list = ref<HTMLElement>()
 
 let hub: SyncHub | null = null
+/** 지금 듣고 있는 실시간 주소. '모든 기기 접속 끊기'로 바뀌면 새 주소로 다시 연결해야 실시간으로 따라온다 */
+let topic: string | null = null
 
-const askState = () => hub?.send({ type: 'request-state', from: 'viewer' })
-
-/** 토큰이 아직 유효한지 확인하고 호스트에 현재 상태를 다시 요청. 거부되면(보기 비밀번호 변경 등) 입력 화면으로 */
+/** 서버에서 현재 상태를 다시 읽는다. 토큰이 거부되면(보기 비밀번호 변경 등) 입력 화면으로 */
 async function catchUp() {
   const j = await api.joinView(code.value)
-  if (j.status === 'ok') { askState(); return }
+  if (j.status === 'ok') {
+    if (j.viewTopic && topic && j.viewTopic !== topic) { void enter(); return } // 주소가 바뀜 → 다시 연결
+    if (j.state) hub?.receive(j.state)
+    return
+  }
   if (j.status === 'password_required' || j.status === 'token_rejected') { teardown(); status.value = 'password'; return }
   if (j.status === 'not_found') { status.value = 'notfound'; state.value = null; return }
   if (!state.value) status.value = 'error'
@@ -70,20 +74,22 @@ async function enter(password?: string) {
     default: status.value = 'error'; return
   }
   title.value = j.title ?? ''
+  topic = j.viewTopic
   const rt = new SupabaseRealtimeTransport(supabase, j.viewTopic!, {
     onStatus: (st) => {
-      if (st === 'SUBSCRIBED') { if (status.value !== 'notfound') status.value = 'live'; askState() }
+      if (st === 'SUBSCRIBED') { if (status.value !== 'notfound') status.value = 'live'; void catchUp() }
       else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') status.value = 'reconnecting'
     },
   })
   hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live' })
+  if (j.state) hub.receive(j.state)
   document.addEventListener('visibilitychange', onVis)
   timer = window.setInterval(() => void catchUp(), 30000)
 }
 
 /** 상태가 아직 없을 때: 연결됐는데 응답이 없으면 호스트 PC 가 꺼져 있거나 오프라인인 것 */
 const waitText = computed(() =>
-  status.value === 'error' ? '연결할 수 없습니다.' : status.value === 'live' ? '송출 대기 중 — 컨트롤러 PC 가 연결되면 표시됩니다' : '불러오는 중…',
+  status.value === 'error' ? '연결할 수 없습니다.' : status.value === 'live' ? '송출 대기 중 — 아직 콘티가 없습니다' : '불러오는 중…',
 )
 
 // 컨트롤러가 FREEZE 중이면 고정된 화면을 따라간다(실제 송출과 같게)

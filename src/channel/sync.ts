@@ -1,28 +1,28 @@
 /**
- * 채널 실시간 연결. 네트워크 실패가 로컬 송출(BroadcastChannel)에 영향을 주지 않는다.
- * 송출 상태는 서버(DB)에 저장하지 않는다 — 호스트 PC 가 원본이고, 늦게 들어온 기기는 같은 topic 에서
- * 'request-state' 를 보내면 호스트가 현재 상태로 답한다(같은 PC 의 출력 창과 같은 방식).
+ * 인터넷 송출의 실시간 연결. 송출 상태의 원본은 서버(channels.state).
+ * 네트워크가 끊겨도 로컬 송출(PC 컨트롤러 ↔ 출력 창, BroadcastChannel)은 멈추지 않는다.
  *
- * 호스트(PC): 이 PC 에 기억해 둔 topic(live/persistence.ts 의 host 기록)으로 연결 → 로그인 불필요.
- *   로그인 중이면 서버에서 최신 topic 을 받아 기억을 갱신한다(다른 곳에서 '접속 끊기'를 했을 수 있으므로).
- *   - control topic: 리모컨 명령 수신(검사·적용은 liveStore.handleCommand) + 상태 송신 + 상태 요청 응답
- *   - view topic   : 상태 송신 + 상태 요청 응답
- * 리모컨(폰, 비밀번호 입장): control topic 하나로 명령 송신 + 상태 수신.
- *   view topic 은 쓰지 않는다 — 보는 기기(비밀번호 없는 채널이면 번호만 아는 누구나)가 위조할 수 있으므로.
- *   주기적으로 join RPC 로 토큰을 확인하고, 거부되면 비밀번호를 다시 묻는다.
+ * 호스트(PC): 이 PC 에 저장된 호스트 토큰(live/persistence.ts 의 host 기록)으로 — 로그인 불필요.
+ *   - PC 에서 조작하면 화면을 먼저 바꾸고(liveStore.commit) 서버에 올린다(host_set_state).
+ *     못 올리면(인터넷 끊김) '서버에 아직 못 올림'(dirty)을 남기고 PC 혼자 계속. 다시 연결되면 PC 기준으로 덮어쓴다(force).
+ *   - 리모컨이 서버 상태를 바꾸면 알림이 오는데, 알림 내용은 믿지 않고 서버에서 다시 읽는다(host_join)
+ *     — 실시간 주소는 리모컨도 보낼 수 있어 가짜 상태(콘티 교체 등)를 섞을 수 있기 때문.
+ * 리모컨(폰): 명령을 서버로(remote_command — 서버가 검사·적용, PC 가 꺼져 있어도 동작).
+ *   결과 상태를 화면에 쓰고, control/view 주소로 알린다(DB 발 공개 알림은 전달되지 않아 변경한 쪽이 알림 — 마이그레이션 20261118010000).
+ *   상태는 control 주소에서만 받는다(view 주소는 보는 기기도 보낼 수 있으므로).
  */
 import { ref, watch } from 'vue'
 import type { LiveState } from '@shared/types'
 import { supabase } from '@/lib/supabase'
 import { session } from '@/lib/auth'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
-import type { Command } from '@/sync/SyncTransport'
-import { isLiveState, normalizeLive, loadHost, saveHost } from '@/live/persistence'
+import type { Command, SyncMessage } from '@/sync/SyncTransport'
+import { isLiveState, normalizeLive, loadHost, saveHost, patchHost, setHostDirty, isHostDirty } from '@/live/persistence'
 import * as api from './api'
 
 export type Link = 'off' | 'connecting' | 'live' | 'error'
 export const hostLink = ref<Link>('off')
-/** 호스트 PC 에 기억된 주소가 없음 → 폰/보기 연결은 로그인해야 생긴다(송출은 정상) */
+/** 이 PC 의 호스트 토큰이 없거나 거부됨(접속 끊기·30일 미사용) → 로그인하면 새로 받는다. PC 송출은 계속된다 */
 export const hostNeedsLogin = ref(false)
 export const remoteLink = ref<Link>('off')
 /** 리모컨의 토큰이 거부됨(접속 끊기·비밀번호 변경·만료·채널 삭제) → 입력 화면으로 돌아가야 함 */
@@ -34,90 +34,159 @@ const BAD = (st: string) => st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st =
 let hostCode: string | null = null
 let view: SupabaseRealtimeTransport | null = null
 let ctl: SupabaseRealtimeTransport | null = null
-let onCommand: ((raw: unknown) => void) | null = null
 let getState: (() => LiveState) | null = null
+let adopt: ((s: unknown) => void) | null = null
 let retryTimer: number | undefined
-let replyTimer: number | undefined
-let lastReply = 0
+let fetchTimer: number | undefined
 let gen = 0
+let pushing = false
+let queued: { s: LiveState; force: boolean } | null = null
 
 function closeHostTransports() {
   view?.close(); ctl?.close(); view = null; ctl = null
 }
 
-/** 상태 요청에 답한다. 여러 기기가 한꺼번에 요청해도 0.3초에 한 번만 보낸다 */
-function replyState() {
-  if (replyTimer !== undefined) return
-  const wait = Math.max(0, 300 - (Date.now() - lastReply))
-  replyTimer = window.setTimeout(() => {
-    replyTimer = undefined
-    lastReply = Date.now()
-    if (getState) publishHost(getState())
-  }, wait)
+/** 로그인 중이면 이 PC 용 호스트 토큰을 새로 받아 저장 */
+async function refreshGrant(code: string): Promise<boolean> {
+  if (!session.value) return false
+  const g = await api.issueHostToken(code)
+  if (!g.grant) return false
+  saveHost(code, { title: g.grant.title, token: g.grant.token, controlTopic: g.grant.controlTopic, viewTopic: g.grant.viewTopic })
+  return true
 }
 
-async function connectHost() {
+/** 토큰 거부: 로그인 중이면 바로 새로 받고, 아니면 '로그인 필요' 표시 */
+async function onRejected(code: string) {
+  patchHost(code, { token: null })
+  if (await refreshGrant(code)) { void connectHost(); return }
+  hostNeedsLogin.value = true
+  hostLink.value = 'error'
+}
+
+async function connectHost(retried = false) {
   const code = hostCode
   if (!code || !supabase) return
   const my = ++gen
   closeHostTransports()
   hostLink.value = 'connecting'
   if (!navigator.onLine) { hostLink.value = 'error'; return }
-  // 로그인 중이면 최신 topic 으로 기억 갱신(로그인 안 했으면 기억해 둔 것 그대로)
-  if (session.value) {
-    const t = await api.channelTopics(code)
-    if (my !== gen) return
-    if (t) saveHost(code, { title: loadHost(code)?.title ?? code, ...t })
-  }
-  const h = loadHost(code)
-  if (!h?.controlTopic || !h.viewTopic) { hostNeedsLogin.value = true; hostLink.value = 'error'; return }
+  if (!loadHost(code)?.token) await refreshGrant(code)
+  if (my !== gen) return
+  const token = loadHost(code)?.token
+  if (!token) { hostNeedsLogin.value = true; hostLink.value = 'error'; return }
+
+  const j = await api.hostJoin(code, token)
+  if (my !== gen) return
+  if (j.status === 'token_rejected') { if (!retried) await onRejected(code); return }
+  if (j.status !== 'ok' || !j.controlTopic || !j.viewTopic) { hostLink.value = 'error'; return }
   hostNeedsLogin.value = false
-  view = new SupabaseRealtimeTransport(supabase, h.viewTopic)
-  ctl = new SupabaseRealtimeTransport(supabase, h.controlTopic, {
+  patchHost(code, { title: j.title ?? loadHost(code)?.title ?? code, controlTopic: j.controlTopic, viewTopic: j.viewTopic })
+
+  view = new SupabaseRealtimeTransport(supabase, j.viewTopic, { sendOnly: true })
+  ctl = new SupabaseRealtimeTransport(supabase, j.controlTopic, {
     onStatus: (st) => {
       if (my !== gen) return
-      if (st === 'SUBSCRIBED') { hostLink.value = 'live'; replyState() } // 연결되면 한 번 알림(재연결 시 리모컨이 따라오도록)
+      if (st === 'SUBSCRIBED') hostLink.value = 'live'
       else if (BAD(st)) hostLink.value = 'error'
     },
   })
-  ctl.subscribe((m) => {
-    if (m.type === 'command') onCommand?.(m.cmd)
-    else if (m.type === 'request-state') replyState()
-  })
-  view.subscribe((m) => { if (m.type === 'request-state') replyState() })
+  // 알림은 '바뀌었다'는 신호로만 — 실제 상태는 서버에서 읽는다
+  ctl.subscribe((m) => { if (m.type === 'state') scheduleFetch() })
+
+  // 상태 맞추기: 끊긴 동안 PC 혼자 송출했다면 PC 기준(force), 아니면 더 새로운 쪽
+  const local = getState?.()
+  if (isHostDirty(code) && local) await push(local, true)
+  else {
+    if (j.state) adopt?.(j.state)
+    const now = getState?.()
+    if (now && (!j.state || now.version > j.state.version)) await push(now, false)
+  }
+}
+
+/** 서버의 현재 상태를 읽어 반영(리모컨이 바꿨을 때). 짧은 시간의 여러 알림은 한 번으로 */
+function scheduleFetch(delay = 150) {
+  clearTimeout(fetchTimer)
+  fetchTimer = window.setTimeout(async () => {
+    const code = hostCode
+    const token = code ? loadHost(code)?.token : null
+    if (!code || !token) return
+    if (pushing || queued) { scheduleFetch(); return } // 올리는 중이면 끝난 뒤에
+    const j = await api.hostJoin(code, token)
+    if (code !== hostCode) return
+    if (j.status === 'ok' && j.state) adopt?.(j.state)
+    else if (j.status === 'token_rejected') void onRejected(code)
+  }, delay)
+}
+
+/** 서버에 올리고, 성공하면 보기 기기·리모컨에 알린다. 동시에 여러 번 오면 마지막 것만 이어서 */
+async function push(s: LiveState, force: boolean) {
+  const code = hostCode
+  if (!code) return
+  if (pushing) { queued = { s, force: force || !!queued?.force }; return }
+  const token = loadHost(code)?.token
+  if (!token) { setHostDirty(code, true); return }
+  pushing = true
+  try {
+    const st = await api.hostSetState(code, token, s, force)
+    if (code !== hostCode) return
+    if (st === 'ok') {
+      setHostDirty(code, false)
+      const msg: SyncMessage = { type: 'state', state: s }
+      view?.send(msg); ctl?.send(msg)
+    } else if (st === 'stale') {
+      setHostDirty(code, false) // 그 사이 리모컨이 바꿈 → 서버 것을 따른다
+      scheduleFetch(0)
+    } else if (st === 'token_rejected') {
+      setHostDirty(code, true)
+      void onRejected(code)
+    } else {
+      setHostDirty(code, true) // 인터넷 끊김 등 — PC 혼자 계속, 다시 연결되면 PC 기준으로
+      hostLink.value = 'error'
+    }
+  } finally {
+    pushing = false
+    const q = queued
+    queued = null
+    if (q) void push(q.s, q.force)
+  }
 }
 
 const onOnline = () => { if (hostCode) void connectHost() }
-// 로그인하면 최신 topic 을 받아 다시 연결(기억이 없던 PC 도 이때 생긴다)
-watch(session, (s) => { if (s && hostCode) void connectHost() })
+const onOffline = () => { if (hostCode) hostLink.value = 'error' }
+// 로그인하면 이 PC 의 호스트 토큰을 새로 받아 다시 연결
+watch(session, (s) => { if (s && hostCode && hostLink.value !== 'live') { patchHost(hostCode, { token: hostNeedsLogin.value ? null : loadHost(hostCode)?.token ?? null }); void connectHost() } })
 
-export function startHostSync(code: string, opts: { onCommand: (raw: unknown) => void; getState: () => LiveState }) {
+export function startHostSync(code: string, opts: { getState: () => LiveState; adopt: (s: unknown) => void }) {
   stopHostSync()
   hostCode = code
-  onCommand = opts.onCommand
   getState = opts.getState
+  adopt = opts.adopt
   window.addEventListener('online', onOnline)
+  window.addEventListener('offline', onOffline)
   retryTimer = window.setInterval(() => {
     if (hostCode && hostLink.value === 'error' && !hostNeedsLogin.value) void connectHost()
-  }, 20000)
+  }, 15000)
   void connectHost()
 }
 
-/** 접속 끊기/비밀번호 변경으로 topic 이 바뀐 뒤 호출(새 topic 은 호출 전에 saveHost 로 기억) */
+/** 접속 끊기 뒤 새 토큰을 저장하고 호출 */
 export function reconnectHost() { void connectHost() }
 
-/** liveStore 가 상태가 바뀔 때마다 호출 */
+/** liveStore 가 PC 조작으로 상태가 바뀔 때마다 호출 */
 export function publishHost(s: LiveState) {
-  view?.send({ type: 'state', state: s })
-  ctl?.send({ type: 'state', state: s }) // 리모컨 모니터용(리모컨은 control topic 에서만 상태를 믿는다)
+  const code = hostCode
+  if (!code) return
+  setHostDirty(code, true) // 서버 확인 전까지는 '못 올림'(중간에 새로고침돼도 다시 연결 시 PC 기준)
+  void push(s, false)
 }
 
 export function stopHostSync() {
   gen++
-  clearInterval(retryTimer); clearTimeout(replyTimer); replyTimer = undefined
+  clearInterval(retryTimer); clearTimeout(fetchTimer)
   window.removeEventListener('online', onOnline)
+  window.removeEventListener('offline', onOffline)
   closeHostTransports()
-  hostCode = null; onCommand = null; getState = null
+  hostCode = null; getState = null; adopt = null; queued = null; pushing = false
   hostLink.value = 'off'
   hostNeedsLogin.value = false
 }
@@ -125,22 +194,23 @@ export function stopHostSync() {
 // ── 리모컨 ──────────────────────────────────────────
 let remoteCode: string | null = null
 let rCtl: SupabaseRealtimeTransport | null = null
+let rView: SupabaseRealtimeTransport | null = null
+let rOnState: ((s: LiveState) => void) | null = null
 let catchTimer: number | undefined
 
-const askState = () => rCtl?.send({ type: 'request-state', from: 'remote' })
+function rejectRemote() {
+  remoteRejected.value = true
+  stopRemote(true)
+}
 
-/** 토큰이 아직 유효한지 확인하고, 놓친 변경이 있을 수 있으니 상태를 다시 요청 */
+/** 토큰 확인 + 서버 상태로 따라잡기(끊긴 동안 놓친 변경 보정) */
 async function catchUp() {
   const code = remoteCode
   if (!code) return
   const j = await api.joinControl(code)
   if (code !== remoteCode) return
-  if (j.status === 'token_rejected' || j.status === 'password_required' || j.status === 'not_found') {
-    remoteRejected.value = true
-    stopRemote(true)
-    return
-  }
-  askState()
+  if (j.status === 'token_rejected' || j.status === 'password_required' || j.status === 'not_found') return rejectRemote()
+  if (j.status === 'ok' && j.state) rOnState?.(j.state)
 }
 const onVisible = () => { if (document.visibilityState === 'visible') void catchUp() }
 
@@ -149,30 +219,41 @@ export function startRemote(code: string, join: api.Join, onState: (s: LiveState
   remoteRejected.value = false
   if (!supabase || !join.controlTopic) { remoteLink.value = 'error'; return }
   remoteCode = code
+  rOnState = onState
+  if (join.state) onState(join.state)
   remoteLink.value = 'connecting'
   rCtl = new SupabaseRealtimeTransport(supabase, join.controlTopic, {
     onStatus: (st) => {
-      if (st === 'SUBSCRIBED') { remoteLink.value = 'live'; askState() }
+      if (st === 'SUBSCRIBED') { remoteLink.value = 'live'; void catchUp() }
       else if (BAD(st)) remoteLink.value = 'error'
     },
   })
-  rCtl.subscribe((m) => {
-    if (m.type === 'state' && isLiveState(m.state)) onState(normalizeLive(m.state))
-  })
+  rCtl.subscribe((m) => { if (m.type === 'state' && isLiveState(m.state)) onState(normalizeLive(m.state)) })
+  if (join.viewTopic) rView = new SupabaseRealtimeTransport(supabase, join.viewTopic, { sendOnly: true })
   catchTimer = window.setInterval(() => void catchUp(), 30000)
   document.addEventListener('visibilitychange', onVisible)
 }
 
-export function sendRemote(cmd: Command) {
-  rCtl?.send({ type: 'command', cmd })
+/** 명령을 서버로 → 서버가 적용한 상태를 화면에 쓰고 PC·보기 기기에 알림 */
+export async function sendRemote(cmd: Command) {
+  const code = remoteCode
+  if (!code) return
+  const r = await api.remoteCommand(code, cmd)
+  if (code !== remoteCode) return
+  if (r.status === 'ok' && r.state) {
+    rOnState?.(r.state)
+    const msg: SyncMessage = { type: 'state', state: r.state }
+    rCtl?.send(msg); rView?.send(msg)
+  } else if (r.status === 'token_rejected' || r.status === 'not_found') rejectRemote()
+  else if (r.status === 'error') remoteLink.value = 'error'
 }
 
 /** keepRejected: 거부로 멈춘 경우 rejected 표시를 유지 */
 export function stopRemote(keepRejected = false) {
   clearInterval(catchTimer)
   document.removeEventListener('visibilitychange', onVisible)
-  rCtl?.close(); rCtl = null
-  remoteCode = null
+  rCtl?.close(); rView?.close(); rCtl = null; rView = null
+  remoteCode = null; rOnState = null
   remoteLink.value = 'off'
   if (!keepRejected) remoteRejected.value = false
 }

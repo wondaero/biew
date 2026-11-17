@@ -1,12 +1,16 @@
 /**
- * 채널 마이그레이션(supabase/migrations/20261117000000_channels.sql) 적용 후 검증.
+ * 채널 마이그레이션(supabase/migrations/2026111*_channel*.sql) 적용 후 검증.
  *   npm run verify:channels
  * .env 필요: SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
  * 임시 스태프 계정과 임시 채널(Lorem 더미)을 만들고, 끝나면 모두 삭제한다. 가사·실데이터는 건드리지 않는다.
- * 확인: RLS(남의 채널 안 보임), 비밀번호/토큰 흐름, 잠금, 접속 끊기, 보기 비밀번호 선택, 삭제.
+ * 확인: RLS(남의 채널 안 보임), 비밀번호/토큰 흐름, 접속 끊기, 보기 비밀번호 선택, 삭제,
+ *       인터넷 송출 상태(호스트 토큰·상태 올리기·리모컨 명령·서버 실시간 알림), 서버 이동 규칙 = 앱(nav.ts) 대조.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { randomBytes } from 'node:crypto'
+import * as nav from '../src/live/nav'
+import { parseCommand } from '../src/live/commands'
+import { emptyLiveState, type LiveState, type SetlistItem } from '../shared/types'
 
 process.loadEnvFile()
 const url = process.env.SUPABASE_URL
@@ -107,18 +111,78 @@ try {
   check('소유자는 제목 수정 가능', !rename.error && rename.data?.[0]?.title === 'Lorem renamed', rename.error?.message)
   const hv = await owner.from('channels').update({ has_view_password: false }).eq('code', code)
   check('has_view_password 직접 변조 거부', !!hv.error)
-  check('입장 응답에 송출 상태(가사) 없음', ok !== undefined && !('state' in ok) && vok !== undefined && !('state' in vok))
+  check('비밀번호 틀림 응답엔 상태(가사) 없음', !((await g({ p_password: 'nope' })) as { state?: unknown } | undefined)?.state)
 
-  // ── 잠금(별도 채널) ──
+  // ── 서버는 잠그지 않는다(폰별 잠금은 클라이언트에서) ──
   const lk = async (pw: string) => first<J>((await rpc(guest, 'join_control', { p_code: lockCode, p_password: pw })).data)
-  for (let i = 0; i < 5; i++) await lk('wrong')
-  check('5번 틀리면 잠김(맞는 비밀번호도 거부)', (await lk('ctl-pass-3'))?.status === 'locked')
+  for (let i = 0; i < 6; i++) await lk('wrong')
+  check('여러 번 틀려도 서버는 다른 기기를 잠그지 않음', (await lk('ctl-pass-3'))?.status === 'ok')
+
+  // ── 인터넷 송출: 호스트 토큰 · 상태 · 리모컨 명령 ──
+  const seed = (v: number): LiveState => ({ ...emptyLiveState('pc-verify'), version: v, setlist: [
+    { key: 'k0', songId: 's0', title: 'Lorem A', slides: ['Lorem 0', 'Lorem 1'] },
+    { key: 'k1', songId: 's1', title: 'Lorem B', slides: [] },
+    { key: 'k2', songId: 's2', title: 'Lorem C', slides: ['Lorem 2'] },
+  ] })
+  const hostTok = first<{ token: string }>((await rpc(owner, 'issue_host_token', { p_code: openCode })).data)?.token
+  check('소유자는 호스트 토큰 발급', !!hostTok)
+  check('비로그인은 호스트 토큰 발급 불가', !!(await rpc(guest, 'issue_host_token', { p_code: openCode })).error)
+  const hj = async (tok?: string) => first<{ status: string; state: unknown }>((await rpc(guest, 'host_join', { p_code: openCode, p_token: tok ?? null })).data)
+  check('호스트 토큰으로 입장(로그인 불필요)', (await hj(hostTok))?.status === 'ok')
+  check('가짜 호스트 토큰 거부', (await hj('deadbeef'))?.status === 'token_rejected')
+  const hs = async (st: LiveState, force = false, tok = hostTok) =>
+    first<{ status: string; version: number }>((await rpc(guest, 'host_set_state', { p_code: openCode, p_token: tok, p_state: st, p_force: force })).data)
+  const v0 = Date.now()
+  check('호스트 상태 올리기', (await hs(seed(v0)))?.status === 'ok')
+  check('더 오래된 상태는 stale(그 사이 바뀐 서버가 우선)', (await hs(seed(v0 - 1000)))?.status === 'stale')
+  check('force(다시 연결된 PC 기준)는 덮어씀', (await hs(seed(v0 - 500), true))?.status === 'ok')
+  check('리모컨 토큰으로는 호스트 상태를 못 씀', (await hs(seed(v0 + 1), false, ok?.token ?? 'x'))?.status === 'token_rejected')
+
+  const ctlTok = first<J>((await rpc(guest, 'join_control', { p_code: openCode, p_password: 'ctl-pass-2' })).data)
+    const rc = async (cmd: unknown, tok = ctlTok?.token) =>
+    first<{ status: string; state: LiveState }>((await rpc(guest, 'remote_command', { p_code: openCode, p_token: tok, p_cmd: cmd })).data)
+  const r1 = await rc({ cmd: 'next' })
+  check('리모컨 ▶ → 서버가 적용(Lorem A 2번째 장)', r1?.status === 'ok' && r1.state.itemIndex === 0 && r1.state.slideIndex === 1)
+  const r2 = await rc({ cmd: 'next' })
+  check('리모컨 ▶ → 빈 곡 건너뛰고 다음 곡', r2?.status === 'ok' && r2.state.itemIndex === 2 && r2.state.slideIndex === 0)
+  check('범위 밖 점프는 무시(noop)', (await rc({ cmd: 'go', itemIndex: 1, slideIndex: 0 }))?.status === 'noop')
+  check('허용 안 된 명령(freeze·콘티 교체)은 무시', (await rc({ cmd: 'freeze' }))?.status === 'noop' && (await rc({ cmd: 'replace', setlist: [] }))?.status === 'noop')
+  check('보기 토큰으로는 리모컨 명령 불가', (await rc({ cmd: 'next' }, vok?.token ?? 'x'))?.status === 'token_rejected')
+  // 변경 알림은 변경한 클라이언트가 보낸다(DB 발 공개 알림은 전달되지 않음 — 20261118010000 참고)
+  check('호스트는 리모컨이 바꾼 상태를 읽음', ((await hj(hostTok))?.state as LiveState)?.itemIndex === 2)
+
+  // ── 서버 이동 규칙 = 앱(nav.ts) ──
+  let seedN = 7
+  const rnd = (n: number) => { seedN = (seedN * 1103515245 + 12345) & 0x7fffffff; return seedN % n }
+  const tsApply = (st: LiveState, cmd: Record<string, unknown>) => {
+    if (cmd.cmd === 'blank') return { ...st, blank: !st.blank }
+    const c = parseCommand(cmd, st)
+    if (!c || c.cmd === 'blank') return null
+    const cur = c.cmd === 'go' ? { itemIndex: c.itemIndex, slideIndex: c.slideIndex } : nav[c.cmd](st)
+    return cur ? { ...st, ...cur, blank: false } : null
+  }
+  let mismatch = ''
+  for (let t = 0; t < 120 && !mismatch; t++) {
+    const setlist: SetlistItem[] = Array.from({ length: 1 + rnd(4) }, (_, i) => ({ key: 'k' + i, songId: 's' + i, title: 'L' + i, slides: Array.from({ length: rnd(4) }, (_, j) => 'Lorem ' + j) }))
+    const itemIndex = rnd(setlist.length), slideIndex = rnd(Math.max(1, setlist[itemIndex]!.slides.length))
+    const st: LiveState = { ...emptyLiveState('pc'), version: 1, setlist, itemIndex, slideIndex, blank: rnd(2) === 1 }
+    const cmds: Record<string, unknown>[] = [{ cmd: 'next' }, { cmd: 'prev' }, { cmd: 'nextSong' }, { cmd: 'prevSong' }, { cmd: 'blank' }, { cmd: 'go', itemIndex: rnd(5) - 1, slideIndex: rnd(5) - 1 }]
+    const cmd = cmds[rnd(cmds.length)]!
+    const exp = tsApply(st, cmd)
+    const { data, error } = await admin.rpc('_apply_command', { st, cmd })
+    const act = data as LiveState | null
+    const same = exp === null ? act === null : !!act && act.itemIndex === exp.itemIndex && act.slideIndex === exp.slideIndex && act.blank === exp.blank
+    if (error || !same) mismatch = `${JSON.stringify(cmd)} @ ${itemIndex}/${slideIndex} lens=${setlist.map((x) => x.slides.length)} → 앱 ${exp ? exp.itemIndex + '/' + exp.slideIndex : 'null'} / 서버 ${act ? act.itemIndex + '/' + act.slideIndex : 'null'} ${error?.message ?? ''}`
+  }
+  check('서버 이동 규칙 = 앱 이동 규칙(무작위 120건 대조)', !mismatch, mismatch)
 
   // ── 접속 끊기 ──
   const reset = first<{ control_topic: string; view_topic: string }>((await rpc(owner, 'reset_channel_access', { p_code: code, p_control_password: 'ctl-pass-9' })).data)
   check('접속 끊기: topic 재발급', !!reset && reset.control_topic !== tp?.control_topic && reset.view_topic !== tp?.view_topic)
   check('접속 끊기: 기존 컨트롤 토큰 거부', (await g({ p_token: ok?.token }))?.status === 'token_rejected')
   check('접속 끊기: 기존 보기 토큰 거부', (await v(code, { p_token: vok?.token }))?.status === 'token_rejected')
+  await rpc(owner, 'reset_channel_access', { p_code: openCode })
+  check('접속 끊기: 호스트 PC 토큰도 거부(→ PC 가 "로그인 필요"를 앎)', (await hj(hostTok))?.status === 'token_rejected')
   check('비밀번호 변경: 새 비밀번호 ok / 옛 비밀번호 거부', (await g({ p_password: 'ctl-pass-9' }))?.status === 'ok' && (await g({ p_password: 'ctl-pass-1' }))?.status === 'bad_password')
   const noOwnerReset = await rpc(guest, 'reset_channel_access', { p_code: code })
   check('비로그인은 접속 끊기 불가', !!noOwnerReset.error)

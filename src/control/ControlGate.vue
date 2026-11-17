@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * /control/:code 진입 게이트. 접속한 기기에 따라 역할을 정한다.
- *  1. 이 PC 가 이 채널의 호스트 기록(만들 때 기억한 주소)을 갖고 있음 → 호스트. 로그인·인터넷 불필요
- *  2. 기록은 없지만 지금 채널을 만든 계정으로 로그인돼 있음 → 호스트로 열고 이 PC 에 주소를 기억
+ *  1. 이 PC 가 이 채널의 호스트 기록(만들 때 받은 호스트 토큰)을 갖고 있음 → 호스트. 로그인·인터넷 불필요
+ *  2. 기록은 없지만 지금 채널을 만든 계정으로 로그인돼 있음 → 이 PC 용 호스트 토큰을 받아 저장하고 호스트로
  *  3. 그 외 → 리모컨: 저장된 토큰 또는 컨트롤 비밀번호로 입장(이동·BLANK·점프만)
  * 로그인은 저장되지 않으므로(lib/supabase.ts) 호스트 판정을 로그인에 기대지 않는다 — 새로고침·오프라인에도 호스트 유지.
  */
@@ -12,7 +12,7 @@ import { session, authReady } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
 import { startHostSync, stopHostSync, publishHost, startRemote, stopRemote, sendRemote, remoteRejected } from '@/channel/sync'
-import { openHost, openRemote, closeChannel, handleCommand, adoptState, useLive } from '@/live/liveStore'
+import { openHost, openRemote, closeChannel, adoptState, useLive } from '@/live/liveStore'
 import { loadHost, saveHost } from '@/live/persistence'
 import ControlView from './ControlView.vue'
 
@@ -46,9 +46,9 @@ async function enter() {
   const c = code.value
   if (!api.isCode(c)) return fail('잘못된 채널 번호입니다.')
 
-  // 1. 이 PC 의 호스트 기록 — 서버에 묻지 않는다(오프라인에서도 바로 열림)
+  // 1. 이 PC 의 호스트 기록 — 서버에 묻지 않는다(오프라인에서도 바로 열림). 토큰이 만료돼도 PC 송출은 되므로 호스트로 연다
   const hosted = loadHost(c)
-  if (hosted) return enterHost(c, hosted.title)
+  if (hosted) return enterHost(c, hosted.title, null)
 
   if (!supabase) return fail('Supabase 설정(.env)이 없어 채널 기능을 쓸 수 없습니다.')
   await waitAuth()
@@ -59,20 +59,23 @@ async function enter() {
     const { row } = await api.getChannel(c)
     if (my !== ticket) return
     if (row) {
-      const t = await api.channelTopics(c)
+      const g = await api.issueHostToken(c)
       if (my !== ticket) return
-      saveHost(c, { title: row.title, controlTopic: t?.controlTopic ?? null, viewTopic: t?.viewTopic ?? null })
-      return enterHost(c, row.title)
+      if (!g.grant) return fail(g.error ?? '호스트 권한을 받지 못했습니다.')
+      saveHost(c, { title: g.grant.title, token: g.grant.token, controlTopic: g.grant.controlTopic, viewTopic: g.grant.viewTopic })
+      return enterHost(c, g.grant.title, g.grant.state)
     }
   }
   // 3. 리모컨
   await enterRemote(c, undefined, my)
 }
 
-function enterHost(c: string, t: string) {
+/** serverState: 처음 등록할 때 받은 서버 상태(다른 PC·리모컨이 쓰던 것) — 더 새로우면 이어받는다 */
+function enterHost(c: string, t: string, serverState: unknown) {
   title.value = t
   openHost(c, { publish: publishHost })
-  startHostSync(c, { onCommand: handleCommand, getState: () => JSON.parse(JSON.stringify(live.state)) })
+  adoptState(serverState)
+  startHostSync(c, { getState: () => JSON.parse(JSON.stringify(live.state)), adopt: adoptState })
   phase.value = 'ready'
 }
 

@@ -44,24 +44,38 @@ export function saveLive(code: string, s: LiveState) {
   try { localStorage.setItem(keyOf(code), JSON.stringify(s)) } catch { /* quota/private mode */ }
 }
 
-// ── 호스트 기록: 이 PC 가 호스트인 채널 ────────────────────────────
+// ── 호스트 기록: 이 PC 가 인터넷 송출의 호스트인 채널 ───────────────────
 /**
  * 채널을 만들거나(로그인 상태) 로그인해서 호스트로 연 PC 에만 남는다.
- * topic(실시간 비밀 주소)을 기억해 두므로 새로고침·로그아웃·오프라인이어도 로그인 없이 호스트로 열리고 폰과 다시 연결된다.
- * 계정 권한이 아니라 그 채널 하나의 송출 조작·연결만 가능. 다른 곳에서 "모든 기기 접속 끊기"를 하면 topic 이 바뀌어 무효 → 이 PC 에서 다시 로그인.
+ * token = 채널 전용 호스트 토큰(계정 로그인 아님). 서버에 상태를 올리고 읽는 권한 — 그 채널 하나의 송출만.
+ * 로그인을 저장하지 않으므로 새로고침·로그아웃·오프라인이어도 이 토큰으로 호스트가 된다.
+ * "모든 기기 접속 끊기"(어디서 하든)나 30일 미사용이면 서버가 거부 → 이 PC 에서 다시 로그인하면 새 토큰.
  */
-export interface HostRecord { title: string; controlTopic: string | null; viewTopic: string | null; openedAt: string }
+export interface HostRecord {
+  title: string
+  token: string | null
+  controlTopic: string | null
+  viewTopic: string | null
+  openedAt: string
+}
 const HOST = 'biew.host.'
+const DIRTY = 'biew.hostdirty.'
 
 export function saveHost(code: string, r: Omit<HostRecord, 'openedAt'>) {
   try { localStorage.setItem(HOST + code, JSON.stringify({ ...r, openedAt: new Date().toISOString() })) } catch { /* ignore */ }
+}
+/** 일부만 갱신(토큰 무효화·topic 갱신 등) */
+export function patchHost(code: string, patch: Partial<Omit<HostRecord, 'openedAt'>>) {
+  const r = loadHost(code)
+  if (r) saveHost(code, { title: r.title, token: r.token, controlTopic: r.controlTopic, viewTopic: r.viewTopic, ...patch })
 }
 export function loadHost(code: string): HostRecord | null {
   try {
     const raw = localStorage.getItem(HOST + code)
     if (!raw) return null
-    const r = JSON.parse(raw) as HostRecord
-    return typeof r?.title === 'string' ? r : null
+    const r = JSON.parse(raw) as Partial<HostRecord>
+    if (typeof r?.title !== 'string') return null
+    return { title: r.title, token: r.token ?? null, controlTopic: r.controlTopic ?? null, viewTopic: r.viewTopic ?? null, openedAt: r.openedAt ?? '' }
   } catch { return null }
 }
 /** 이 기기에서 호스트로 연 채널 목록(최근 연 순) */
@@ -77,7 +91,17 @@ export function listHosts(): (HostRecord & { code: string })[] {
   } catch { /* ignore */ }
   return out.sort((a, b) => (b.openedAt ?? '').localeCompare(a.openedAt ?? ''))
 }
+/**
+ * 서버에 아직 못 올린 PC 변경이 있는지(인터넷이 끊긴 동안 PC 혼자 송출).
+ * 다시 연결되면 PC 기준으로 서버를 덮어쓴다(force). 새로고침해도 잊지 않도록 저장.
+ */
+export function setHostDirty(code: string, dirty: boolean) {
+  try { dirty ? localStorage.setItem(DIRTY + code, '1') : localStorage.removeItem(DIRTY + code) } catch { /* ignore */ }
+}
+export function isHostDirty(code: string): boolean {
+  try { return localStorage.getItem(DIRTY + code) === '1' } catch { return false }
+}
 /** 이 기기에서 채널 흔적(호스트 기록 + 콘티) 지우기. 서버의 채널은 그대로 */
 export function forgetChannelLocal(code: string) {
-  try { localStorage.removeItem(HOST + code); localStorage.removeItem(keyOf(code)) } catch { /* ignore */ }
+  try { localStorage.removeItem(HOST + code); localStorage.removeItem(DIRTY + code); localStorage.removeItem(keyOf(code)) } catch { /* ignore */ }
 }

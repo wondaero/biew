@@ -3,9 +3,10 @@
  * 모든 변경은 commit() 하나를 거친다 → version 증가 → localStorage 저장 → 전송.
  *
  * 채널 하나를 연 동안만 의미가 있다(openHost / openRemote → closeChannel).
- *  - host   : 이 PC 가 상태의 원본. 변경은 commit() 으로, 폰 리모컨 명령은 handleCommand() 로 받는다.
- *  - remote : 폰 리모컨. 상태는 호스트가 보내준 것을 그대로 비추기만 하고(commit 불가),
- *             actions 는 명령(Command)으로 바뀌어 호스트에 전달된다. 곡/콘티/스타일 변경 권한 없음.
+ *  - host   : 이 PC 의 컨트롤러. 변경은 commit() — 화면을 먼저 바꾸고, 인터넷 송출이면 publish 로 서버에 올린다.
+ *             리모컨이 서버 상태를 바꾸면 adoptState() 로 따라간다(로컬 송출이면 서버 없음).
+ *  - remote : 폰 리모컨. 상태는 서버가 준 것을 비추기만 하고(commit 불가),
+ *             actions 는 명령(Command)으로 바뀌어 서버(remote_command)로 간다. 곡/콘티/스타일 변경 권한 없음.
  */
 import { reactive, ref, computed, readonly } from 'vue'
 import { emptyLiveState, nextVersion, type LiveState, type OutputStyle, type SetlistItem } from '@shared/types'
@@ -14,7 +15,6 @@ import { SyncHub } from '@/sync/SyncHub'
 import type { Command } from '@/sync/SyncTransport'
 import { loadLive, saveLive, isLiveState, normalizeLive } from './persistence'
 import * as nav from './nav'
-import { parseCommand } from './commands'
 import { uid } from '@/lib/uid'
 import type { Cursor } from './nav'
 
@@ -110,7 +110,7 @@ function go(c: Cursor | null) {
 /** 다음 송출될 위치: PVW 에서 고른 것 or 자동 다음 장 */
 const upcoming = computed<Cursor | null>(() => preview.value ?? nav.next(state))
 
-/** 호스트가 리모컨 명령을 실제로 적용 */
+/** 호스트(PC)가 자기 조작을 적용(인터넷 송출의 리모컨 명령은 서버가 적용 — remote_command) */
 function applyCommand(c: Command) {
   switch (c.cmd) {
     case 'next': go(nav.next(state)); break
@@ -120,13 +120,6 @@ function applyCommand(c: Command) {
     case 'blank': commit((s) => { s.blank = !s.blank }); break
     case 'go': go({ itemIndex: c.itemIndex, slideIndex: c.slideIndex }); break
   }
-}
-
-/** 리모컨에서 온 원본 메시지: 허용된 명령만 통과(live/commands.ts) */
-export function handleCommand(raw: unknown) {
-  if (role.value !== 'host') return
-  const c = parseCommand(raw, state)
-  if (c) applyCommand(c)
 }
 
 /** 리모컨이면 명령으로 보내고, 호스트면 바로 적용 */

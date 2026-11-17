@@ -1,5 +1,15 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { ref } from 'vue'
 import type { Song } from '@shared/types'
+
+/**
+ * 저장소 구조 업그레이드 안내.
+ * IndexedDB 는 같은 PC 의 다른 창이 옛 버전으로 열고 있으면, 그 창이 닫힐 때까지 업그레이드가 '멈춰서 기다린다'.
+ *  - blocked : 이 창(새 버전)이 옛 창 때문에 기다리는 중 → 사용자에게 옛 창을 닫으라고 안내(닫히면 자동으로 이어짐)
+ *  - blocking: 이 창이 다른 창(더 새 버전)의 업그레이드를 막는 중 → 연결을 스스로 닫아 길을 비켜 준다
+ * 송출(컨트롤러↔출력 창)은 IndexedDB 를 쓰지 않으므로 어느 경우에도 송출은 멈추지 않는다.
+ */
+export const dbNotice = ref<string | null>(null)
 
 /**
  * PC 에서 고친 곡 / 새로 등록한 곡 — 서버에 아직 안 올라간 변경(오프라인·로그인 없이 저장한 것).
@@ -32,6 +42,18 @@ function db() {
       }
       if (oldVersion < 2) d.createObjectStore('pending', { keyPath: 'id' })
     },
+    blocked() {
+      dbNotice.value = '다른 Biew 창(옛 버전)이 열려 있어 곡 목록을 불러오지 못하고 있습니다. 다른 Biew 창을 닫거나 새로고침하면 바로 이어집니다. (송출은 영향 없음)'
+    },
+    blocking() {
+      // 더 새 버전이 다른 창에서 열림 → 이 창의 연결을 닫아 그쪽 업그레이드를 막지 않는다
+      void dbp?.then((d) => d.close())
+      dbp = null
+      dbNotice.value = '다른 창에서 새 버전이 열렸습니다. 이 창을 새로고침해 주세요. (송출은 영향 없음)'
+    },
+  }).then((d) => {
+    if (dbNotice.value?.startsWith('다른 Biew 창')) dbNotice.value = null // 기다리던 업그레이드가 끝남
+    return d
   })
   return dbp
 }

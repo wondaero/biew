@@ -8,6 +8,7 @@ import { useLive } from '@/live/liveStore'
 import type { Song } from '@shared/types'
 import SongEditor from '../SongEditor.vue'
 import UploadDialog from '../UploadDialog.vue'
+import { dbNotice } from '@/library/db'
 
 const lib = useLibrary()
 const live = useLive()
@@ -70,6 +71,7 @@ defineExpose({ focus: () => input.value?.focus() })
         ↑ 서버에 올리기 {{ lib.pendingCount.value }}건{{ online ? '' : ' (인터넷 연결 후)' }}
       </button>
       <p v-if="notice" class="notice" @click="notice = null">{{ notice }}</p>
+      <p v-if="dbNotice" class="dbnotice">{{ dbNotice }}</p>
       <div class="status" :class="syncStatus">
         <span>{{ statusText }}</span>
         <template v-if="session">
@@ -142,6 +144,7 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .upload { margin-top: 6px; width: 100%; padding: 5px 8px; font-size: 12px; color: var(--warn); border-color: #5a4a1e; background: none; }
 .upload.ready { background: #3a3014; }
 .notice { margin: 6px 0 0; font-size: 12px; color: var(--warn); cursor: pointer; }
+.dbnotice { margin: 6px 0 0; font-size: 12px; color: var(--warn); }
 .n { font-size: 11px; color: var(--muted); }
 .empty { color: var(--muted); cursor: default !important; }
 </style>
