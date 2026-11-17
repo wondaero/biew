@@ -24,6 +24,10 @@ function add(i = sel.value) {
   live.setlist.add(h.song)
   input.value?.select()
 }
+/** v-model 은 한글 조합이 끝날 때까지 값을 갱신하지 않아("안녕" 입력 중에도 "안"으로 검색) — 입력마다 바로 반영 */
+function onInput(e: Event) {
+  q.value = (e.target as HTMLInputElement).value
+}
 function onKey(e: KeyboardEvent) {
   if (e.isComposing) return
   if (e.key === 'ArrowDown') { sel.value = Math.min(sel.value + 1, hits.value.length - 1); e.preventDefault() }
@@ -91,10 +95,11 @@ defineExpose({ focus: () => input.value?.focus() })
 
     <input
       ref="input"
-      v-model="q"
+      :value="q"
       class="search"
       type="search"
       placeholder="제목·가사 검색  ( / )"
+      @input="onInput"
       @keydown="onKey"
     />
     <ol class="hits">

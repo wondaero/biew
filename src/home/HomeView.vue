@@ -159,7 +159,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
     <h2 class="group">인터넷 송출 <small>폰 리모컨·보기 기기 · 서버를 거침 · 가끔 쓸 때</small></h2>
 
     <!-- 제목 검색(대소문자·띄어쓰기 무시) -->
-    <input v-if="anyList" v-model="q" class="search" type="search" placeholder="채널 제목 검색 (대소문자·띄어쓰기 무시)" />
+    <input v-if="anyList" :value="q" class="search" type="search" placeholder="채널 제목 검색 (대소문자·띄어쓰기 무시)" @input="q = ($event.target as HTMLInputElement).value" />
 
     <!-- 이 기기의 채널 -->
     <section class="card">
