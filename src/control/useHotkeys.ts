@@ -4,7 +4,7 @@ import type { useLive } from '@/live/liveStore'
 type Live = ReturnType<typeof useLive>
 
 /**
- * →/Space 다음 · ← 이전 · ↑/↓ 이전/다음 곡 · B 블랭크 · 1~9,0 현재 곡 N번째 · Enter 미리보기 송출(TAKE)
+ * →/Space 다음 · ← 이전 · ↑/↓ 이전/다음 곡 · B 블랭크 · F 프리즈 걸기(해제는 버튼) · 1~9,0 현재 곡 N번째 · Enter 미리보기 송출(TAKE)
  * 입력창에 포커스가 있으면 동작하지 않는다(Esc 로 빠져나옴).
  */
 export function useHotkeys(live: Live, extra: { focusSearch: () => void }) {
@@ -29,6 +29,8 @@ export function useHotkeys(live: Live, extra: { focusSearch: () => void }) {
       case 'ArrowUp': a.prevSong(); break
       case 'Enter': a.take(); break
       case 'b': case 'B': case 'ㅠ': a.toggleBlank(); break
+      // 켜기만. 끄는 건 버튼으로만(가사 수정 중 한/영 상태에서 눌려 풀리는 사고 방지)
+      case 'f': case 'F': case 'ㄹ': a.freeze(); break
       case '/': extra.focusSearch(); break
       default:
         if (/^[0-9]$/.test(e.key)) a.nth(e.key === '0' ? 10 : Number(e.key))

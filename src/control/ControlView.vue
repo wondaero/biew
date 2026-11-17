@@ -76,6 +76,14 @@ onBeforeUnmount(() => {
         <button class="blank" :class="{ on: live.state.blank }" title="자막 내리기 (B)" @click="live.actions.toggleBlank()">
           {{ live.state.blank ? 'BLANK 해제' : 'BLANK' }}
         </button>
+        <button
+          class="freeze"
+          :class="{ on: !!live.state.frozen }"
+          title="송출 화면 고정 — 조작은 계속되지만 송출은 그대로 (F 로 걸기, 해제는 이 버튼)"
+          @click="live.state.frozen ? live.actions.unfreeze() : live.actions.freeze()"
+        >
+          {{ live.state.frozen ? 'FREEZE 해제' : 'FREEZE' }}
+        </button>
       </div>
 
       <label class="mode" title="켜면 카드 클릭 = 미리보기, Enter/TAKE = 송출">
@@ -99,6 +107,7 @@ onBeforeUnmount(() => {
         <tr><td>↓ / ↑</td><td>다음 곡 첫 장 / 이전 곡(또는 현재 곡) 첫 장</td></tr>
         <tr><td>1 ~ 9, 0</td><td>현재 곡의 N번째 (0 = 10번째)</td></tr>
         <tr><td>B</td><td>블랭크 토글</td></tr>
+        <tr><td>F</td><td>프리즈 걸기 (송출 화면 고정, 조작은 계속). 해제는 FREEZE 버튼을 직접 클릭</td></tr>
         <tr><td>Enter</td><td>TAKE (미리보기 → 송출)</td></tr>
         <tr><td>/</td><td>검색창으로</td></tr>
         <tr><td>Esc</td><td>입력창에서 빠져나오기</td></tr>
@@ -157,6 +166,7 @@ onBeforeUnmount(() => {
 .share.error { border-color: var(--pgm); }
 .group { display: flex; gap: 4px; }
 .blank.on { background: var(--warn); border-color: var(--warn); color: #222; font-weight: 700; }
+.freeze.on { background: var(--freeze); border-color: var(--freeze); color: #04212e; font-weight: 700; }
 .mode { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .spacer { flex: 1; }
 .conn { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }

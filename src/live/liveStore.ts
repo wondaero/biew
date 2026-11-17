@@ -69,6 +69,13 @@ const actions = {
   nth: (n: number) => go(nav.nth(state, n)),
   take: () => go(upcoming.value),
   toggleBlank: () => commit((s) => { s.blank = !s.blank }),
+  /** FREEZE 걸기: 지금 송출 화면을 고정(컨트롤러 조작은 계속 가능). 이미 걸려 있으면 아무것도 안 함 — 단축키용 */
+  freeze: () => {
+    if (state.frozen) return
+    commit((s) => { s.frozen = { itemIndex: s.itemIndex, slideIndex: s.slideIndex, blank: s.blank, text: nav.currentText(s) } })
+  },
+  /** FREEZE 풀기: 컨트롤러의 현재 위치가 바로 송출된다. 실수 방지로 단축키 없이 버튼으로만 */
+  unfreeze: () => { if (state.frozen) commit((s) => { s.frozen = null }) },
   setPreview: (c: Cursor | null) => { preview.value = c },
   /** 카드 클릭: 즉시 모드면 바로 송출, PVW 모드면 미리보기 지정 */
   pick: (c: Cursor) => (pvwMode.value ? (preview.value = c) : go(c)),

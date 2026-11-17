@@ -9,6 +9,15 @@ export function currentText(s: S): string | null {
   return s.setlist[s.itemIndex]?.slides[s.slideIndex] ?? null
 }
 
+export interface OnAir { itemIndex: number; slideIndex: number; blank: boolean; text: string | null; frozen: boolean }
+
+/** 실제로 송출되는 화면. FREEZE 중이면 걸어 둔 순간의 스냅샷, 아니면 컨트롤러 위치 */
+export function onAir(s: S & Pick<LiveState, 'blank' | 'frozen'>): OnAir {
+  const f = s.frozen
+  if (f) return { itemIndex: f.itemIndex, slideIndex: f.slideIndex, blank: f.blank, text: f.text, frozen: true }
+  return { itemIndex: s.itemIndex, slideIndex: s.slideIndex, blank: s.blank, text: currentText(s), frozen: false }
+}
+
 export function textAt(setlist: SetlistItem[], c: Cursor | null): string | null {
   return c ? (setlist[c.itemIndex]?.slides[c.slideIndex] ?? null) : null
 }

@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useLive } from '@/live/liveStore'
+import { onAir } from '@/live/nav'
 
 const live = useLive()
 const root = ref<HTMLElement>()
 
-const isLive = (i: number, j: number) => i === live.state.itemIndex && j === live.state.slideIndex
+/** 실제 송출 위치. FREEZE 중이면 고정된 화면 쪽이 '송출 중' 표시를 가진다 */
+const air = computed(() => onAir(live.state))
+const isLive = (i: number, j: number) => i === air.value.itemIndex && j === air.value.slideIndex
+/** FREEZE 중 컨트롤러가 가리키는 위치(아직 송출 안 됨) — 미리보기와 같은 파란 점선 */
+const isCtl = (i: number, j: number) =>
+  air.value.frozen && i === live.state.itemIndex && j === live.state.slideIndex && !isLive(i, j)
 /** 미리보기 표시는 PVW 모드에서 직접 고른 슬라이드에만 (즉시 모드에선 NEXT 모니터로 충분) */
 const isPreview = (i: number, j: number) =>
   live.pvwMode.value && live.preview.value?.itemIndex === i && live.preview.value?.slideIndex === j
@@ -47,12 +53,12 @@ watch(
   },
 )
 
-// 송출 위치가 바뀌면 해당 카드가 보이도록(이미 보이면 움직이지 않음)
+// 컨트롤러 위치가 바뀌면 해당 카드가 보이도록(이미 보이면 움직이지 않음). FREEZE 중엔 고정 화면이 아니라 컨트롤러 위치를 따라간다
 watch(
-  () => [live.state.itemIndex, live.state.slideIndex],
+  () => [live.state.itemIndex, live.state.slideIndex, !!live.state.frozen],
   async () => {
     await nextTick()
-    root.value?.querySelector('.card.live')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    root.value?.querySelector(air.value.frozen ? '.card.ctl' : '.card.live')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   },
 )
 
@@ -67,7 +73,7 @@ defineExpose({ scrollToItem })
     </div>
     <div v-for="(it, i) in live.state.setlist" :key="it.key" class="song" :data-item="i">
       <h3
-        :class="{ live: i === live.state.itemIndex, closed: isClosed(it.key) }"
+        :class="{ live: i === air.itemIndex, closed: isClosed(it.key) }"
         role="button"
         :aria-expanded="!isClosed(it.key)"
         @click="toggle(it.key)"
@@ -76,8 +82,8 @@ defineExpose({ scrollToItem })
         <span class="no">{{ i + 1 }}</span>
         <span class="name">{{ it.title }}</span>
         <small>{{ it.slides.length }}장</small>
-        <span v-if="i === live.state.itemIndex" class="onair" :class="{ blanked: live.state.blank }">
-          ● {{ live.state.blank ? 'BLANK' : '송출 중' }} {{ live.state.slideIndex + 1 }}/{{ it.slides.length }}
+        <span v-if="i === air.itemIndex" class="onair" :class="{ blanked: air.blank, frozen: air.frozen }">
+          {{ air.frozen ? '❄ FREEZE' : air.blank ? '● BLANK' : '● 송출 중' }} {{ air.slideIndex + 1 }}/{{ it.slides.length }}
         </span>
       </h3>
       <p v-if="!isClosed(it.key) && !it.slides.length" class="noslide">슬라이드 없음</p>
@@ -86,7 +92,7 @@ defineExpose({ scrollToItem })
           v-for="(s, j) in it.slides"
           :key="j"
           class="card"
-          :class="{ live: isLive(i, j), pvw: isPreview(i, j), blanked: isLive(i, j) && live.state.blank }"
+          :class="{ live: isLive(i, j), frozen: isLive(i, j) && air.frozen, pvw: isPreview(i, j), ctl: isCtl(i, j), blanked: isLive(i, j) && air.blank }"
           @click="onClick(i, j)"
           @dblclick="onDbl(i, j)"
         >
@@ -117,6 +123,7 @@ h3 .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; whi
 h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-space: nowrap; }
 .onair { font-size: 11px; font-weight: 700; color: var(--live); white-space: nowrap; }
 .onair.blanked { color: var(--warn); }
+.onair.frozen { color: var(--freeze); }
 .noslide { color: var(--muted); font-size: 12px; margin: 0 8px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .card {
@@ -125,8 +132,10 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   border: 2px solid var(--line); border-radius: 8px; overflow: hidden;
 }
 .card:hover { border-color: #5a5a68; }
-.card.pvw { border-style: dashed; border-color: var(--preview-soft); }
+.card.pvw, .card.ctl { border-style: dashed; border-color: var(--preview-soft); }
 .card.live { border-color: var(--live); background: var(--live-bg); box-shadow: 0 0 0 2px var(--live-glow); }
+.card.live.frozen { border-color: var(--freeze); background: #0c2430; box-shadow: 0 0 0 2px rgba(56, 189, 248, .35); }
+.card.live.frozen .idx { color: var(--freeze); }
 .card.live .txt { color: #fff; }
 .card.blanked .txt { opacity: .35; }
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }

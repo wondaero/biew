@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import type { SetlistItem } from '@shared/types'
 import { useLive } from '@/live/liveStore'
+import { onAir } from '@/live/nav'
 import { useLibrary } from '@/library/library'
 
 const live = useLive()
@@ -46,7 +47,7 @@ function clear() {
       <li
         v-for="(it, i) in list"
         :key="it.key"
-        :class="{ live: i === live.state.itemIndex }"
+        :class="{ live: i === onAir(live.state).itemIndex }"
         @click="emit('jump', i)"
       >
         <span class="grip" title="드래그해서 순서 변경">⋮⋮</span>

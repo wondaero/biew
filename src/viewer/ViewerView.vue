@@ -10,7 +10,7 @@ import type { LiveState } from '@shared/types'
 import { supabase } from '@/lib/supabase'
 import { SyncHub } from '@/sync/SyncHub'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
-import { currentText } from '@/live/nav'
+import { onAir } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
 
 // 넓은 화면(PC/태블릿)이면 송출 화면 그대로, 폰이면 가사 목록. 폰 가로(높이 작음)는 목록 유지
@@ -36,14 +36,16 @@ async function catchUp() {
   hub?.receive(row.state)
 }
 
-const item = computed(() => (state.value ? state.value.setlist[state.value.itemIndex] : undefined))
-const nextItem = computed(() => (state.value ? state.value.setlist[state.value.itemIndex + 1] : undefined))
-const text = computed(() => (state.value ? currentText(state.value) : null))
-const layerKey = computed(() => (state.value ? `${state.value.itemIndex}:${state.value.slideIndex}` : 0))
+// 컨트롤러가 FREEZE 중이면 고정된 화면을 따라간다(실제 송출과 같게)
+const air = computed(() => (state.value ? onAir(state.value) : null))
+const item = computed(() => (state.value && air.value ? state.value.setlist[air.value.itemIndex] : undefined))
+const nextItem = computed(() => (state.value && air.value ? state.value.setlist[air.value.itemIndex + 1] : undefined))
+const text = computed(() => air.value?.text ?? null)
+const layerKey = computed(() => (air.value ? `${air.value.itemIndex}:${air.value.slideIndex}` : 0))
 
 // 현재 슬라이드를 화면 중앙 근처로
 watch(
-  () => [state.value?.itemIndex, state.value?.slideIndex],
+  () => [air.value?.itemIndex, air.value?.slideIndex],
   async () => {
     await nextTick()
     list.value?.querySelector('.slide.cur')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -75,7 +77,7 @@ onBeforeUnmount(() => {
 <template>
   <!-- 넓은 화면: 송출 화면(출력과 같은 렌더러)만 전체로 -->
   <div v-if="wide" class="stage">
-    <SlideRender v-if="state" :text="text" :blank="state.blank" :style-cfg="state.style" :layer-key="layerKey" />
+    <SlideRender v-if="state" :text="text" :blank="air?.blank ?? false" :style-cfg="state.style" :layer-key="layerKey" />
     <p v-if="status === 'notfound'" class="wmsg">방을 찾을 수 없습니다 — 코드 <b>{{ code }}</b> 가 종료되었거나 잘못되었습니다.</p>
     <p v-else-if="!state" class="wmsg">{{ status === 'error' ? '연결할 수 없습니다.' : '불러오는 중…' }}</p>
     <span class="dot wdot" :class="status" :title="status" />
@@ -85,7 +87,7 @@ onBeforeUnmount(() => {
     <header>
       <div class="t">
         <strong>{{ item?.title ?? '실시간 가사' }}</strong>
-        <small v-if="item && state">{{ state.slideIndex + 1 }} / {{ item.slides.length }}</small>
+        <small v-if="item && air">{{ air.slideIndex + 1 }} / {{ item.slides.length }}</small>
       </div>
       <span class="dot" :class="status" :title="status" />
     </header>
@@ -97,12 +99,12 @@ onBeforeUnmount(() => {
     <main v-else-if="status === 'error' && !state" class="msg"><p>연결할 수 없습니다.</p></main>
     <main v-else-if="!state" class="msg"><p>불러오는 중…</p></main>
 
-    <main v-else ref="list" class="slides" :class="{ blank: state.blank }">
+    <main v-else ref="list" class="slides" :class="{ blank: air?.blank }">
       <p
         v-for="(s, j) in item?.slides ?? []"
-        :key="`${state.itemIndex}-${j}`"
+        :key="`${air?.itemIndex}-${j}`"
         class="slide"
-        :class="{ cur: j === state.slideIndex, past: j < state.slideIndex }"
+        :class="{ cur: j === air?.slideIndex, past: j < (air?.slideIndex ?? 0) }"
       >{{ s }}</p>
       <p v-if="!item" class="msg">대기 중</p>
       <footer v-if="nextItem" class="next">다음 곡 · {{ nextItem.title }}</footer>

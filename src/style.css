@@ -4,6 +4,7 @@
   --pgm: #ff3b3b; --pvw: #2ecc71; --warn: #f5a524;
   /* 송출 중(라이브) / PVW 미리보기 표시 색 — 여기만 바꾸면 전체 반영 */
   --live: #22c55e; --live-glow: rgba(34, 197, 94, .35); --live-bg: #11291a; --live-ink: #04210f;
+  --freeze: #38bdf8; /* FREEZE 전용(하늘색) */
   --preview: #4f8cff; --preview-soft: rgba(79, 140, 255, .6);
   color-scheme: dark;
 }

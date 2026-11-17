@@ -40,6 +40,17 @@ export interface OutputStyle {
   fadeMs: number
 }
 
+/**
+ * FREEZE: 걸어 둔 순간의 송출 화면. 컨트롤러는 계속 움직여도 출력·뷰어는 이걸 유지한다.
+ * 텍스트까지 스냅샷으로 들고 있는 이유: freeze 중 가사를 고쳐 콘티를 갱신해도 송출이 바뀌면 안 되므로.
+ */
+export interface Frozen {
+  itemIndex: number
+  slideIndex: number
+  blank: boolean
+  text: string | null
+}
+
 export interface LiveState {
   /** 증가하는 버전. 수신 측은 더 큰 version 만 반영 */
   version: number
@@ -49,6 +60,8 @@ export interface LiveState {
   itemIndex: number
   slideIndex: number
   blank: boolean
+  /** null/없음 = 해제. 예전 저장 상태엔 필드가 없을 수 있다 */
+  frozen?: Frozen | null
   style: OutputStyle
 }
 
@@ -70,7 +83,7 @@ export const DEFAULT_STYLE: OutputStyle = {
 }
 
 export function emptyLiveState(origin: string): LiveState {
-  return { version: 0, origin, setlist: [], itemIndex: 0, slideIndex: 0, blank: false, style: { ...DEFAULT_STYLE } }
+  return { version: 0, origin, setlist: [], itemIndex: 0, slideIndex: 0, blank: false, frozen: null, style: { ...DEFAULT_STYLE } }
 }
 
 /** 상태가 더 새로운지. version 동률이면 origin 사전순으로 결정(모든 기기가 같은 결론) */

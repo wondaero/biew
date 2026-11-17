@@ -8,7 +8,7 @@ import type { LiveState } from '@shared/types'
 import { BroadcastChannelTransport } from '@/sync/BroadcastChannelTransport'
 import { SyncHub } from '@/sync/SyncHub'
 import { loadLive } from '@/live/persistence'
-import { currentText } from '@/live/nav'
+import { onAir } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
 import { useWakeLock } from './useWakeLock'
 import { uid } from '@/lib/uid'
@@ -18,8 +18,10 @@ const state = ref<LiveState | null>(loadLive())
 const hub = new SyncHub([new BroadcastChannelTransport()], (s) => { state.value = s })
 if (state.value) hub.mark(state.value)
 
-const text = computed(() => (state.value ? currentText(state.value) : null))
-const layerKey = computed(() => (state.value ? `${state.value.itemIndex}:${state.value.slideIndex}` : 0))
+// FREEZE 중이면 고정된 화면(onAir)을 그린다 — 컨트롤러 조작이 출력에 새지 않게
+const air = computed(() => (state.value ? onAir(state.value) : null))
+const text = computed(() => air.value?.text ?? null)
+const layerKey = computed(() => (air.value ? `${air.value.itemIndex}:${air.value.slideIndex}` : 0))
 
 useWakeLock()
 
@@ -62,7 +64,7 @@ onBeforeUnmount(() => {
     <SlideRender
       v-if="state"
       :text="text"
-      :blank="state.blank"
+      :blank="air?.blank ?? false"
       :style-cfg="state.style"
       :layer-key="layerKey"
       :animate="visible"

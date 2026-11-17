@@ -30,3 +30,16 @@ describe('nav', () => {
     expect(nav.currentText({ setlist: [], itemIndex: 0, slideIndex: 0 })).toBeNull()
   })
 })
+
+describe('onAir (FREEZE)', () => {
+  const base = { setlist, itemIndex: 2, slideIndex: 1, blank: false }
+  it('freeze 아니면 컨트롤러 위치를 그대로 송출', () => {
+    expect(nav.onAir({ ...base, frozen: null })).toEqual({ itemIndex: 2, slideIndex: 1, blank: false, text: 'Lorem 1', frozen: false })
+    expect(nav.onAir(base)).toMatchObject({ frozen: false }) // 예전 저장 상태(필드 없음)
+  })
+  it('freeze 중엔 컨트롤러가 움직이고 blank 여도 고정된 화면(텍스트 스냅샷)을 유지', () => {
+    const frozen = { itemIndex: 0, slideIndex: 0, blank: false, text: 'Lorem 0 (snapshot)' }
+    const a = nav.onAir({ ...base, blank: true, frozen })
+    expect(a).toEqual({ itemIndex: 0, slideIndex: 0, blank: false, text: 'Lorem 0 (snapshot)', frozen: true })
+  })
+})

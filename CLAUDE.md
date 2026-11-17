@@ -18,7 +18,7 @@ Vite + Vue 3 + TypeScript · Supabase(Postgres/Auth/Realtime) · IndexedDB(idb) 
 
 ```bash
 npm run dev            # http://localhost:5173/control
-npm test               # vitest (32개)
+npm test               # vitest (34개)
 npm run typecheck      # vue-tsc
 npm run build
 npm run import -- "<gcg폴더>" [--dry-run]   # .gcg → songs upsert (key: source_file)
@@ -52,7 +52,8 @@ supabase/migrations/  songs, rooms
 - **songs.updated_at 트리거**는 내용이 바뀐 경우에만 갱신(재import 시 전 기기 재다운로드 방지). 삭제는 `deleted_at` 소프트 삭제(델타 동기화가 삭제를 알 수 있게).
 - 델타 동기화는 `updated_at >= lastSync`(gte, 멱등). 단건 저장은 lastSync 를 건드리지 않는다.
 - 연속 중복 슬라이드는 의도된 것 — 지우지 않는다.
-- 색: `--live`(초록) = 송출 중, `--preview`(파랑 점선) = PVW 선택, 노랑 = BLANK 전용, 빨강 = 오류/삭제만. (src/style.css)
+- 색: `--live`(초록) = 송출 중, `--preview`(파랑 점선) = PVW 선택, 노랑 = BLANK 전용, `--freeze`(하늘색) = FREEZE 전용, 빨강 = 오류/삭제만. (src/style.css)
+- **FREEZE**(단축키 F 는 **걸기만**, 해제는 버튼 클릭으로만 — 가사 수정 중 실수로 풀리는 것 방지): `LiveState.frozen` = 걸 때의 송출 위치 + **텍스트 스냅샷**. 컨트롤러 이동/BLANK 는 그대로 동작하지만 출력·뷰어·PGM 모니터는 `nav.onAir(state)`(freeze 중이면 스냅샷)를 그린다. 해제하면 컨트롤러의 현재 위치가 바로 송출. 목적: 예배 중 오타 발견 시 송출은 유지한 채 가사 수정. 송출을 그리는 곳은 `currentText(state)` 대신 반드시 `onAir()` 를 쓸 것. 컨트롤러가 freeze 중 가리키는 위치는 SlideGrid 에서 파란 점선(`.ctl`).
 - 즉시 모드: 카드 클릭 = 송출, 그리드엔 송출 중만 표시. PVW 모드: 클릭 = 미리보기, Enter/TAKE = 송출.
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.
 
