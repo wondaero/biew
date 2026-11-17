@@ -25,7 +25,7 @@ function check(name: string, ok: boolean, detail = '') {
   console.log(`${ok ? '✔' : '✖'} ${name}${!ok && detail ? `  — ${detail}` : ''}`)
 }
 const first = <T>(d: unknown) => (d as T[] | null)?.[0]
-type J = { status: string; title: string | null; state: unknown; control_topic?: string; view_topic?: string; token?: string | null }
+type J = { status: string; title: string | null; control_topic?: string; view_topic?: string; token?: string | null }
 const rpc = async (c: SupabaseClient, fn: string, args: Record<string, unknown>) => c.rpc(fn, args)
 
 const email = `verify-${randomBytes(4).toString('hex')}@example.test`
@@ -82,7 +82,7 @@ try {
   // ── 컨트롤 입장 ──
   const g = async (args: Record<string, unknown>) => first<J>((await rpc(guest, 'join_control', { p_code: code, ...args })).data)
   check('없는 번호 → not_found', (first<J>((await rpc(guest, 'join_control', { p_code: 'ZZZZZZ' })).data))?.status === 'not_found')
-  check('비밀번호 없이 → password_required (상태/토픽 노출 없음)', await g({}).then((r) => r?.status === 'password_required' && !r.state && !r.control_topic))
+  check('비밀번호 없이 → password_required (상태/토픽 노출 없음)', await g({}).then((r) => r?.status === 'password_required' && !r.control_topic && !r.token))
   check('틀린 비밀번호 → bad_password', (await g({ p_password: 'nope' }))?.status === 'bad_password')
   const ok = await g({ p_password: 'ctl-pass-1' })
   check('맞는 비밀번호 → ok + 토큰 + topic', ok?.status === 'ok' && !!ok.token && ok.control_topic === tp?.control_topic && ok.view_topic === tp?.view_topic)
@@ -102,12 +102,12 @@ try {
   const open = await v(openCode, {})
   check('보기 비밀번호 없는 채널: 번호만으로 ok', open?.status === 'ok' && !!open.view_topic)
 
-  // ── 상태 저장/전달 ──
-  const st = { version: 1, origin: 'verify', setlist: [{ key: 'k', songId: 's', title: 'Lorem', slides: ['Lorem ipsum'] }], itemIndex: 0, slideIndex: 0, blank: false, frozen: null, style: {} }
-  const up = await owner.from('channels').update({ state: st, version: 1, updated_at: new Date().toISOString() }).eq('code', code)
-  check('소유자는 state 저장', !up.error, up.error?.message)
-  const after = await v(code, { p_token: vok?.token })
-  check('입장 시 최신 state 전달', JSON.stringify((after?.state as { origin?: string } | null)?.origin) === '"verify"')
+  // ── 메타 수정 / 상태는 DB 에 없음 ──
+  const rename = await owner.from('channels').update({ title: 'Lorem renamed', updated_at: new Date().toISOString() }).eq('code', code).select('title')
+  check('소유자는 제목 수정 가능', !rename.error && rename.data?.[0]?.title === 'Lorem renamed', rename.error?.message)
+  const hv = await owner.from('channels').update({ has_view_password: false }).eq('code', code)
+  check('has_view_password 직접 변조 거부', !!hv.error)
+  check('입장 응답에 송출 상태(가사) 없음', ok !== undefined && !('state' in ok) && vok !== undefined && !('state' in vok))
 
   // ── 잠금(별도 채널) ──
   const lk = async (pw: string) => first<J>((await rpc(guest, 'join_control', { p_code: lockCode, p_password: pw })).data)

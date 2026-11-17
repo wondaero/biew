@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
  * 보기 /view/:code — 로그인 불필요, 보기 전용.
- * join_view RPC 로 입장(보기 비밀번호가 있으면 입력, 한 번 맞으면 이 브라우저가 토큰을 기억) → 현재 상태 + view topic 을 받고,
- * 이후 Realtime Broadcast 로 따라간다. 탭이 다시 보이거나 재연결되면 RPC 로 한 번 더 따라잡는다(끊긴 동안 놓친 변경 보정).
+ * join_view RPC 로 입장(보기 비밀번호가 있으면 입력, 한 번 맞으면 이 브라우저가 토큰을 기억) → view topic 을 받아 연결하고,
+ * 호스트 PC 에 'request-state' 를 보내 현재 화면을 받는다(서버엔 상태가 없다). 이후 Realtime Broadcast 로 따라간다.
+ * 탭이 다시 보이거나 재연결되면 토큰을 다시 확인하고 상태를 다시 요청한다(끊긴 동안 놓친 변경 보정).
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
@@ -32,10 +33,12 @@ const list = ref<HTMLElement>()
 
 let hub: SyncHub | null = null
 
-/** 서버에서 현재 상태를 다시 받아 따라잡는다. 토큰이 거부되면(보기 비밀번호 변경 등) 입력 화면으로 */
+const askState = () => hub?.send({ type: 'request-state', from: 'viewer' })
+
+/** 토큰이 아직 유효한지 확인하고 호스트에 현재 상태를 다시 요청. 거부되면(보기 비밀번호 변경 등) 입력 화면으로 */
 async function catchUp() {
   const j = await api.joinView(code.value)
-  if (j.status === 'ok') { if (j.state) hub?.receive(j.state); return }
+  if (j.status === 'ok') { askState(); return }
   if (j.status === 'password_required' || j.status === 'token_rejected') { teardown(); status.value = 'password'; return }
   if (j.status === 'not_found') { status.value = 'notfound'; state.value = null; return }
   if (!state.value) status.value = 'error'
@@ -69,16 +72,19 @@ async function enter(password?: string) {
   title.value = j.title ?? ''
   const rt = new SupabaseRealtimeTransport(supabase, j.viewTopic!, {
     onStatus: (st) => {
-      if (st === 'SUBSCRIBED') { if (status.value !== 'notfound') status.value = 'live'; void catchUp() }
+      if (st === 'SUBSCRIBED') { if (status.value !== 'notfound') status.value = 'live'; askState() }
       else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') status.value = 'reconnecting'
     },
   })
   hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live' })
-  if (j.state) hub.receive(j.state)
-  else status.value = 'live'
   document.addEventListener('visibilitychange', onVis)
   timer = window.setInterval(() => void catchUp(), 30000)
 }
+
+/** 상태가 아직 없을 때: 연결됐는데 응답이 없으면 호스트 PC 가 꺼져 있거나 오프라인인 것 */
+const waitText = computed(() =>
+  status.value === 'error' ? '연결할 수 없습니다.' : status.value === 'live' ? '송출 대기 중 — 컨트롤러 PC 가 연결되면 표시됩니다' : '불러오는 중…',
+)
 
 // 컨트롤러가 FREEZE 중이면 고정된 화면을 따라간다(실제 송출과 같게)
 const air = computed(() => (state.value ? onAir(state.value) : null))
@@ -124,7 +130,7 @@ onBeforeUnmount(() => {
   <div v-else-if="wide" class="stage">
     <SlideRender v-if="state" :text="text" :blank="air?.blank ?? false" :style-cfg="state.style" :layer-key="layerKey" />
     <p v-if="status === 'notfound'" class="wmsg">채널을 찾을 수 없습니다 — 번호 <b>{{ code }}</b> 가 삭제되었거나 잘못되었습니다.</p>
-    <p v-else-if="!state" class="wmsg">{{ status === 'error' ? '연결할 수 없습니다.' : '불러오는 중…' }}</p>
+    <p v-else-if="!state" class="wmsg">{{ waitText }}</p>
     <span class="dot wdot" :class="status" :title="status" />
   </div>
 
@@ -142,7 +148,7 @@ onBeforeUnmount(() => {
       <small>번호 <b>{{ code }}</b> 가 삭제되었거나 잘못되었습니다.</small>
     </main>
     <main v-else-if="status === 'error' && !state" class="msg"><p>연결할 수 없습니다.</p></main>
-    <main v-else-if="!state" class="msg"><p>불러오는 중…</p></main>
+    <main v-else-if="!state" class="msg"><p>{{ waitText }}</p></main>
 
     <main v-else ref="list" class="slides" :class="{ blank: air?.blank }">
       <p

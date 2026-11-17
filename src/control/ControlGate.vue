@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * /control/:code 진입 게이트. 접속자가 누구인지에 따라 역할을 정한다.
- *  - 이 채널을 만든 계정으로 로그인됨 → 호스트(전체 컨트롤러)
- *  - 그 외 → 리모컨: 저장된 토큰 또는 컨트롤 비밀번호로 입장(이동·BLANK·점프만)
- * 호스트로 한 번 연 브라우저는 오프라인에서 새로고침해도 호스트로 다시 열린다(인터넷이 끊겨도 송출이 멈추면 안 되므로).
+ * /control/:code 진입 게이트. 접속한 기기에 따라 역할을 정한다.
+ *  1. 이 PC 가 이 채널의 호스트 기록(만들 때 기억한 주소)을 갖고 있음 → 호스트. 로그인·인터넷 불필요
+ *  2. 기록은 없지만 지금 채널을 만든 계정으로 로그인돼 있음 → 호스트로 열고 이 PC 에 주소를 기억
+ *  3. 그 외 → 리모컨: 저장된 토큰 또는 컨트롤 비밀번호로 입장(이동·BLANK·점프만)
+ * 로그인은 저장되지 않으므로(lib/supabase.ts) 호스트 판정을 로그인에 기대지 않는다 — 새로고침·오프라인에도 호스트 유지.
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
@@ -12,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
 import { startHostSync, stopHostSync, publishHost, startRemote, stopRemote, sendRemote, remoteRejected } from '@/channel/sync'
 import { openHost, openRemote, closeChannel, handleCommand, adoptState, useLive } from '@/live/liveStore'
-import { markHosted, hostedTitle } from '@/live/persistence'
+import { loadHost, saveHost } from '@/live/persistence'
 import ControlView from './ControlView.vue'
 
 const route = useRoute()
@@ -44,28 +45,33 @@ async function enter() {
   pwErr.value = null
   const c = code.value
   if (!api.isCode(c)) return fail('잘못된 채널 번호입니다.')
+
+  // 1. 이 PC 의 호스트 기록 — 서버에 묻지 않는다(오프라인에서도 바로 열림)
+  const hosted = loadHost(c)
+  if (hosted) return enterHost(c, hosted.title)
+
   if (!supabase) return fail('Supabase 설정(.env)이 없어 채널 기능을 쓸 수 없습니다.')
   await waitAuth()
   if (my !== ticket) return
 
+  // 2. 로그인한 소유자 → 이 PC 를 호스트로 등록
   if (session.value) {
-    const { row, error } = await api.getChannel(c)
+    const { row } = await api.getChannel(c)
     if (my !== ticket) return
-    if (row) return enterHost(c, row.title, row.state)
-    if (error) {
-      // 오프라인 등으로 확인 실패: 이 브라우저가 호스트로 연 적 있으면 호스트로 다시 연다
-      const t = hostedTitle(c)
-      if (t) return enterHost(c, t, null)
+    if (row) {
+      const t = await api.channelTopics(c)
+      if (my !== ticket) return
+      saveHost(c, { title: row.title, controlTopic: t?.controlTopic ?? null, viewTopic: t?.viewTopic ?? null })
+      return enterHost(c, row.title)
     }
   }
+  // 3. 리모컨
   await enterRemote(c, undefined, my)
 }
 
-function enterHost(c: string, t: string, serverState: unknown) {
+function enterHost(c: string, t: string) {
   title.value = t
-  markHosted(c, t)
   openHost(c, { publish: publishHost })
-  adoptState(serverState) // 서버 쪽이 더 새로우면(다른 PC 에서 이어서 열 때) 따라간다
   startHostSync(c, { onCommand: handleCommand, getState: () => JSON.parse(JSON.stringify(live.state)) })
   phase.value = 'ready'
 }
@@ -120,6 +126,7 @@ onBeforeUnmount(() => { ticket++; teardown() })
       <input v-model="pw" type="password" autocomplete="off" autofocus placeholder="컨트롤 비밀번호" />
       <button class="primary" :disabled="busy || !pw">입장</button>
       <p v-if="pwErr" class="err">{{ pwErr }}</p>
+      <p><small>이 채널을 만든 계정이라면 처음 화면에서 로그인한 뒤 채널을 열면 이 PC 가 호스트(전체 컨트롤러)로 등록됩니다.</small></p>
       <router-link to="/">← 처음으로</router-link>
     </form>
 

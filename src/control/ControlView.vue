@@ -67,6 +67,11 @@ function onJump(i: number) {
 
 // 송출 중 실수로 컨트롤러를 닫는 것 방지(출력은 계속 유지되지만 조작 불가해짐)
 const onBeforeUnload = (e: BeforeUnloadEvent) => { if (outputOn.value) e.preventDefault() }
+// 앱 안 이동(로고 클릭)은 beforeunload 가 안 걸리므로 따로 확인
+function goHome() {
+  if (isHost.value && outputOn.value && !confirm('출력이 연결된 상태입니다. 채널 목록으로 나가면 조작이 끊깁니다(출력 창은 마지막 화면 유지). 나갈까요?')) return
+  router.push('/')
+}
 
 onMounted(() => {
   document.title = `${isHost.value ? '컨트롤러' : '리모컨'} — Biew`
@@ -85,7 +90,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="control" :class="{ remote: !isHost }">
     <header class="top">
-      <button class="brand" title="채널 목록" @click="router.push('/')">Biew</button>
+      <button class="brand" title="채널 목록" @click="goHome">Biew</button>
       <span class="ch"><b>{{ title }}</b> <code>{{ code }}</code></span>
 
       <div class="group">

@@ -6,7 +6,7 @@ PC 한 대 듀얼모니터: 왼쪽 = 호스트 컨트롤러, 오른쪽 = 출력.
 
 - 원래 명세: [docs/SPEC.md](docs/SPEC.md)
 - 진행 상황 · 다음 할 일 · 새 컴퓨터 세팅: [docs/PROGRESS.md](docs/PROGRESS.md) ← **세션 시작 시 먼저 읽을 것**
-- ⚠️ PROGRESS.md 맨 위 **"인계: 채널 구조"** 가 미완료면(마이그레이션 미적용·서버 미검증) DB 가 되는 환경에서 그 순서대로 이어서 진행한다. 해당 코드는 **`feat/channels` 브랜치**에 있고, DB 적용 전에 main 에 합치면 운영 배포가 깨진다.
+- 채널 구조는 DB 적용·검증 완료, 코드는 **`feat/channels` 브랜치**(main 병합 = 운영 배포는 사용자 확인 후). 상태는 PROGRESS.md 맨 위.
 
 ## ⚠️ 절대 규칙
 - **가사는 저작권 데이터.** 개발/디버깅 중 가사 본문을 콘솔·로그·답변·스크린샷에 출력하지 않는다. 검증은 글자 수/줄 수/슬라이드 수/해시 같은 구조 정보만. 브라우저 확인은 Lorem ipsum 더미 콘티로.
@@ -53,8 +53,10 @@ supabase/migrations/  songs, rooms(구), channels
 - **출력 복구**: 출력 창은 localStorage 마지막 상태로 즉시 그림 → `request-state` → 컨트롤러가 스냅샷 응답.
 - **콘티 항목은 슬라이드 스냅샷**(곡 추가 시 복사). 예배 중 DB 수정이 송출 번호를 흔들지 않게. 최신화는 콘티의 "↻ 최신" 버튼으로만.
 - **콘티 순서 변경 시** 송출 중 곡을 `key` 로 추적해 itemIndex 보정. 송출 중 곡 삭제 → blank.
-- **채널 보안**(자세한 확정 설계는 PROGRESS.md): 컨트롤 비밀번호(필수, 폰 리모컨 = 송출 조작만)와 보기 비밀번호(선택)가 별개. 비밀번호는 bcrypt 해시만, 맞으면 서버(RPC `join_control`/`join_view`)가 기기 토큰과 **추측 불가 Realtime topic** 을 준다. 호스트(PC)만 상태를 바꾸고 리모컨 명령은 `live/commands.ts` 허용 목록+범위 검사 뒤에 적용 → 폰/네트워크가 상태를 직접 못 바꾼다. 곡·콘티·스타일 수정, FREEZE, 채널 삭제는 호스트(계정)만.
-- 송출은 항상 호스트 PC 를 거친다. 호스트↔출력 창은 BroadcastChannel `biew-live:<code>` 라 인터넷이 끊겨도 동작. 호스트로 연 적 있는 브라우저는 오프라인 새로고침에도 호스트로 열린다.
+- **채널 보안**(자세한 확정 설계는 PROGRESS.md): 컨트롤 비밀번호(필수, 폰 리모컨 = 송출 조작만)와 보기 비밀번호(선택)가 별개. 비밀번호는 bcrypt 해시만, 맞으면 서버(RPC `join_control`/`join_view`)가 기기 토큰과 **추측 불가 Realtime topic** 을 준다. 호스트(PC)만 상태를 바꾸고 리모컨 명령은 `live/commands.ts` 허용 목록+범위 검사 뒤에 적용. 리모컨은 control topic 에서만 상태를 받는다(view topic 은 보는 기기가 위조 가능).
+- **로그인은 저장하지 않는다**(`persistSession:false`). 호스트 판정은 로그인이 아니라 이 PC 의 호스트 기록(`biew.host.<code>` = topic)으로 → 새로고침·오프라인에도 호스트. 로그인은 채널 만들기·관리·곡 편집/받기 때만.
+- **송출 상태는 DB 에 저장하지 않는다.** 늦게 들어온 기기는 topic 으로 `request-state` → 호스트가 답함.
+- 송출은 항상 호스트 PC 를 거친다. 호스트↔출력 창은 BroadcastChannel `biew-live:<code>` 라 인터넷이 끊겨도 동작.
 - **songs.updated_at 트리거**는 내용이 바뀐 경우에만 갱신(재import 시 전 기기 재다운로드 방지). 삭제는 `deleted_at` 소프트 삭제(델타 동기화가 삭제를 알 수 있게).
 - 델타 동기화는 `updated_at >= lastSync`(gte, 멱등). 단건 저장은 lastSync 를 건드리지 않는다.
 - 연속 중복 슬라이드는 의도된 것 — 지우지 않는다.
@@ -84,7 +86,9 @@ supabase/migrations/  songs, rooms(구), channels
 
 ## 함정
 - `supabase config push` 는 **확인 프롬프트에 n 을 넣어도 적용된다**(겪음). 원격 auth 설정 변경은 대시보드에서 하거나, 로컬 config.toml 을 원격 값과 정확히 맞춘 뒤에만.
-- `supabase projects api-keys` 는 새 `secret` 키를 마스킹해서 준다 → import 용으로는 레거시 `service_role` 사용 중.
+- `supabase projects api-keys` 는 새 `secret` 키를 마스킹해서 준다 → import 용으로는 레거시 `service_role` 사용 중. `.env` 는 이 출력에서 값을 화면에 내지 않고 바로 파일로 기록할 것.
+- Supabase CLI 3.x 는 config.toml 의 `[inbucket]` 때문에 실행을 거부한다 → `npx supabase@2 ...` 로 실행(config.toml 을 고치지 말 것 — config push 사고와 얽힘).
+- supabase-js 는 같은 이름으로 `channel()` 을 부르면 기존 인스턴스를 돌려준다 → 정리는 `removeChannel` 로(`unsubscribe` 만 하면 재구독 예외).
 - supabase-js 최신은 Node 22+ 필요(Node 20 에서 WebSocket 오류).
 - `crypto.randomUUID` 는 http(LAN IP)에서 없음 → `src/lib/uid.ts` 의 `uid()` 사용.
 - Window Management API(두 번째 모니터 배치)는 Chrome/Edge 전용. 전체화면은 출력 창 안에서 클릭 1번 필요.

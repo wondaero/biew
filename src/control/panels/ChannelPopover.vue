@@ -1,11 +1,16 @@
 <script setup lang="ts">
-/** 호스트 전용: 채널 번호·링크·QR, 접속 끊기/비밀번호 변경, 채널 삭제 */
+/**
+ * 호스트 전용: 채널 번호·링크·QR, 접속 끊기/비밀번호 변경, 채널 삭제.
+ * 접속 끊기·삭제는 계정 권한이라 그때 로그인한다(로그인은 저장되지 않음).
+ */
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import * as api from '@/channel/api'
-import { hostLink, reconnectHost } from '@/channel/sync'
-import { clearChannelLocal } from '@/live/persistence'
+import { hostLink, hostNeedsLogin, reconnectHost } from '@/channel/sync'
+import { session } from '@/lib/auth'
+import { loadHost, saveHost, forgetChannelLocal } from '@/live/persistence'
+import LoginForm from '@/components/LoginForm.vue'
 
 const props = defineProps<{ code: string; title: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -23,10 +28,13 @@ async function copy(label: string, text: string) {
 }
 
 const linkText = computed(() =>
-  hostLink.value === 'live' ? '● 폰 연결 준비됨' : hostLink.value === 'connecting' ? '연결 중…' : hostLink.value === 'error' ? '폰 연결 안 됨 (송출은 정상) — 자동 재시도 중' : '',
+  hostNeedsLogin.value ? '폰·보기 연결 주소가 이 PC 에 없습니다 — 로그인하면 연결됩니다 (송출은 정상)'
+    : hostLink.value === 'live' ? '● 폰·보기 연결 준비됨'
+      : hostLink.value === 'connecting' ? '연결 중…'
+        : hostLink.value === 'error' ? '폰·보기 연결 안 됨 (송출은 정상) — 자동 재시도 중' : '',
 )
 
-// 접속 끊기 / 비밀번호 변경
+// 접속 끊기 / 비밀번호 변경 (로그인 필요)
 const showReset = ref(false)
 const newControl = ref('')
 const newView = ref('')
@@ -34,21 +42,23 @@ const removeView = ref(false)
 const msg = ref<string | null>(null)
 const busy = ref(false)
 async function reset() {
-  if (!confirm('모든 기기의 접속을 끊습니다. 폰은 비밀번호를 다시 입력해야 합니다. 계속할까요?')) return
+  if (!confirm('모든 기기의 접속을 끊습니다. 폰은 비밀번호를 다시 입력해야 하고, 이 채널을 연 다른 PC 도 다시 로그인해야 합니다. 계속할까요?')) return
   busy.value = true
-  const err = await api.resetAccess(props.code, { controlPassword: newControl.value, viewPassword: newView.value, removeViewPassword: removeView.value })
+  const r = await api.resetAccess(props.code, { controlPassword: newControl.value, viewPassword: newView.value, removeViewPassword: removeView.value })
   busy.value = false
-  if (err) { msg.value = err; return }
+  if (r.error || !r.topics) { msg.value = r.error ?? '실패했습니다'; return }
+  // 이 PC 는 새 주소를 기억하고 다시 연결
+  saveHost(props.code, { title: loadHost(props.code)?.title ?? props.title, ...r.topics })
+  reconnectHost()
   newControl.value = ''; newView.value = ''; removeView.value = false
   msg.value = '모든 기기의 접속을 끊었습니다.'
-  reconnectHost() // topic 이 새로 발급됨
 }
 
 async function remove() {
-  if (!confirm(`채널 "${props.title}" 을(를) 삭제할까요?\n이 채널의 콘티와 모든 접속이 사라지고 되돌릴 수 없습니다.`)) return
+  if (!confirm(`채널 "${props.title}" 을(를) 삭제할까요?\n폰·보기 연결이 모두 끊기고 되돌릴 수 없습니다.`)) return
   const err = await api.deleteChannel(props.code)
   if (err) { msg.value = err; return }
-  clearChannelLocal(props.code)
+  forgetChannelLocal(props.code)
   router.push('/')
 }
 </script>
@@ -62,7 +72,7 @@ async function remove() {
 
     <div class="code">{{ code }}</div>
     <img v-if="qr" :src="qr" alt="QR" class="qr" />
-    <p class="muted center">QR/링크는 <b>보기용</b>입니다. 리모컨은 아래 컨트롤 링크로 들어가 컨트롤 비밀번호를 입력합니다.</p>
+    <p class="muted center">QR/링크는 <b>보기용</b>입니다. 리모컨은 컨트롤 링크로 들어가 컨트롤 비밀번호를 입력합니다.</p>
 
     <div class="url">
       <input :value="viewUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
@@ -72,19 +82,23 @@ async function remove() {
       <input :value="controlUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
       <button @click="copy('control', controlUrl)">{{ copied === 'control' ? '복사됨' : '컨트롤 링크' }}</button>
     </div>
-    <p class="st" :class="hostLink">{{ linkText }}</p>
+    <p class="st" :class="hostNeedsLogin ? 'error' : hostLink">{{ linkText }}</p>
     <p v-if="isLocal" class="warn">지금 주소가 localhost 라서 폰에서는 열리지 않습니다. 배포된 주소(Vercel)에서 여세요.</p>
 
-    <button class="ghost" @click="showReset = !showReset">{{ showReset ? '▾' : '▸' }} 접속 끊기 · 비밀번호 변경</button>
-    <div v-if="showReset" class="reset">
-      <input v-model="newControl" type="password" placeholder="새 컨트롤 비밀번호 (비우면 유지)" autocomplete="new-password" />
-      <input v-model="newView" type="password" placeholder="새 보기 비밀번호 (비우면 유지)" autocomplete="new-password" :disabled="removeView" />
-      <label class="check"><input v-model="removeView" type="checkbox" /> 보기 비밀번호 없애기(누구나 번호로 보기)</label>
-      <button :disabled="busy" @click="reset">모든 기기 접속 끊기</button>
-    </div>
+    <button class="ghost" @click="showReset = !showReset">{{ showReset ? '▾' : '▸' }} 관리 (접속 끊기 · 비밀번호 변경 · 삭제)</button>
+    <template v-if="showReset">
+      <LoginForm v-if="!session" hint="관리 기능은 채널을 만든 계정으로 로그인해야 합니다. (로그인은 저장되지 않습니다)" />
+      <template v-else>
+        <div class="reset">
+          <input v-model="newControl" type="password" placeholder="새 컨트롤 비밀번호 (비우면 유지)" autocomplete="new-password" />
+          <input v-model="newView" type="password" placeholder="새 보기 비밀번호 (비우면 유지)" autocomplete="new-password" :disabled="removeView" />
+          <label class="check"><input v-model="removeView" type="checkbox" /> 보기 비밀번호 없애기(누구나 번호로 보기)</label>
+          <button :disabled="busy" @click="reset">모든 기기 접속 끊기</button>
+        </div>
+        <button class="danger" @click="remove">채널 삭제</button>
+      </template>
+    </template>
     <p v-if="msg" class="warn">{{ msg }}</p>
-
-    <button class="danger" @click="remove">채널 삭제</button>
   </div>
 </template>
 
