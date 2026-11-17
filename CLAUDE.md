@@ -25,7 +25,8 @@ npm run typecheck      # vue-tsc
 npm run build
 npm run import -- "<gcg폴더>" [--dry-run]   # .gcg → songs upsert (key: source_file)
 npm run staff -- <email>                    # 스태프 계정 생성(비번 숨김 입력) — 일반 터미널에서
-npm run verify:channels                     # 채널 마이그레이션 적용 후 RLS/비밀번호/토큰/잠금 자동 검증(임시 계정·Lorem 채널, 끝나면 삭제)
+npm run verify:channels                     # 실제 DB 검증(RLS·비밀번호/토큰·상태·리모컨 명령=nav 대조 등, 임시 계정·Lorem 채널, 끝나면 삭제)
+npx supabase@2 projects api-keys --project-ref bgfkodbfgjhsauwqhviq -o json | node scripts/make-env.mjs   # .env 만들기(키 값 출력 안 함, 먼저 npx supabase@2 login)
 ```
 
 ## 구조
@@ -85,6 +86,8 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 모바일에선 출력 시작·출력 연결 표시·📱 폰·`?` 를 숨긴다(`desk-only`).
 
 ## 작업 방식
+- 새 컴퓨터에서 이어서 할 때는 PROGRESS.md "새 컴퓨터에서 이어서 작업하기" 순서대로(.env → link → 확인 명령).
+- 배포 확인: 홈 하단 "버전 (빌드 시각) · (커밋)". 브라우저는 앱 파일을 저장(PWA)해서 새로고침만으론 새 버전이 안 열린다 — "새 버전 있음 — 적용" 또는 모든 Biew 탭을 닫고 다시 열기.
 - 변경 후 `npm run typecheck && npm test && npm run build` 통과 확인.
 - UI 확인은 headless Chrome(puppeteer-core, 스크래치 디렉터리에 설치)으로 Lorem 콘티를 localStorage `biew.live.v1` 에 심어서. 로그인 필요 기능은 service_role 로 임시 스태프 계정 생성 → 테스트 → 계정 삭제.
 - 커밋 메시지는 영어, 본문에 이유. main 에 push 하면 Vercel 자동 배포.

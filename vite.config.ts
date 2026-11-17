@@ -2,8 +2,18 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
+import { execSync } from 'node:child_process'
+
+/** 화면에 보이는 버전: 빌드 시각 + 커밋(Vercel 은 VERCEL_GIT_COMMIT_SHA, 로컬은 git) — 홈 하단에 표시 */
+function gitCommit(): string {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7)
+  try { return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch { return 'dev' }
+}
 
 export default defineConfig({
+  define: {
+    __APP_BUILD__: JSON.stringify({ time: new Date().toISOString(), commit: gitCommit() }),
+  },
   plugins: [
     vue(),
     /**

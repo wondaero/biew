@@ -1,6 +1,6 @@
 # 진행 상황 · 다음 작업
 
-마지막 갱신: 2026-11-17 · `main` 에 병합·운영 배포 완료(biew.vercel.app). 작업 브랜치 `feat/channels` 는 삭제함.
+마지막 갱신: 2026-11-17 · 모든 작업은 `main` (운영 배포됨). **다른 컴퓨터에서 이어서 하려면 아래 "새 컴퓨터에서 이어서 작업하기"부터.**
 
 ## 현재 구조 — 송출 방식 2가지 (사용자와 합의됨 — 바꾸기 전에 물어볼 것)
 
@@ -67,35 +67,54 @@
 ## 환경 / 리소스
 | 항목 | 값 |
 |---|---|
-| GitHub | `wondaero/biew` (main 에 push → Vercel 자동 배포) |
-| 배포 | https://biew.vercel.app (`/`, `/control/:code`, `/output/:code`, `/view/:code`) |
-| Supabase | 프로젝트 `jesusville's Project`, ref `bgfkodbfgjhsauwqhviq`, 리전 서울(ap-northeast-2), Free |
+| GitHub | `wondaero/biew` — **`main` 에 push = Vercel 운영 자동 배포**. 큰 변경은 브랜치(미리보기 배포, Vercel 로그인 보호)에서 확인 후 병합 |
+| 배포 | https://biew.vercel.app (`/` 홈 · `/local` 로컬 송출 · `/control/:code` · `/output/:code` · `/view/:code`) |
+| Supabase | 프로젝트 `jesusville's Project`, ref `bgfkodbfgjhsauwqhviq`, 리전 서울(ap-northeast-2), Free(7일 미사용 일시정지 — 사용자가 주기 호출 배치 운영 예정) |
 | Vercel 환경변수 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`(publishable) 두 개만 |
-| 스태프 계정 | 대시보드 Authentication → Users 에서 생성(공개 가입 차단됨). 계정은 하나만 쓴다 |
-| 데이터 | songs 1069곡(+ 테스트로 만든 소프트삭제 Lorem 1행), 슬라이드 5713장 |
+| 스태프 계정 | 1개(대시보드 Authentication → Users). 공개 가입 차단. 로그인은 앱에 저장되지 않음 |
+| 데이터 | songs **1069곡**(gcg 가져오기만, 테스트 데이터 0 — 2026-11-17 정리) |
+| DB 마이그레이션 | **전부 원격 적용됨**: `20261116000000_songs` · `20261116010000_rooms`(이후 삭제) · `20261117000000_channels` · `20261118000000_channel_live_state` · `20261118010000_no_db_broadcast` · `20261118020000_kick_remotes` · `20261118030000_public_channels` · `20261118040000_cleanup` |
 
-## 새 컴퓨터에서 시작하기
+## 새 컴퓨터에서 이어서 작업하기
 ```bash
 git clone https://github.com/wondaero/biew.git && cd biew
-nvm install 22 && nvm use
+nvm install 22 && nvm use          # Node 22 (.nvmrc)
 npm install
-cp .env.example .env     # 값 채우기 ↓
 ```
-`.env` 값:
-- `VITE_SUPABASE_URL` / `SUPABASE_URL` = `https://bgfkodbfgjhsauwqhviq.supabase.co`
-- `VITE_SUPABASE_ANON_KEY` = 대시보드 Project Settings → API Keys → **publishable** 키
-- `SUPABASE_SERVICE_ROLE_KEY` = 같은 화면의 **secret** 키(또는 Legacy 탭의 service_role). import·staff·verify 스크립트에만 필요. 웹앱 개발만 하면 없어도 됨.
 
-Supabase CLI 작업(마이그레이션 등)이 필요하면:
+**1. `.env` 만들기** (키 값을 화면에 내지 않고 바로 파일로):
 ```bash
-supabase login            # 새 계정 쪽으로 로그인(기존 계정 세션 주의 — 시크릿 창 or --token)
-supabase link --project-ref bgfkodbfgjhsauwqhviq
-supabase migration list --linked
-supabase db push          # config push 아님!
-# CLI 3.x 는 config.toml 의 [inbucket] 때문에 거부함 → npx supabase@2 ... 로 실행(config.toml 은 손대지 않음)
+npx supabase@2 login               # 브라우저 인증 — 이 프로젝트가 있는 계정인지 확인
+npx supabase@2 projects api-keys --project-ref bgfkodbfgjhsauwqhviq -o json | node scripts/make-env.mjs
 ```
+- CLI 는 **반드시 `npx supabase@2`**. CLI 3.x 는 `supabase/config.toml` 의 `[inbucket]` 때문에 실행을 거부한다 — config.toml 은 고치지 말 것(`config push` 사고 이력).
+- 대시보드로 해도 된다: Project Settings → API Keys 의 **publishable** → `VITE_SUPABASE_ANON_KEY`, Legacy 탭 **service_role** → `SUPABASE_SERVICE_ROLE_KEY`(스크립트 전용, VITE_ 금지). `.env.example` 참고.
+- 웹앱 화면만 고칠 거면 service_role 은 없어도 된다. `.env` 가 아예 없으면 앱은 뜨지만 로그인·곡·채널이 안 된다.
+
+**2. DB 연결·상태 확인**(DB 를 건드릴 때만):
+```bash
+npx supabase@2 link --project-ref bgfkodbfgjhsauwqhviq
+npx supabase@2 migration list --linked        # 로컬=원격 이면 대기 중인 것 없음
+npx supabase@2 db push --linked --dry-run     # 새 마이그레이션을 만들었다면 먼저 확인
+npx supabase@2 db push --linked               # config push 는 절대 금지
+npx supabase@2 db query --linked "select ..." # 원격 SQL 조회(가사 본문은 출력 금지)
+```
+
+**3. 확인 명령**
+```bash
+npm run dev                # http://localhost:5173/
+npm run typecheck && npm test && npm run build
+npm run verify:channels    # 실제 DB 검증(임시 계정·Lorem 채널 만들고 정리) — 66개
+npx vite preview           # 서비스 워커(PWA)는 배포용 빌드에서만 동작 — 오프라인 확인은 이걸로, 서버를 실제로 꺼서
+```
+- **브라우저 E2E 스크립트는 저장소에 없다**(작업한 PC 의 임시 폴더에만 있었음: internet/local/home/offline/upgrade/bg/ime). 필요하면 puppeteer-core 로 다시 만들거나 저장소로 옮기는 작업을 먼저 할 것. 방법은 CLAUDE.md "작업 방식"·"함정" 참고(Lorem 더미, 임시 스태프 계정 생성·삭제, 테스트 곡은 끝나면 완전 삭제, 뒤로 간 탭은 bringToFront).
+
+**4. 배포·버전 확인**
+- `main` 에 push → Vercel 자동 배포(1~2분). 브라우저는 앱 파일을 저장(PWA)하므로 **새로고침만으로는 새 버전이 안 열린다** → 왼쪽 아래 "새 버전 있음 — 지금 적용"(또는 홈 하단 버전 옆 버튼), 안 보이면 Biew 탭·창을 전부 닫고 다시 열기, 급하면 Ctrl+Shift+R.
+- **홈 하단의 "버전 (빌드 시각) · (커밋)"** 으로 지금 열린 버전을 확인(`git log --oneline -1` 과 비교).
+- 문제가 생기면 Vercel 대시보드 → Deployments → Instant Rollback.
+
 가사 원본(.gcg 폴더)은 git 에 없다. 재import 가 필요할 때만 USB 등으로 복사(`doc/` 아래에 두면 자동으로 git 제외).
-`.env` 가 없어도 앱은 뜨지만 Supabase 가 `null` 이라 로그인·곡 동기화·채널 기능이 모두 안 된다(UI 확인만 가능).
 
 ## 완료된 것
 - [x] **1-A 가져오기**: `npm run import` — .gcg 파싱(Python 기준 파서와 1069곡 해시 일치), source_file upsert, `--dry-run`, 요약(0슬라이드/실패 목록). 파일명 UTF-8/CP949 판별 + NFC 정규화.

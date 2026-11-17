@@ -20,6 +20,7 @@ import { titleMatches } from '@shared/searchText'
 import LoginForm from '@/components/LoginForm.vue'
 import UploadDialog from '@/control/UploadDialog.vue'
 import { dbNotice } from '@/library/db'
+import { needRefresh, applyUpdate } from '@/pwa'
 import { useLibrary, loadCache, syncNow, resetCache, syncStatus, syncError, lastSync } from '@/library/library'
 
 const router = useRouter()
@@ -120,6 +121,9 @@ const joinOk = computed(() => api.isCode(joinCode.value))
 const go = (kind: 'view' | 'control') => { if (joinOk.value) router.push(`/${kind}/${joinCode.value}`) }
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+/** 지금 열린 버전(빌드 시각·커밋). 앱 파일이 PC 에 저장돼 있어 새로고침만으로는 새 버전이 안 열리므로 확인용 */
+const build = __APP_BUILD__
 </script>
 
 <template>
@@ -247,6 +251,11 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
     </section>
 
     <p v-if="!supabase" class="warn">Supabase 설정(.env)이 없어 서버 기능(채널 만들기·리모컨·보기)을 쓸 수 없습니다.</p>
+
+    <footer class="ver">
+      버전 {{ fmt(build.time) }} 빌드 · {{ build.commit }}
+      <button v-if="needRefresh" class="ghost" title="이 창이 새로고침됩니다" @click="applyUpdate">새 버전 있음 — 적용</button>
+    </footer>
   </main>
 </template>
 
@@ -283,5 +292,7 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .role { grid-area: c; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #3a3a46; color: #ddd; white-space: nowrap; }
 .role.host { background: #11291a; color: var(--live); }
 .search { width: 100%; }
+.ver { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 11px; color: var(--muted); }
+.ver .ghost { margin-left: 0; color: var(--accent); border-color: var(--accent); }
 .upload { padding: 8px; color: var(--warn); border-color: #5a4a1e; background: #3a3014; }
 </style>
