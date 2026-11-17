@@ -1,6 +1,6 @@
 /**
  * 인터넷 송출(채널) 서버 API — supabase/migrations/2026111*_channel*.sql 의 테이블·RPC 래퍼.
- * - 만들기/목록/삭제/접속 끊기/호스트 토큰 발급: 로그인한 소유 계정(로그인은 저장되지 않으므로 그때마다 로그인)
+ * - 만들기/목록/삭제/리모컨 쫓아내기/보기 비밀번호 변경/호스트 토큰 발급: 로그인한 소유 계정(로그인은 저장되지 않으므로 그때마다 로그인)
  * - 호스트(PC): 호스트 토큰으로 상태 읽기/올리기(host_join / host_set_state) — 로그인 불필요
  * - 리모컨/보기: join_control / join_view 로 입장(비밀번호 → 기기 토큰 저장), 리모컨 명령은 서버가 적용(remote_command)
  * 송출 상태의 원본은 서버(channels.state). 로컬 송출(/local)은 이 모듈과 무관하다.
@@ -104,18 +104,20 @@ export async function issueHostToken(code: string): Promise<{ grant?: HostGrant;
   return { grant: { token: r.token, title: r.title, controlTopic: r.control_topic, viewTopic: r.view_topic, state: asState(r.state) } }
 }
 
-/** 모든 기기 접속 끊기 + (선택) 비밀번호 변경. 호스트 토큰도 모두 무효 → 호출한 PC 는 이어서 issueHostToken */
-export async function resetAccess(
-  code: string,
-  o: { controlPassword?: string; viewPassword?: string; removeViewPassword?: boolean } = {},
-): Promise<string | null> {
+/**
+ * 리모컨 모두 쫓아내기 = 컨트롤 비밀번호 변경(새 비밀번호 필수, 기존과 같으면 거부).
+ * 리모컨 입장 토큰 전부 무효 + 리모컨 실시간 주소 재발급. 호스트 PC·보기 기기는 그대로(PC 는 새 주소로 다시 연결).
+ */
+export async function kickRemotes(code: string, newControlPassword: string): Promise<string | null> {
   if (!supabase) return NO_SUPABASE
-  const { error } = await supabase.rpc('reset_channel_access', {
-    p_code: code,
-    p_control_password: o.controlPassword || null,
-    p_view_password: o.viewPassword || null,
-    p_remove_view_password: !!o.removeViewPassword,
-  })
+  const { error } = await supabase.rpc('kick_remotes', { p_code: code, p_new_control_password: newControlPassword })
+  return error ? friendly(error.message) : null
+}
+
+/** 보기 비밀번호 설정/변경(보기 기기 다시 입력 필요) 또는 없애기(null — 누구나 번호로). 호스트 PC 는 그대로 */
+export async function setViewPassword(code: string, newViewPassword: string | null): Promise<string | null> {
+  if (!supabase) return NO_SUPABASE
+  const { error } = await supabase.rpc('set_view_password', { p_code: code, p_new_view_password: newViewPassword || null })
   return error ? friendly(error.message) : null
 }
 
@@ -191,5 +193,6 @@ function friendly(msg: string): string {
   if (/invalid title/.test(msg)) return '채널 제목은 1~60자여야 합니다'
   if (/login required|permission denied/.test(msg)) return '로그인이 필요합니다'
   if (/not found/.test(msg)) return '채널을 찾을 수 없거나 이 계정의 채널이 아닙니다'
+  if (/same password/.test(msg)) return '지금과 다른 비밀번호를 입력하세요'
   return msg
 }

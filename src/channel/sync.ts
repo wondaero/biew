@@ -22,7 +22,7 @@ import * as api from './api'
 
 export type Link = 'off' | 'connecting' | 'live' | 'error'
 export const hostLink = ref<Link>('off')
-/** 이 PC 의 호스트 토큰이 없거나 거부됨(접속 끊기·30일 미사용) → 로그인하면 새로 받는다. PC 송출은 계속된다 */
+/** 이 PC 의 호스트 토큰이 없거나 거부됨(30일 미사용·채널 삭제) → 로그인하면 새로 받는다. PC 송출은 계속된다 */
 export const hostNeedsLogin = ref(false)
 export const remoteLink = ref<Link>('off')
 /** 리모컨의 토큰이 거부됨(접속 끊기·비밀번호 변경·만료·채널 삭제) → 입력 화면으로 돌아가야 함 */
@@ -37,7 +37,11 @@ let ctl: SupabaseRealtimeTransport | null = null
 let getState: (() => LiveState) | null = null
 let adopt: ((s: unknown) => void) | null = null
 let retryTimer: number | undefined
+let checkTimer: number | undefined
 let fetchTimer: number | undefined
+/** 지금 연결된 실시간 주소. 다른 기기에서 '리모컨 쫓아내기'·'보기 비밀번호 변경'을 하면 바뀐다 → 다시 연결 */
+let curCtl: string | null = null
+let curView: string | null = null
 let gen = 0
 let pushing = false
 let queued: { s: LiveState; force: boolean } | null = null
@@ -82,6 +86,7 @@ async function connectHost(retried = false) {
   hostNeedsLogin.value = false
   patchHost(code, { title: j.title ?? loadHost(code)?.title ?? code, controlTopic: j.controlTopic, viewTopic: j.viewTopic })
 
+  curCtl = j.controlTopic; curView = j.viewTopic
   view = new SupabaseRealtimeTransport(supabase, j.viewTopic, { sendOnly: true })
   ctl = new SupabaseRealtimeTransport(supabase, j.controlTopic, {
     onStatus: (st) => {
@@ -103,8 +108,11 @@ async function connectHost(retried = false) {
   }
 }
 
-/** 서버의 현재 상태를 읽어 반영(리모컨이 바꿨을 때). 짧은 시간의 여러 알림은 한 번으로 */
-function scheduleFetch(delay = 150) {
+/**
+ * 서버의 현재 상태를 읽어 반영(리모컨이 바꿨을 때). 짧은 시간의 여러 알림은 한 번으로(0.03초 — 리모컨→프로젝터 0.5초 이내 목표).
+ * 주소가 바뀌었으면(다른 기기에서 쫓아내기·보기 비밀번호 변경) 다시 연결한다.
+ */
+function scheduleFetch(delay = 30) {
   clearTimeout(fetchTimer)
   fetchTimer = window.setTimeout(async () => {
     const code = hostCode
@@ -113,8 +121,10 @@ function scheduleFetch(delay = 150) {
     if (pushing || queued) { scheduleFetch(); return } // 올리는 중이면 끝난 뒤에
     const j = await api.hostJoin(code, token)
     if (code !== hostCode) return
-    if (j.status === 'ok' && j.state) adopt?.(j.state)
-    else if (j.status === 'token_rejected') void onRejected(code)
+    if (j.status === 'ok') {
+      if ((j.controlTopic && j.controlTopic !== curCtl) || (j.viewTopic && j.viewTopic !== curView)) { void connectHost(); return }
+      if (j.state) adopt?.(j.state)
+    } else if (j.status === 'token_rejected') void onRejected(code)
   }, delay)
 }
 
@@ -166,10 +176,12 @@ export function startHostSync(code: string, opts: { getState: () => LiveState; a
   retryTimer = window.setInterval(() => {
     if (hostCode && hostLink.value === 'error' && !hostNeedsLogin.value) void connectHost()
   }, 15000)
+  // 30초마다 서버 확인: 바뀐 주소·놓친 리모컨 변경을 따라잡는다
+  checkTimer = window.setInterval(() => { if (hostCode && hostLink.value === 'live') scheduleFetch(0) }, 30000)
   void connectHost()
 }
 
-/** 접속 끊기 뒤 새 토큰을 저장하고 호출 */
+/** 주소가 바뀐 뒤(이 PC 에서 쫓아내기·보기 비밀번호 변경) 바로 다시 연결 */
 export function reconnectHost() { void connectHost() }
 
 /** liveStore 가 PC 조작으로 상태가 바뀔 때마다 호출 */
@@ -182,7 +194,8 @@ export function publishHost(s: LiveState) {
 
 export function stopHostSync() {
   gen++
-  clearInterval(retryTimer); clearTimeout(fetchTimer)
+  clearInterval(retryTimer); clearInterval(checkTimer); clearTimeout(fetchTimer)
+  curCtl = null; curView = null
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)
   closeHostTransports()

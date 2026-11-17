@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * 호스트 전용: 채널 번호·링크·QR, 접속 끊기/비밀번호 변경, 채널 삭제.
- * 접속 끊기·삭제는 계정 권한이라 그때 로그인한다(로그인은 저장되지 않음).
+ * 호스트 전용: 채널 번호·링크·QR, 관리(리모컨 쫓아내기 · 보기 비밀번호 · 채널 삭제).
+ * 관리는 계정 권한이라 그때 로그인한다(로그인은 저장되지 않음). 이 PC(호스트)는 어느 관리를 해도 끊기지 않는다.
  */
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -9,7 +9,7 @@ import QRCode from 'qrcode'
 import * as api from '@/channel/api'
 import { hostLink, hostNeedsLogin, reconnectHost } from '@/channel/sync'
 import { session } from '@/lib/auth'
-import { saveHost, forgetChannelLocal } from '@/live/persistence'
+import { forgetChannelLocal } from '@/live/persistence'
 import LoginForm from '@/components/LoginForm.vue'
 
 const props = defineProps<{ code: string; title: string }>()
@@ -28,31 +28,46 @@ async function copy(label: string, text: string) {
 }
 
 const linkText = computed(() =>
-  hostNeedsLogin.value ? '이 PC 의 인터넷 송출 권한이 만료됐습니다 — 아래 관리에서 로그인하면 다시 연결됩니다 (PC 송출은 정상)'
+  hostNeedsLogin.value ? '이 PC 의 인터넷 송출 권한이 만료됐습니다(30일 미사용 등) — 아래 관리에서 로그인하면 다시 연결됩니다 (PC 송출은 정상)'
     : hostLink.value === 'live' ? '● 폰·보기 연결 준비됨'
       : hostLink.value === 'connecting' ? '연결 중…'
         : hostLink.value === 'error' ? '폰·보기 연결 안 됨 (송출은 정상) — 자동 재시도 중' : '',
 )
 
-// 접속 끊기 / 비밀번호 변경 (로그인 필요)
-const showReset = ref(false)
+// 관리 (로그인 필요). 호스트 PC 는 어느 쪽도 끊기지 않는다 — 바뀐 주소로 바로 다시 연결
+const showManage = ref(false)
 const newControl = ref('')
 const newView = ref('')
-const removeView = ref(false)
 const msg = ref<string | null>(null)
 const busy = ref(false)
-async function reset() {
-  if (!confirm('모든 기기의 접속을 끊습니다. 폰은 비밀번호를 다시 입력해야 하고, 이 채널을 연 다른 PC 도 다시 로그인해야 합니다. 계속할까요?')) return
+
+/** 리모컨 모두 쫓아내기 = 컨트롤 비밀번호 변경(새 비밀번호 필수) */
+async function kick() {
+  if (newControl.value.length < 4) { msg.value = '새 컨트롤 비밀번호를 4자 이상 입력하세요'; return }
+  if (!confirm('컨트롤 비밀번호를 바꾸고 모든 리모컨을 쫓아냅니다.\n리모컨 폰은 다음 조작부터 막히고, 새 비밀번호로만 다시 들어올 수 있습니다.\n(이 PC 와 보기 기기는 그대로)')) return
   busy.value = true
-  const err = await api.resetAccess(props.code, { controlPassword: newControl.value, viewPassword: newView.value, removeViewPassword: removeView.value })
-  if (err) { busy.value = false; msg.value = err; return }
-  // 이 PC 의 호스트 토큰도 지워졌으므로 새로 받아 다시 연결
-  const g = await api.issueHostToken(props.code)
+  const err = await api.kickRemotes(props.code, newControl.value)
   busy.value = false
-  if (g.grant) saveHost(props.code, { title: g.grant.title, token: g.grant.token, controlTopic: g.grant.controlTopic, viewTopic: g.grant.viewTopic })
+  if (err) { msg.value = err; return }
+  newControl.value = ''
+  msg.value = '리모컨을 모두 쫓아냈습니다. 새 컨트롤 비밀번호를 알려 주세요.'
   reconnectHost()
-  newControl.value = ''; newView.value = ''; removeView.value = false
-  msg.value = '모든 기기의 접속을 끊었습니다.'
+}
+
+/** 보기 비밀번호 설정/변경, 또는 없애기(null) */
+async function changeView(remove: boolean) {
+  if (!remove && newView.value.length < 4) { msg.value = '새 보기 비밀번호를 4자 이상 입력하세요'; return }
+  const q = remove
+    ? '보기 비밀번호를 없앱니다. 채널 번호만 알면 누구나 볼 수 있게 됩니다.'
+    : '보기 비밀번호를 바꿉니다. 보기 기기는 새 비밀번호를 입력해야 합니다.'
+  if (!confirm(q)) return
+  busy.value = true
+  const err = await api.setViewPassword(props.code, remove ? null : newView.value)
+  busy.value = false
+  if (err) { msg.value = err; return }
+  newView.value = ''
+  msg.value = remove ? '보기 비밀번호를 없앴습니다.' : '보기 비밀번호를 바꿨습니다.'
+  reconnectHost()
 }
 
 async function remove() {
@@ -86,17 +101,27 @@ async function remove() {
     <p class="st" :class="hostNeedsLogin ? 'error' : hostLink">{{ linkText }}</p>
     <p v-if="isLocal" class="warn">지금 주소가 localhost 라서 폰에서는 열리지 않습니다. 배포된 주소(Vercel)에서 여세요.</p>
 
-    <button class="ghost" @click="showReset = !showReset">{{ showReset ? '▾' : '▸' }} 관리 (접속 끊기 · 비밀번호 변경 · 삭제)</button>
-    <template v-if="showReset">
+    <button class="ghost" @click="showManage = !showManage">{{ showManage ? '▾' : '▸' }} 관리 (리모컨 쫓아내기 · 보기 비밀번호 · 삭제)</button>
+    <template v-if="showManage">
       <LoginForm v-if="!session" hint="관리 기능은 채널을 만든 계정으로 로그인해야 합니다. (로그인은 저장되지 않습니다)" />
       <template v-else>
-        <div class="reset">
-          <input v-model="newControl" type="password" placeholder="새 컨트롤 비밀번호 (비우면 유지)" autocomplete="new-password" />
-          <input v-model="newView" type="password" placeholder="새 보기 비밀번호 (비우면 유지)" autocomplete="new-password" :disabled="removeView" />
-          <label class="check"><input v-model="removeView" type="checkbox" /> 보기 비밀번호 없애기(누구나 번호로 보기)</label>
-          <button :disabled="busy" @click="reset">모든 기기 접속 끊기</button>
+        <div class="box">
+          <b>리모컨 모두 쫓아내기</b>
+          <small>컨트롤 비밀번호를 바꿉니다. 리모컨 폰은 다음 조작부터 막힙니다. 이 PC·보기 기기는 그대로.</small>
+          <input v-model="newControl" type="password" placeholder="새 컨트롤 비밀번호 (필수, 4자 이상)" autocomplete="new-password" />
+          <button :disabled="busy || newControl.length < 4" @click="kick">비밀번호 바꾸고 리모컨 쫓아내기</button>
+        </div>
+        <div class="box">
+          <b>보기 비밀번호</b>
+          <small>바꾸면 보기 기기는 새 비밀번호를 입력해야 합니다. 없애면 번호만으로 누구나 봅니다.</small>
+          <input v-model="newView" type="password" placeholder="새 보기 비밀번호 (4자 이상)" autocomplete="new-password" />
+          <div class="row2">
+            <button :disabled="busy || newView.length < 4" @click="changeView(false)">설정·변경</button>
+            <button :disabled="busy" @click="changeView(true)">없애기</button>
+          </div>
         </div>
         <button class="danger" @click="remove">채널 삭제</button>
+        <small class="muted">이 PC 를 잃어버렸다면 채널을 삭제하고 새로 만드세요.</small>
       </template>
     </template>
     <p v-if="msg" class="warn">{{ msg }}</p>
@@ -123,8 +148,12 @@ h3 { margin: 0; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-o
 .st.error { color: var(--warn); }
 .warn { margin: 0; font-size: 12px; color: var(--warn); }
 .ghost { text-align: left; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; }
-.reset { display: grid; gap: 6px; }
-.check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.box { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.box b { font-size: 13px; }
+.box small { color: var(--muted); font-size: 11px; }
+.row2 { display: flex; gap: 6px; }
+.row2 button { flex: 1; }
+
 @media (max-width: 768px) {
   .pop { top: auto; bottom: 0; left: 0; right: 0; width: auto; border-radius: 14px 14px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom)); max-height: 85dvh; }
 }

@@ -3,7 +3,7 @@
  *   npm run verify:channels
  * .env 필요: SUPABASE_URL, VITE_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
  * 임시 스태프 계정과 임시 채널(Lorem 더미)을 만들고, 끝나면 모두 삭제한다. 가사·실데이터는 건드리지 않는다.
- * 확인: RLS(남의 채널 안 보임), 비밀번호/토큰 흐름, 접속 끊기, 보기 비밀번호 선택, 삭제,
+ * 확인: RLS(남의 채널 안 보임), 비밀번호/토큰 흐름, 리모컨 쫓아내기·보기 비밀번호 변경(호스트 유지), 삭제,
  *       인터넷 송출 상태(호스트 토큰·상태 올리기·리모컨 명령·서버 실시간 알림), 서버 이동 규칙 = 앱(nav.ts) 대조.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -176,18 +176,28 @@ try {
   }
   check('서버 이동 규칙 = 앱 이동 규칙(무작위 120건 대조)', !mismatch, mismatch)
 
-  // ── 접속 끊기 ──
-  const reset = first<{ control_topic: string; view_topic: string }>((await rpc(owner, 'reset_channel_access', { p_code: code, p_control_password: 'ctl-pass-9' })).data)
-  check('접속 끊기: topic 재발급', !!reset && reset.control_topic !== tp?.control_topic && reset.view_topic !== tp?.view_topic)
-  check('접속 끊기: 기존 컨트롤 토큰 거부', (await g({ p_token: ok?.token }))?.status === 'token_rejected')
-  check('접속 끊기: 기존 보기 토큰 거부', (await v(code, { p_token: vok?.token }))?.status === 'token_rejected')
-  await rpc(owner, 'reset_channel_access', { p_code: openCode })
-  check('접속 끊기: 호스트 PC 토큰도 거부(→ PC 가 "로그인 필요"를 앎)', (await hj(hostTok))?.status === 'token_rejected')
-  check('비밀번호 변경: 새 비밀번호 ok / 옛 비밀번호 거부', (await g({ p_password: 'ctl-pass-9' }))?.status === 'ok' && (await g({ p_password: 'ctl-pass-1' }))?.status === 'bad_password')
-  const noOwnerReset = await rpc(guest, 'reset_channel_access', { p_code: code })
-  check('비로그인은 접속 끊기 불가', !!noOwnerReset.error)
-  await rpc(owner, 'reset_channel_access', { p_code: code, p_remove_view_password: true })
-  check('보기 비밀번호 제거 → 번호만으로 보기', (await v(code, {}))?.status === 'ok')
+  // ── 리모컨 쫓아내기(컨트롤 비밀번호 변경) / 보기 비밀번호 변경 — 호스트 PC 는 유지 ──
+  const hostTok2 = first<{ token: string }>((await rpc(owner, 'issue_host_token', { p_code: code })).data)?.token
+  const hj2 = async () => first<{ status: string; control_topic: string; view_topic: string }>((await rpc(guest, 'host_join', { p_code: code, p_token: hostTok2 })).data)
+  check('같은 비밀번호로는 쫓아내기 거부', !!(await rpc(owner, 'kick_remotes', { p_code: code, p_new_control_password: 'ctl-pass-1' })).error)
+  check('짧은 새 비밀번호 거부', !!(await rpc(owner, 'kick_remotes', { p_code: code, p_new_control_password: 'abc' })).error)
+  check('비로그인은 쫓아내기 불가', !!(await rpc(guest, 'kick_remotes', { p_code: code, p_new_control_password: 'ctl-pass-9' })).error)
+  const kick = first<{ control_topic: string }>((await rpc(owner, 'kick_remotes', { p_code: code, p_new_control_password: 'ctl-pass-9' })).data)
+  check('쫓아내기: 리모컨 주소 재발급', !!kick && kick.control_topic !== tp?.control_topic)
+  check('쫓아내기: 기존 리모컨 토큰 거부', (await g({ p_token: ok?.token }))?.status === 'token_rejected')
+  check('쫓아내기: 옛 비밀번호 거부 / 새 비밀번호 ok', (await g({ p_password: 'ctl-pass-1' }))?.status === 'bad_password' && (await g({ p_password: 'ctl-pass-9' }))?.status === 'ok')
+  check('쫓아내기: 보기 토큰은 유지', (await v(code, { p_token: vok?.token }))?.status === 'ok')
+  const h2 = await hj2()
+  check('쫓아내기: 호스트 PC 는 그대로(새 주소를 받음)', h2?.status === 'ok' && h2.control_topic === kick?.control_topic)
+  const sv = first<{ view_topic: string; has_view_password: boolean }>((await rpc(owner, 'set_view_password', { p_code: code, p_new_view_password: 'view-pass-2' })).data)
+  check('보기 비밀번호 변경: 주소 재발급 + 기존 보기 토큰 거부', !!sv && sv.view_topic !== tp?.view_topic && (await v(code, { p_token: vok?.token }))?.status === 'token_rejected')
+  check('보기 비밀번호 변경: 같은 비밀번호 거부', !!(await rpc(owner, 'set_view_password', { p_code: code, p_new_view_password: 'view-pass-2' })).error)
+  check('보기 비밀번호 변경: 새 비밀번호 ok', (await v(code, { p_password: 'view-pass-2' }))?.status === 'ok')
+  check('보기 비밀번호 변경: 호스트 PC 그대로', (await hj2())?.status === 'ok')
+  check('비로그인은 보기 비밀번호 변경 불가', !!(await rpc(guest, 'set_view_password', { p_code: code, p_new_view_password: null })).error)
+  await rpc(owner, 'set_view_password', { p_code: code, p_new_view_password: null })
+  check('보기 비밀번호 없애기 → 번호만으로 보기', (await v(code, {}))?.status === 'ok')
+  check('예전 "모든 기기 접속 끊기" 함수는 없음', !!(await rpc(owner, 'reset_channel_access', { p_code: code })).error)
 
   // ── 삭제 ──
   const del = await owner.from('channels').delete().eq('code', code)
