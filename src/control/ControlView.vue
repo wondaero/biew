@@ -38,6 +38,18 @@ async function startOutput() {
 const showHelp = ref(false)
 const showShare = ref(false)
 
+// 모바일 바텀시트 (PC 에선 CSS 가 무시하므로 상태만 있고 영향 없음)
+const sheet = ref<'find' | 'style' | null>(null)
+const tab = ref<'lib' | 'set'>('lib')
+function openSheet(kind: 'find' | 'style', t?: 'lib' | 'set') {
+  sheet.value = kind
+  if (t) tab.value = t
+}
+function onJump(i: number) {
+  gridRef.value?.scrollToItem(i)
+  sheet.value = null
+}
+
 // 송출 중 실수로 컨트롤러를 닫는 것 방지(출력은 계속 유지되지만 조작 불가해짐)
 const onBeforeUnload = (e: BeforeUnloadEvent) => { if (outputOn.value) e.preventDefault() }
 
@@ -72,10 +84,10 @@ onBeforeUnmount(() => {
 
       <span class="spacer" />
 
-      <span class="conn" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
-      <button class="primary" @click="startOutput">출력 시작</button>
+      <span class="conn desk-only" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
+      <button class="primary desk-only" @click="startOutput">출력 시작</button>
       <button class="share" :class="shareStatus" title="폰으로 보기 (QR)" @click="showShare = !showShare">📱 폰</button>
-      <button title="단축키" @click="showHelp = !showHelp">?</button>
+      <button class="desk-only" title="단축키" @click="showHelp = !showHelp">?</button>
     </header>
 
     <div v-if="toast" class="toast" @click="toast = null">{{ toast }}</div>
@@ -93,9 +105,17 @@ onBeforeUnmount(() => {
       </table>
     </div>
 
-    <aside class="left">
+    <div v-if="sheet" class="backdrop" @click="sheet = null" />
+
+    <aside class="left" :class="{ open: sheet === 'find' }" :data-tab="tab">
+      <div class="sheet-head">
+        <button :class="{ on: tab === 'lib' }" @click="tab = 'lib'">곡 검색</button>
+        <button :class="{ on: tab === 'set' }" @click="tab = 'set'">콘티 {{ live.state.setlist.length }}</button>
+        <span class="spacer" />
+        <button aria-label="닫기" @click="sheet = null">✕</button>
+      </div>
       <LibraryPanel ref="libRef" class="lib" />
-      <SetlistPanel class="set" @jump="(i) => gridRef?.scrollToItem(i)" />
+      <SetlistPanel class="set" @jump="onJump" />
     </aside>
 
     <main class="center">
@@ -104,8 +124,20 @@ onBeforeUnmount(() => {
 
     <aside class="right">
       <MonitorPanel />
-      <StylePanel />
+      <div class="style-sheet" :class="{ open: sheet === 'style' }">
+        <div class="sheet-head">
+          <span class="spacer" />
+          <button aria-label="닫기" @click="sheet = null">✕</button>
+        </div>
+        <StylePanel />
+      </div>
     </aside>
+
+    <nav class="dock">
+      <button @click="openSheet('find', 'lib')">🔍 곡 검색</button>
+      <button @click="openSheet('find', 'set')">☰ 콘티 {{ live.state.setlist.length }}</button>
+      <button @click="openSheet('style')">⚙ 출력 설정</button>
+    </nav>
   </div>
 </template>
 
@@ -147,4 +179,50 @@ onBeforeUnmount(() => {
   background: var(--panel-2); border: 1px solid var(--line); font-size: 13px;
 }
 .help td:first-child { color: var(--accent); padding-right: 16px; white-space: nowrap; }
+
+/* ── 모바일: 모니터 + 슬라이드 목록 한 줄 스크롤, 검색/콘티/설정은 바텀시트 ── */
+.sheet-head, .dock, .backdrop { display: none; }
+
+@media (max-width: 768px) {
+  .control {
+    height: 100dvh;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'top' 'right' 'center' 'dock';
+  }
+  .desk-only { display: none !important; }
+
+  .top { flex-wrap: wrap; gap: 8px; padding: 6px 10px; }
+  .spacer { display: none; }
+  .group { flex: 1; }
+  .group button { flex: 1; padding: 9px 12px; }
+  .mode { font-size: 12px; }
+
+  .right { padding: 6px 10px; border-left: 0; border-bottom: 1px solid var(--line); overflow: visible; gap: 0; }
+  .right :deep(.monitors) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+  .right :deep(.screen) { width: min(100%, calc(30dvh * 16 / 9)); margin: 0 auto; }
+
+  .backdrop { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(0, 0, 0, .5); }
+
+  .left, .style-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    height: min(78dvh, 640px); padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--panel); border: 1px solid var(--line); border-bottom: 0; border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
+    transform: translateY(105%); visibility: hidden; transition: transform .2s, visibility 0s .2s;
+  }
+  .left.open, .style-sheet.open { transform: none; visibility: visible; transition: transform .2s; }
+  .left { grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+  .style-sheet { overflow-y: auto; }
+  .left[data-tab='lib'] .set, .left[data-tab='set'] .lib { display: none; }
+
+  .sheet-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .left .sheet-head { margin-bottom: 0; }
+  .sheet-head .spacer { display: block; flex: 1; }
+  .sheet-head button { padding: 8px 14px; }
+  .sheet-head button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .dock { grid-area: dock; display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
+  .dock button { flex: 1; padding: 12px 6px; font-size: 13px; white-space: nowrap; }
+}
 </style>

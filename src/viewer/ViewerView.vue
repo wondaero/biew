@@ -10,6 +10,14 @@ import type { LiveState } from '@shared/types'
 import { supabase } from '@/lib/supabase'
 import { SyncHub } from '@/sync/SyncHub'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
+import { currentText } from '@/live/nav'
+import SlideRender from '@/components/SlideRender.vue'
+
+// 넓은 화면(PC/태블릿)이면 송출 화면 그대로, 폰이면 가사 목록. 폰 가로(높이 작음)는 목록 유지
+const mq = window.matchMedia('(min-width: 900px) and (min-height: 520px)')
+const wide = ref(mq.matches)
+const onMq = () => { wide.value = mq.matches }
+mq.addEventListener('change', onMq)
 
 const route = useRoute()
 const code = computed(() => String(route.params.code ?? '').toUpperCase())
@@ -30,6 +38,8 @@ async function catchUp() {
 
 const item = computed(() => (state.value ? state.value.setlist[state.value.itemIndex] : undefined))
 const nextItem = computed(() => (state.value ? state.value.setlist[state.value.itemIndex + 1] : undefined))
+const text = computed(() => (state.value ? currentText(state.value) : null))
+const layerKey = computed(() => (state.value ? `${state.value.itemIndex}:${state.value.slideIndex}` : 0))
 
 // 현재 슬라이드를 화면 중앙 근처로
 watch(
@@ -56,13 +66,22 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', onVis)
 })
 onBeforeUnmount(() => {
+  mq.removeEventListener('change', onMq)
   document.removeEventListener('visibilitychange', onVis)
   hub?.close()
 })
 </script>
 
 <template>
-  <div class="viewer">
+  <!-- 넓은 화면: 송출 화면(출력과 같은 렌더러)만 전체로 -->
+  <div v-if="wide" class="stage">
+    <SlideRender v-if="state" :text="text" :blank="state.blank" :style-cfg="state.style" :layer-key="layerKey" />
+    <p v-if="status === 'notfound'" class="wmsg">방을 찾을 수 없습니다 — 코드 <b>{{ code }}</b> 가 종료되었거나 잘못되었습니다.</p>
+    <p v-else-if="!state" class="wmsg">{{ status === 'error' ? '연결할 수 없습니다.' : '불러오는 중…' }}</p>
+    <span class="dot wdot" :class="status" :title="status" />
+  </div>
+
+  <div v-else class="viewer">
     <header>
       <div class="t">
         <strong>{{ item?.title ?? '실시간 가사' }}</strong>
@@ -92,6 +111,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.stage { position: fixed; inset: 0; background: #000; color: #aaa; }
+.wmsg { position: absolute; inset: 0; display: grid; place-content: center; margin: 0; font-size: 18px; text-align: center; }
+.wdot { position: absolute; top: 12px; right: 12px; opacity: .6; }
 .viewer { min-height: 100dvh; display: flex; flex-direction: column; background: #0e0e11; color: #eee; }
 header {
   position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px;

@@ -56,6 +56,19 @@ supabase/migrations/  songs, rooms
 - 즉시 모드: 카드 클릭 = 송출, 그리드엔 송출 중만 표시. PVW 모드: 클릭 = 미리보기, Enter/TAKE = 송출.
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.
 
+## 출력 여백 · 정렬 (사용자가 나중에 수치 조절을 요청하면 바로 여기를 수정)
+- **여백은 위·왼쪽만 쓴다.** 오른쪽·아래는 화면 끝까지(넘치면 글자 축소). 글은 왼쪽 정렬, (왼쪽 여백, 위 여백)에서 시작하고 줄이 늘면 아래로 자란다. 가운데 정렬/하단 기준으로 되돌리지 말 것.
+- 값: `OutputStyle.topMargin`(cqh, 기본 5), `leftMargin`(cqw, 기본 5) — 기본값은 `shared/types.ts` 의 `DEFAULT_STYLE`.
+- 적용 위치: `src/components/FitText.vue` 의 `boxStyle`(top/left/bottom/right). 슬라이더 UI: `src/control/panels/StylePanel.vue`("위 여백"/"왼쪽 여백").
+- 기본값을 바꿔도 **이미 저장된 설정(localStorage `biew.live.v1`)이 우선**한다. 모든 기기에 새 기본값을 강제하려면 `src/live/persistence.ts` 의 `loadLive` 에 마이그레이션을 추가하거나, 사용자에게 "기본값으로" 버튼을 안내한다.
+- 글자 자동 축소 최소 배율 `MIN_SCALE = 0.2`(FitText.vue) — 최대 10줄까지 한 화면에 들어가도록. 슬라이드 카드 미리보기 줄 제한도 10줄(SlideGrid.vue).
+- `position`: `'top'`(기본) / `'center'`(세로 중앙). 예전 저장값 `'bottom'` 은 `'top'` 으로 이전된다.
+- 같은 렌더러(`SlideRender`/`FitText`)를 출력·컨트롤러 모니터·카드 미리보기·폰 뷰어가 공유하므로 한 곳 수정이 전부에 반영된다.
+
+## 모바일 컨트롤러 (≤768px, CSS 미디어쿼리)
+- 위: 상단 바 → 송출 모니터 → 슬라이드 목록(곡별 아코디언, 접힌 곡 헤더에도 "● 송출 중 n/m" 표시, 1열 행 목록). 아래 도크 버튼 3개(곡 검색/콘티/출력 설정)가 바텀시트를 연다. 컴포넌트를 복제하지 않고 같은 DOM 을 CSS 로 재배치한다(`ControlView.vue` 하단 스타일).
+- 모바일에선 출력 시작·출력 연결 표시·📱 폰·`?` 를 숨긴다(`desk-only`).
+
 ## 작업 방식
 - 변경 후 `npm run typecheck && npm test && npm run build` 통과 확인.
 - UI 확인은 headless Chrome(puppeteer-core, 스크래치 디렉터리에 설치)으로 Lorem 콘티를 localStorage `biew.live.v1` 에 심어서. 로그인 필요 기능은 service_role 로 임시 스태프 계정 생성 → 테스트 → 계정 삭제.

@@ -16,7 +16,8 @@ export interface SetlistItem {
   slides: string[]
 }
 
-export type TextPosition = 'bottom' | 'center'
+/** top = 첫 줄 위치를 고정하고 줄이 늘면 아래로 자람 / center = 세로 가운데 */
+export type TextPosition = 'top' | 'center'
 export type Background = 'black' | 'green'
 export type TransitionKind = 'cut' | 'fade'
 
@@ -31,8 +32,9 @@ export interface OutputStyle {
   outlineColor: string
   shadow: boolean
   position: TextPosition
-  /** 하단 여백 (cqh) — position=bottom 일 때 */
-  bottomMargin: number
+  /** 여백은 위·왼쪽만 쓴다(오른쪽·아래는 화면 끝까지). 글은 (leftMargin, topMargin) 에서 시작 */
+  topMargin: number // cqh — position=top 일 때
+  leftMargin: number // cqw
   background: Background
   transition: TransitionKind
   fadeMs: number
@@ -59,8 +61,9 @@ export const DEFAULT_STYLE: OutputStyle = {
   outlineWidth: 0.35,
   outlineColor: '#000000',
   shadow: true,
-  position: 'bottom',
-  bottomMargin: 6,
+  position: 'top',
+  topMargin: 5,
+  leftMargin: 5,
   background: 'black',
   transition: 'fade',
   fadeMs: 250,

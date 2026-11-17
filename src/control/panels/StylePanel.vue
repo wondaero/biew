@@ -56,11 +56,14 @@ const isPreset = computed(() => FONTS.some((f) => f.value === st.value.fontFamil
 
     <div class="seg full">
       <span>위치</span>
-      <button :class="{ on: st.position === 'bottom' }" @click="set('position', 'bottom')">하단</button>
-      <button :class="{ on: st.position === 'center' }" @click="set('position', 'center')">중앙</button>
+      <button :class="{ on: st.position === 'top' }" @click="set('position', 'top')">위 기준</button>
+      <button :class="{ on: st.position === 'center' }" @click="set('position', 'center')">세로 중앙</button>
     </div>
-    <label v-if="st.position === 'bottom'">하단 여백 <output>{{ st.bottomMargin.toFixed(0) }}</output>
-      <input type="range" min="0" max="40" step="1" :value="st.bottomMargin" @input="set('bottomMargin', num($event))" />
+    <label v-if="st.position === 'top'">위 여백 <output>{{ st.topMargin.toFixed(0) }}</output>
+      <input type="range" min="0" max="60" step="1" :value="st.topMargin" @input="set('topMargin', num($event))" />
+    </label>
+    <label>왼쪽 여백 <output>{{ st.leftMargin.toFixed(0) }}</output>
+      <input type="range" min="0" max="40" step="1" :value="st.leftMargin" @input="set('leftMargin', num($event))" />
     </label>
 
     <div class="seg full">
@@ -95,4 +98,9 @@ input[type='color'] { width: 100%; height: 28px; padding: 2px; }
 .seg button { flex: 1; padding: 4px; font-size: 12px; }
 .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .reset { font-size: 12px; }
+/* 좁은 화면: 한 줄에 하나씩 (2열이면 "줄 간격" 같은 라벨이 세로로 깨짐) */
+@media (max-width: 768px) {
+  .style { grid-template-columns: minmax(0, 1fr); font-size: 13px; }
+  label.check { white-space: nowrap; }
+}
 </style>

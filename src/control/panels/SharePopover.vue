@@ -8,6 +8,7 @@ const emit = defineEmits<{ close: [] }>()
 const qr = ref<string | null>(null)
 const err = ref<string | null>(null)
 const copied = ref(false)
+const origin = location.origin
 const isLocal = computed(() => /^(localhost|127\.|\[::1\])/.test(location.hostname))
 
 watch(viewerUrl, async (u) => { qr.value = u ? await QRCode.toDataURL(u, { margin: 1, width: 220 }) : null }, { immediate: true })
@@ -45,6 +46,7 @@ async function copy() {
       <p class="st" :class="shareStatus">
         {{ shareStatus === 'live' ? '● 실시간 전송 중' : shareStatus === 'connecting' ? '연결 중…' : shareStatus === 'error' ? `오류: ${shareError ?? '연결 실패'}` : '' }}
       </p>
+      <p class="muted">링크 없이 들어가려면 다른 기기에서 <b>{{ origin }}/view</b> 에 접속해 위 코드를 입력하세요.</p>
       <p v-if="isLocal" class="warn">지금 주소가 localhost 라서 폰에서는 열리지 않습니다. 배포된 주소(Vercel)에서 공유를 시작하세요.</p>
       <div class="row">
         <button @click="rotate">새 코드</button>
@@ -75,4 +77,8 @@ h3 { margin: 0; font-size: 14px; flex: 1; }
 .warn { margin: 0; font-size: 12px; color: var(--warn); }
 .row { display: flex; gap: 6px; }
 .row button { flex: 1; }
+/* 모바일: 아래에서 올라오는 시트 모양 */
+@media (max-width: 768px) {
+  .pop { top: auto; bottom: 0; left: 0; right: 0; width: auto; border-radius: 14px 14px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom)); max-height: 85dvh; overflow-y: auto; }
+}
 </style>

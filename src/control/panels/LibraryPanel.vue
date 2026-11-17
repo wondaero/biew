@@ -120,6 +120,7 @@ header h2 { margin: 0; font-size: 14px; flex: 1; }
 .edit { padding: 0 6px; border: none; background: none; color: var(--muted); visibility: hidden; }
 .hits li:hover .edit, .hits li.sel .edit { visibility: visible; }
 .edit:hover { color: var(--accent); }
+@media (hover: none) { .edit { visibility: visible; } } /* 터치엔 hover 가 없어 ✎ 가 영영 안 보임 */
 header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .status { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .status span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
