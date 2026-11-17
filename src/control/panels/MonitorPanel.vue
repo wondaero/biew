@@ -18,7 +18,7 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
   <section class="monitors">
     <div class="mon">
       <div class="bar pgm">
-        <b>PGM</b> <span>{{ label({ itemIndex: air.itemIndex, slideIndex: air.slideIndex }) }}</span>
+        <b>송출 중</b> <span>{{ label({ itemIndex: air.itemIndex, slideIndex: air.slideIndex }) }}</span>
         <em v-if="air.frozen" class="frz">FREEZE</em>
         <em v-if="air.blank">BLANK</em>
       </div>
@@ -27,8 +27,8 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
     <!-- 즉시 모드에선 PGM 하나만. PVW 모드에서만 'TAKE 하면 나갈 화면' 표시 -->
     <div v-if="live.pvwMode.value" class="mon">
       <div class="bar pvw">
-        <b>PVW</b> <span>{{ label(live.upcoming.value) }}</span>
-        <button class="take" :disabled="!live.upcoming.value" @click="live.actions.take()">TAKE ⏎</button>
+        <b>미리보기</b> <span>{{ label(live.upcoming.value) }}</span>
+        <button class="take" :disabled="!live.upcoming.value" title="미리보기를 송출 (Enter)" @click="live.actions.take()">송출 ⏎</button>
       </div>
       <div class="screen"><SlideRender :text="nextText" :style-cfg="s.style" :animate="false" /></div>
     </div>

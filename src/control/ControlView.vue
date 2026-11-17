@@ -121,8 +121,8 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <label v-if="isHost" class="mode" title="켜면 카드 클릭 = 미리보기, Enter/TAKE = 송출">
-        <input v-model="live.pvwMode.value" type="checkbox" /> PVW/PGM 분리
+      <label v-if="isHost" class="mode" title="켜면 슬라이드를 누를 때 바로 나가지 않고 미리보기로 골라 둔 뒤, Enter 나 [송출] 버튼으로 내보냅니다">
+        <input v-model="live.pvwMode.value" type="checkbox" /> 미리보기 후 송출
       </label>
 
       <span class="spacer" />
@@ -144,13 +144,13 @@ onBeforeUnmount(() => {
     <ChannelPopover v-if="isHost && showChannel" :code="code" :title="title" @close="showChannel = false" />
     <div v-if="showHelp" class="help" @click="showHelp = false">
       <table>
-        <tr><td>→ / Space</td><td>다음 슬라이드 (PVW 모드: 미리보기 송출)</td></tr>
+        <tr><td>→ / Space</td><td>다음 슬라이드 (미리보기 후 송출 모드: 골라 둔 미리보기를 송출)</td></tr>
         <tr><td>←</td><td>이전 슬라이드</td></tr>
         <tr><td>↓ / ↑</td><td>다음 곡 첫 장 / 이전 곡(또는 현재 곡) 첫 장</td></tr>
         <tr><td>1 ~ 9, 0</td><td>현재 곡의 N번째 (0 = 10번째)</td></tr>
         <tr><td>B</td><td>블랭크 토글</td></tr>
         <tr><td>F</td><td>프리즈 걸기 (송출 화면 고정, 조작은 계속). 해제는 FREEZE 버튼을 직접 클릭</td></tr>
-        <tr><td>Enter</td><td>TAKE (미리보기 → 송출)</td></tr>
+        <tr><td>Enter</td><td>미리보기 → 송출</td></tr>
         <tr><td>/</td><td>검색창으로</td></tr>
         <tr><td>Esc</td><td>입력창에서 빠져나오기</td></tr>
       </table>
