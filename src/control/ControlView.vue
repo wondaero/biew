@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useLive } from '@/live/liveStore'
 import { hostLink, hostNeedsLogin, remoteLink } from '@/channel/sync'
 import { forgetToken } from '@/channel/api'
@@ -14,9 +14,11 @@ import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import StylePanel from './panels/StylePanel.vue'
 import ChannelPopover from './panels/ChannelPopover.vue'
+import SwitchToInternet from './SwitchToInternet.vue'
 
 defineProps<{ title: string }>()
 const router = useRouter()
+const route = useRoute()
 const live = useLive()
 /** host = 이 PC(전체 기능) / remote = 폰 리모컨(이동·BLANK·점프만) */
 const isHost = computed(() => live.role.value === 'host')
@@ -54,7 +56,15 @@ async function startOutput() {
 }
 
 const showHelp = ref(false)
-const showChannel = ref(false)
+// 인터넷 송출로 막 전환했으면(?share=1) 📡 창을 바로 열어 폰이 QR·링크로 들어오게
+const showChannel = ref(route.query.share === '1')
+const showSwitch = ref(false)
+
+/** 로컬 송출 종료: 콘티를 비우고(출력 설정 유지) 출력 창은 검은 화면으로 남긴다 — 다음 예배를 그대로 이어서 */
+function endLocal() {
+  if (!confirm('이 송출을 끝낼까요?\n콘티가 비워지고 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.')) return
+  live.actions.endSession()
+}
 
 /** 리모컨: 이 기기에 저장된 토큰을 지우고 나간다(다음엔 비밀번호를 다시 입력) */
 function leaveRemote() {
@@ -128,6 +138,10 @@ onBeforeUnmount(() => {
       <span class="spacer" />
 
       <span v-if="netWarn" class="netwarn" role="status">{{ netWarn }}</span>
+      <template v-if="isLocalMode">
+        <button class="endlocal" title="콘티를 비우고 다음 예배 준비(출력 창은 검은 화면으로 유지)" @click="endLocal">송출 종료</button>
+        <button title="지금 송출을 그대로 인터넷 송출로 옮겨 폰 리모컨·보기를 씀" @click="showSwitch = true">🌐 인터넷 송출로 전환</button>
+      </template>
       <template v-if="isHost">
         <span class="conn desk-only" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
         <button class="primary desk-only" @click="startOutput">출력 시작</button>
@@ -141,7 +155,8 @@ onBeforeUnmount(() => {
     </header>
 
     <div v-if="toast" class="toast" @click="toast = null">{{ toast }}</div>
-    <ChannelPopover v-if="isHost && showChannel" :code="code" :title="title" @close="showChannel = false" />
+    <ChannelPopover v-if="isHost && !isLocalMode && showChannel" :code="code" :title="title" @close="showChannel = false" />
+    <SwitchToInternet v-if="showSwitch" @close="showSwitch = false" />
     <div v-if="showHelp" class="help" @click="showHelp = false">
       <table>
         <tr><td>→ / Space</td><td>다음 슬라이드 (미리보기 후 송출 모드: 골라 둔 미리보기를 송출)</td></tr>
@@ -156,7 +171,7 @@ onBeforeUnmount(() => {
       </table>
     </div>
 
-    <div v-if="sheet" class="backdrop" @click="sheet = null" />
+    <div v-if="sheet" class="sheet-backdrop" @click="sheet = null" />
 
     <aside v-if="isHost" class="left" :class="{ open: sheet === 'find' }" :data-tab="tab">
       <div class="sheet-head">
@@ -207,6 +222,7 @@ onBeforeUnmount(() => {
 .ch { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 13px; }
 .ch b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 26ch; }
 .ch code, .ch small { color: var(--muted); font-size: 12px; }
+.endlocal { color: var(--muted); }
 .netwarn { font-size: 12px; color: var(--warn); padding: 3px 8px; border: 1px solid #5a4a1e; border-radius: 6px; background: #3a3014; }
 .share.live { border-color: var(--pvw); color: var(--pvw); }
 .share.error { border-color: var(--pgm); }
@@ -250,7 +266,8 @@ onBeforeUnmount(() => {
 .help td:first-child { color: var(--accent); padding-right: 16px; white-space: nowrap; }
 
 /* ── 모바일: 모니터 + 슬라이드 목록 한 줄 스크롤, 검색/콘티/설정은 바텀시트 ── */
-.sheet-head, .dock, .backdrop { display: none; }
+/* 이름 주의: scoped 스타일은 자식 컴포넌트의 최상위 요소에도 걸린다 — 자식 대화창(.backdrop)과 겹치지 않게 sheet- 접두사 */
+.sheet-head, .dock, .sheet-backdrop { display: none; }
 
 @media (max-width: 768px) {
   .control {
@@ -271,7 +288,7 @@ onBeforeUnmount(() => {
   .right :deep(.monitors) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
   .right :deep(.screen) { width: min(100%, calc(30dvh * 16 / 9)); margin: 0 auto; }
 
-  .backdrop { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(0, 0, 0, .5); }
+  .sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(0, 0, 0, .5); }
 
   .left, .style-sheet {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;

@@ -144,6 +144,15 @@ const actions = {
   },
   /** FREEZE 풀기: 컨트롤러의 현재 위치가 바로 송출된다. 실수 방지로 단축키 없이 버튼으로만 */
   unfreeze: () => { if (state.frozen) commit((s) => { s.frozen = null }) },
+  /**
+   * 송출 종료(로컬 송출): 콘티·위치·BLANK·FREEZE 를 비운다. 출력 설정(폰트·여백 등)은 유지.
+   * 출력 창은 닫지 않고 검은 화면이 된다 — 전체화면 출력 창을 닫으면 프로젝터에 PC 바탕화면이 보이므로.
+   * 실수로 닫거나 새로고침한 경우는 이어지고(저장됨), 이 버튼을 눌렀을 때만 끝난다.
+   */
+  endSession: () => {
+    preview.value = null
+    commit((s) => { s.setlist = []; s.itemIndex = 0; s.slideIndex = 0; s.blank = false; s.frozen = null })
+  },
   /** 카드 클릭: 즉시 모드면 바로 송출, PVW 모드면 미리보기 지정 */
   pick: (c: Cursor) => (pvwMode.value ? (preview.value = c) : actions.go(c)),
 }

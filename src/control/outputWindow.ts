@@ -12,6 +12,9 @@ export interface OpenResult { ok: boolean; placed: boolean; message: string }
 let win: Window | null = null
 let winCode: string | null = null
 
+/** 로컬 → 인터넷 전환 뒤: 열려 있는 출력 창은 스스로 새 채널로 갈아탔으므로 기록만 맞춘다 */
+export function retargetOutputWindow(code: string) { if (win && !win.closed) winCode = code }
+
 /** 채널별 출력 창(/output/<번호>). 이미 다른 채널 출력 창이 열려 있으면 그 창을 이 채널로 바꾼다 */
 export async function openOutputWindow(code: string): Promise<OpenResult> {
   let features = 'popup,width=1280,height=720'

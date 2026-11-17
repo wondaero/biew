@@ -2,6 +2,8 @@
 /**
  * 보기 전용 출력 화면. 상태를 그리기만 한다.
  * 복구 순서: localStorage 마지막 상태로 즉시 그림 → 컨트롤러에 request-state → 더 새 version 이 오면 반영.
+ * 채널 갈아타기: 로컬 송출에서 인터넷 송출로 전환하면 컨트롤러가 'switch-channel' 을 보낸다 →
+ *   화면은 그대로 둔 채(다시 그리지 않음) 새 채널의 BroadcastChannel 로 연결만 바꾼다(프로젝터 깜빡임 없음).
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
@@ -15,11 +17,26 @@ import { useWakeLock } from './useWakeLock'
 import { uid } from '@/lib/uid'
 
 // 채널별 출력: 같은 PC 의 해당 채널 컨트롤러와만 BroadcastChannel 로 연결된다(네트워크 불필요 → 인터넷이 끊겨도 동작)
-const code = String(useRoute().params.code ?? '').toUpperCase()
+let code = String(useRoute().params.code ?? '').toUpperCase()
 const ID = `out-${uid().slice(0, 8)}`
 const state = ref<LiveState | null>(loadLive(code))
-const hub = new SyncHub([new BroadcastChannelTransport(`biew-live:${code}`)], (s) => { state.value = s })
+let hub = connect(code)
 if (state.value) hub.mark(state.value)
+
+function connect(c: string): SyncHub {
+  return new SyncHub([new BroadcastChannelTransport(`biew-live:${c}`)], (s) => { state.value = s }, (m) => {
+    if (m.type === 'switch-channel' && m.code !== code) switchTo(m.code)
+  })
+}
+/** 화면은 그대로, 연결만 새 채널로(주소도 바꿔 두어 새로고침해도 새 채널로 복구) */
+function switchTo(next: string) {
+  hub.close()
+  code = next
+  history.replaceState(history.state, '', `/output/${next}`)
+  hub = connect(next)
+  hub.send({ type: 'request-state', from: ID })
+  hub.send({ type: 'output-alive', from: ID })
+}
 
 // FREEZE 중이면 고정된 화면(onAir)을 그린다 — 컨트롤러 조작이 출력에 새지 않게
 const air = computed(() => (state.value ? onAir(state.value) : null))
