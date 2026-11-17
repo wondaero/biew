@@ -2,7 +2,9 @@
 /**
  * / — 로그인 없이 보인다.
  *  - 채널 번호로 입장(보기/리모컨)
- *  - 이 기기의 채널: 이 PC 가 호스트로 연 채널(로그인·인터넷 불필요, 예배 당일 여기서 바로 들어감)
+ *  - 이 기기의 채널: 이 기기가 호스트(PC)·리모컨·보기로 들어간 채널(누르면 바로, 저장된 입장 정보로)
+ *  - 공개 채널: 보기 비밀번호가 있고 최근 7일 안에 사용된 채널(로그인 불필요, 들어갈 때 보기 비밀번호)
+ *  - 제목 검색: 대소문자·띄어쓰기 무시(shared/searchText)
  *  - 새 채널: 누를 때 로그인(로그인은 저장되지 않음)
  *  - 로그인 중이면 내 계정의 전체 채널(다른 PC 에서 만든 것 포함)도 보이고, 열면 이 PC 가 호스트로 등록된다
  *  - 로컬 송출(/local): 채널·서버 없이 이 PC 하나에서만 송출(예배용 기본). 그 외는 전부 인터넷 송출(채널)
@@ -13,7 +15,8 @@ import { useRouter } from 'vue-router'
 import { session, signOut } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
-import { listHosts, saveHost, forgetChannelLocal } from '@/live/persistence'
+import { listHosts, listVisits, saveHost, forgetChannelLocal, forgetVisit, type VisitRole } from '@/live/persistence'
+import { titleMatches } from '@shared/searchText'
 import LoginForm from '@/components/LoginForm.vue'
 import UploadDialog from '@/control/UploadDialog.vue'
 import { dbNotice } from '@/library/db'
@@ -21,13 +24,38 @@ import { useLibrary, loadCache, syncNow, resetCache, syncStatus, syncError, last
 
 const router = useRouter()
 
-// 이 기기의 채널
-const local = ref(listHosts())
-const localCodes = computed(() => new Set(local.value.map((r) => r.code)))
-function forget(code: string, title: string) {
-  if (!confirm(`"${title}" 을(를) 이 기기 목록에서 지울까요?\n이 PC 의 콘티와 호스트 연결 정보가 지워집니다. 서버의 채널은 그대로입니다.`)) return
-  forgetChannelLocal(code)
-  local.value = listHosts()
+// 이 기기의 채널: 호스트(PC) 기록 + 리모컨·보기로 들어간 기록
+type Role = 'host' | VisitRole
+interface DeviceEntry { code: string; title: string; role: Role; at: string; needsLogin: boolean }
+const ROLE_LABEL: Record<Role, string> = { host: 'PC(호스트)', control: '리모컨', view: '보기' }
+function loadDevice(): DeviceEntry[] {
+  const hosts = listHosts().map((h) => ({ code: h.code, title: h.title, role: 'host' as Role, at: h.openedAt, needsLogin: !h.token }))
+  const visits = listVisits().map((v) => ({ code: v.code, title: v.title, role: v.role as Role, at: v.at, needsLogin: false }))
+  return [...hosts, ...visits].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))
+}
+const device = ref(loadDevice())
+const hostCodes = computed(() => new Set(device.value.filter((d) => d.role === 'host').map((d) => d.code)))
+const openEntry = (e: DeviceEntry) => router.push(e.role === 'view' ? `/view/${e.code}` : `/control/${e.code}`)
+function forget(e: DeviceEntry) {
+  if (e.role === 'host') {
+    if (!confirm(`"${e.title}" 을(를) 이 기기 목록에서 지울까요?\n이 PC 의 콘티와 호스트 권한이 지워집니다. 서버의 채널은 그대로입니다.`)) return
+    forgetChannelLocal(e.code)
+  } else {
+    if (!confirm(`"${e.title}" 을(를) 이 기기 목록에서 지울까요?\n다음에 들어갈 때 비밀번호를 다시 입력해야 할 수 있습니다.`)) return
+    forgetVisit(e.code, e.role)
+    api.forgetToken(e.role, e.code)
+  }
+  device.value = loadDevice()
+}
+
+// 공개 채널(로그인 불필요): 보기 비밀번호가 있고 최근 7일 안에 사용된 채널
+const pub = ref<api.PublicChannel[]>([])
+const pubErr = ref<string | null>(null)
+async function loadPublic() {
+  if (!supabase) return
+  const r = await api.listPublicChannels()
+  pub.value = r.rows
+  pubErr.value = r.error ?? null
 }
 
 // 내 계정의 채널(로그인 중일 때만)
@@ -40,7 +68,14 @@ async function loadServer() {
   listErr.value = r.error ?? null
 }
 watch(session, loadServer)
-onMounted(() => { document.title = 'Biew'; void loadServer(); void loadCache() })
+onMounted(() => { document.title = 'Biew'; void loadServer(); void loadPublic(); void loadCache() })
+
+// 제목 검색(대소문자·띄어쓰기 무시) — 세 목록 모두
+const q = ref('')
+const fDevice = computed(() => device.value.filter((e) => titleMatches(e.title, q.value)))
+const fPub = computed(() => pub.value.filter((e) => titleMatches(e.title, q.value)))
+const fRows = computed(() => rows.value.filter((e) => titleMatches(e.title, q.value)))
+const anyList = computed(() => device.value.length + pub.value.length + rows.value.length > 0)
 
 // 곡 다운로드(오프라인용). 로그인하면 library 가 자동으로 받는다(바뀐 곡만)
 const lib = useLibrary()
@@ -123,16 +158,36 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
     <!-- ── 인터넷 송출 ── -->
     <h2 class="group">인터넷 송출 <small>폰 리모컨·보기 기기 · 서버를 거침 · 가끔 쓸 때</small></h2>
 
+    <!-- 제목 검색(대소문자·띄어쓰기 무시) -->
+    <input v-if="anyList" v-model="q" class="search" type="search" placeholder="채널 제목 검색 (대소문자·띄어쓰기 무시)" />
+
     <!-- 이 기기의 채널 -->
     <section class="card">
-      <h2>이 기기의 채널 <small>{{ local.length }}</small></h2>
-      <p v-if="!local.length" class="muted">이 PC 에서 만들거나 연 인터넷 송출 채널이 여기에 표시됩니다. 로그인 없이 바로 들어갈 수 있습니다.</p>
+      <h2>이 기기의 채널 <small>{{ device.length }}</small></h2>
+      <p v-if="!device.length" class="muted">이 기기에서 만들었거나(PC) 리모컨·보기로 들어간 채널이 여기에 표시됩니다. 다음부터 누르면 바로 들어갑니다.</p>
+      <p v-else-if="!fDevice.length" class="muted">검색 결과 없음</p>
       <ul v-else class="list">
-        <li v-for="r in local" :key="r.code" @click="router.push(`/control/${r.code}`)">
-          <span class="t">{{ r.title }}</span>
-          <span class="c">{{ r.code }}</span>
-          <button class="x" title="이 기기 목록에서 지우기" @click.stop="forget(r.code, r.title)">✕</button>
-          <span class="d">{{ r.openedAt ? fmt(r.openedAt) : '' }}<template v-if="!r.token"> · 폰·보기 연결하려면 로그인 필요</template></span>
+        <li v-for="e in fDevice" :key="e.role + e.code" @click="openEntry(e)">
+          <span class="t">{{ e.title || e.code }}</span>
+          <span class="role" :class="e.role">{{ ROLE_LABEL[e.role] }}</span>
+          <button class="x" title="이 기기 목록에서 지우기" @click.stop="forget(e)">✕</button>
+          <span class="d">{{ e.code }} · {{ e.at ? fmt(e.at) : '' }}<template v-if="e.needsLogin"> · 폰·보기 연결하려면 로그인 필요</template></span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 공개 채널 -->
+    <section v-if="supabase" class="card">
+      <h2>공개 채널 <small>{{ pub.length }}</small></h2>
+      <p class="muted">보기 비밀번호가 있는 채널만 보입니다(최근 7일). 비밀번호가 없는 채널은 QR·링크·번호로 들어오세요.</p>
+      <p v-if="pubErr" class="err">{{ pubErr }}</p>
+      <p v-else-if="pub.length && !fPub.length" class="muted">검색 결과 없음</p>
+      <ul v-else-if="fPub.length" class="list">
+        <li v-for="c in fPub" :key="c.code" @click="router.push(`/view/${c.code}`)">
+          <span class="t">{{ c.title }}</span>
+          <span class="badge" title="들어갈 때 보기 비밀번호가 필요합니다">🔒 비밀번호</span>
+          <span />
+          <span class="d">{{ fmt(c.updated_at) }} 사용</span>
         </li>
       </ul>
     </section>
@@ -147,6 +202,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
           <input v-model="title" placeholder="채널 제목 (예: 주일 2부)" maxlength="60" />
           <input v-model="controlPw" type="password" placeholder="컨트롤 비밀번호 (필수, 4자 이상)" autocomplete="new-password" />
           <input v-model="viewPw" type="password" placeholder="보기 비밀번호 (선택 — 비우면 번호만 알면 누구나)" autocomplete="new-password" />
+          <p class="muted">보기 비밀번호를 정하면 홈의 <b>공개 채널</b>에 7일간 제목이 보입니다(들어갈 땐 비밀번호 필요). 비우면 목록에 안 뜨고 QR·링크·번호로만 들어옵니다. 공개되는 채널은 컨트롤 비밀번호를 6자 이상으로 권장합니다.</p>
           <button class="primary" :disabled="creating">{{ creating ? '만드는 중…' : '채널 만들기' }}</button>
           <p v-if="createErr" class="err">{{ createErr }}</p>
         </form>
@@ -158,11 +214,11 @@ const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'num
       <h2>내 계정의 채널 <small>{{ rows.length }}</small></h2>
       <p class="muted">다른 PC 에서 만든 채널도 여기서 열면 이 PC 가 호스트로 등록됩니다.</p>
       <p v-if="listErr" class="err">{{ listErr }}</p>
-      <ul v-else-if="rows.length" class="list">
-        <li v-for="r in rows" :key="r.code" @click="router.push(`/control/${r.code}`)">
+      <ul v-else-if="fRows.length" class="list">
+        <li v-for="r in fRows" :key="r.code" @click="router.push(`/control/${r.code}`)">
           <span class="t">{{ r.title }}</span>
           <span class="c">{{ r.code }}</span>
-          <span v-if="localCodes.has(r.code)" class="badge">이 기기</span>
+          <span v-if="hostCodes.has(r.code)" class="badge">이 기기</span>
           <span v-else-if="r.has_view_password" class="badge" title="보기 비밀번호 있음">🔒</span>
           <span v-else />
           <span class="d">{{ fmt(r.created_at) }}</span>
@@ -224,5 +280,8 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .x { grid-area: x; padding: 0 6px; border: none; background: none; color: var(--muted); }
 .x:hover { color: var(--pgm); }
 .badge { grid-area: x; font-size: 11px; color: var(--muted); }
+.role { grid-area: c; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #3a3a46; color: #ddd; white-space: nowrap; }
+.role.host { background: #11291a; color: var(--live); }
+.search { width: 100%; }
 .upload { padding: 8px; color: var(--warn); border-color: #5a4a1e; background: #3a3014; }
 </style>

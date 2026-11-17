@@ -105,3 +105,33 @@ export function isHostDirty(code: string): boolean {
 export function forgetChannelLocal(code: string) {
   try { localStorage.removeItem(HOST + code); localStorage.removeItem(DIRTY + code); localStorage.removeItem(keyOf(code)) } catch { /* ignore */ }
 }
+
+// ── 이 기기에서 들어간 채널(리모컨·보기) ────────────────────────────
+/**
+ * 홈의 "이 기기의 채널"에 보여 줄 기록. 들어갈 때 저장 → 다음엔 목록에서 바로(입장 토큰이 있으면 비밀번호 없이).
+ * 이 기기가 이미 들어갈 수 있는 채널만 남으므로 보안상 새로 열리는 것은 없다.
+ */
+export type VisitRole = 'control' | 'view'
+export interface VisitRecord { title: string; at: string }
+const VISIT = 'biew.visit.'
+const visitKey = (role: VisitRole, code: string) => `${VISIT}${role}.${code}`
+
+export function saveVisit(code: string, role: VisitRole, title: string) {
+  try { localStorage.setItem(visitKey(role, code), JSON.stringify({ title, at: new Date().toISOString() })) } catch { /* ignore */ }
+}
+export function forgetVisit(code: string, role: VisitRole) {
+  try { localStorage.removeItem(visitKey(role, code)) } catch { /* ignore */ }
+}
+export function listVisits(): (VisitRecord & { code: string; role: VisitRole })[] {
+  const out: (VisitRecord & { code: string; role: VisitRole })[] = []
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith(VISIT)) continue
+      const [role, code] = k.slice(VISIT.length).split('.') as [VisitRole, string]
+      if ((role !== 'control' && role !== 'view') || !code) continue
+      const r = JSON.parse(localStorage.getItem(k) ?? 'null') as VisitRecord | null
+      if (r && typeof r.title === 'string') out.push({ ...r, code, role })
+    }
+  } catch { /* ignore */ }
+  return out
+}

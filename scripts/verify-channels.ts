@@ -106,6 +106,14 @@ try {
   const open = await v(openCode, {})
   check('보기 비밀번호 없는 채널: 번호만으로 ok', open?.status === 'ok' && !!open.view_topic)
 
+  // ── 공개 채널 목록(로그인 불필요) ──
+  const pubList = await rpc(guest, 'list_public_channels', {})
+  const pubCodes = ((pubList.data ?? []) as { code: string; title: string }[]).map((r) => r.code)
+  check('공개 목록: 비로그인으로 조회 가능', !pubList.error, pubList.error?.message)
+  check('공개 목록: 보기 비밀번호 있는 채널은 보임', pubCodes.includes(code))
+  check('공개 목록: 보기 비밀번호 없는 채널은 안 보임', !pubCodes.includes(openCode) && !pubCodes.includes(lockCode))
+  check('공개 목록: 비밀번호·주소·상태 미노출', !((pubList.data ?? []) as Record<string, unknown>[]).some((r) => 'view_topic' in r || 'state' in r || 'control_topic' in r))
+
   // ── 메타 수정 / 상태는 DB 에 없음 ──
   const rename = await owner.from('channels').update({ title: 'Lorem renamed', updated_at: new Date().toISOString() }).eq('code', code).select('title')
   check('소유자는 제목 수정 가능', !rename.error && rename.data?.[0]?.title === 'Lorem renamed', rename.error?.message)

@@ -10,6 +10,7 @@ import { useRoute } from 'vue-router'
 import type { LiveState } from '@shared/types'
 import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
+import { saveVisit } from '@/live/persistence'
 import { SyncHub } from '@/sync/SyncHub'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import { onAir } from '@/live/nav'
@@ -74,6 +75,7 @@ async function enter(password?: string) {
     default: status.value = 'error'; return
   }
   title.value = j.title ?? ''
+  saveVisit(code.value, 'view', title.value) // 홈 "이 기기의 채널"
   topic = j.viewTopic
   const rt = new SupabaseRealtimeTransport(supabase, j.viewTopic!, {
     onStatus: (st) => {

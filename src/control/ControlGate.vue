@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
 import { startHostSync, stopHostSync, publishHost, startRemote, stopRemote, sendRemote, remoteRejected } from '@/channel/sync'
 import { openHost, openRemote, closeChannel, adoptState, useLive } from '@/live/liveStore'
-import { loadHost, saveHost } from '@/live/persistence'
+import { loadHost, saveHost, saveVisit } from '@/live/persistence'
 import ControlView from './ControlView.vue'
 
 const route = useRoute()
@@ -87,6 +87,7 @@ async function enterRemote(c: string, password: string | undefined, my: number) 
   switch (j.status) {
     case 'ok':
       title.value = j.title ?? c
+      saveVisit(c, 'control', title.value) // 홈 "이 기기의 채널"
       openRemote(c, sendRemote)
       startRemote(c, j, (s) => adoptState(s))
       phase.value = 'ready'

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useLive } from '@/live/liveStore'
 import { hostLink, hostNeedsLogin, remoteLink } from '@/channel/sync'
 import { forgetToken } from '@/channel/api'
-import { LOCAL_CODE } from '@/live/persistence'
+import { LOCAL_CODE, forgetVisit } from '@/live/persistence'
 import { loadCache, syncNow } from '@/library/library'
 import { openOutputWindow } from './outputWindow'
 import { useHotkeys } from './useHotkeys'
@@ -60,6 +60,7 @@ const showChannel = ref(false)
 function leaveRemote() {
   if (!confirm('이 기기에서 나갈까요? 다음에 들어올 때 비밀번호를 다시 입력해야 합니다.')) return
   forgetToken('control', code.value)
+  forgetVisit(code.value, 'control')
   router.push('/')
 }
 

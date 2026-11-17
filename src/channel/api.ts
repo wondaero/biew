@@ -87,6 +87,14 @@ export async function getChannel(code: string): Promise<{ row: ChannelRow | null
   return { row: (data as ChannelRow | null) ?? null }
 }
 
+export interface PublicChannel { code: string; title: string; updated_at: string }
+/** 공개 채널 목록(로그인 불필요): 보기 비밀번호가 있고 최근 7일 안에 사용된 채널만 */
+export async function listPublicChannels(): Promise<{ rows: PublicChannel[]; error?: string }> {
+  if (!supabase) return { rows: [], error: NO_SUPABASE }
+  const { data, error } = await supabase.rpc('list_public_channels')
+  return error ? { rows: [], error: error.message } : { rows: (data ?? []) as PublicChannel[] }
+}
+
 export async function deleteChannel(code: string): Promise<string | null> {
   if (!supabase) return NO_SUPABASE
   const { error } = await supabase.from('channels').delete().eq('code', code)
