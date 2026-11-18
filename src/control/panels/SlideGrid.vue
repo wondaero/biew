@@ -143,7 +143,8 @@ defineExpose({ scrollToItem })
 
 <style scoped>
 /* 위쪽 padding 0: sticky 헤더가 padding 아래에 붙으면 그 틈으로 스크롤되는 카드가 비쳐 보임 */
-.grid-wrap { overflow-y: auto; padding: 0 8px 40vh; min-height: 0; }
+/* 아래 여백 작게(예전 40vh = 마지막 곡도 맨 위로 올리려던 것 — 짧은 마지막 곡일수록 크게 비어 보여서 뺌. 마지막 곡은 맨 끝이라 안 올라가도 다 보인다) */
+.grid-wrap { overflow-y: auto; padding: 0 8px 16px; min-height: 0; }
 .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
 .song { margin-bottom: 18px; scroll-margin-top: 4px; }
 .tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { padding: 4px 10px; font-size: 12px; color: var(--muted); }
