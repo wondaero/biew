@@ -7,7 +7,7 @@ import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import * as api from '@/channel/api'
-import { hostLink, hostNeedsLogin, reconnectHost } from '@/channel/sync'
+import { hostLink, hostNeedsLogin, hostDeleted, reconnectHost } from '@/channel/sync'
 import { session } from '@/lib/auth'
 import { forgetChannelLocal } from '@/live/persistence'
 import LoginForm from '@/components/LoginForm.vue'
@@ -28,7 +28,7 @@ async function copy(label: string, text: string) {
 }
 
 const linkText = computed(() =>
-  hostNeedsLogin.value ? '이 PC 의 인터넷 송출 권한이 만료됐습니다(30일 미사용 등) — 아래 관리에서 로그인하면 다시 연결됩니다 (PC 송출은 정상)'
+  hostDeleted.value ? '이 채널은 서버에서 삭제되었습니다 — 폰·보기는 끊겼고 PC 송출은 계속됩니다' : hostNeedsLogin.value ? '이 PC 의 인터넷 송출 권한이 만료됐습니다(30일 미사용 등) — 아래 관리에서 로그인하면 다시 연결됩니다 (PC 송출은 정상)'
     : hostLink.value === 'live' ? '● 폰·보기 연결 준비됨'
       : hostLink.value === 'connecting' ? '연결 중…'
         : hostLink.value === 'error' ? '폰·보기 연결 안 됨 (송출은 정상) — 자동 재시도 중' : '',
@@ -99,7 +99,7 @@ async function remove() {
       <button @click="copy('control', controlUrl)">{{ copied === 'control' ? '복사됨' : '컨트롤 링크' }}</button>
     </div>
     <p class="muted"><b>다른 기기에서 빔(프로젝터)으로 띄우기</b>: 빔에 연결된 PC 에서 <b>보기 링크</b>를 열면 넓은 화면에선 송출 화면이 그대로 나옵니다(클릭하면 전체화면). 인터넷을 거치므로 끊기면 멈춥니다 — 이 기기가 빔에 연결돼 있다면 <b>출력 시작</b>이 더 안전합니다.</p>
-    <p class="st" :class="hostNeedsLogin ? 'error' : hostLink">{{ linkText }}</p>
+    <p class="st" :class="hostNeedsLogin || hostDeleted ? 'error' : hostLink">{{ linkText }}</p>
     <p v-if="isLocal" class="warn">지금 주소가 localhost 라서 폰에서는 열리지 않습니다. 배포된 주소(Vercel)에서 여세요.</p>
 
     <button class="ghost" @click="showManage = !showManage">{{ showManage ? '▾' : '▸' }} 관리 (리모컨 쫓아내기 · 보기 비밀번호 · 삭제)</button>

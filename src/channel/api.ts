@@ -10,7 +10,7 @@ import type { LiveState } from '@shared/types'
 import type { Command } from '@/sync/SyncTransport'
 import { isLiveState, normalizeLive } from '@/live/persistence'
 
-export interface ChannelRow { code: string; title: string; has_view_password: boolean; created_at: string }
+export interface ChannelRow { code: string; title: string; has_view_password: boolean; created_at: string; updated_at: string }
 export type Kind = 'control' | 'view'
 export type JoinStatus = 'ok' | 'not_found' | 'password_required' | 'token_rejected' | 'bad_password' | 'locked' | 'error'
 
@@ -74,7 +74,7 @@ export async function createChannel(title: string, controlPassword: string, view
 export async function listChannels(): Promise<{ rows: ChannelRow[]; error?: string }> {
   if (!supabase) return { rows: [], error: NO_SUPABASE }
   const { data, error } = await supabase
-    .from('channels').select('code,title,has_view_password,created_at').order('created_at', { ascending: false })
+    .from('channels').select('code,title,has_view_password,created_at,updated_at').order('created_at', { ascending: false })
   return error ? { rows: [], error: error.message } : { rows: (data ?? []) as ChannelRow[] }
 }
 
@@ -82,7 +82,7 @@ export async function listChannels(): Promise<{ rows: ChannelRow[]; error?: stri
 export async function getChannel(code: string): Promise<{ row: ChannelRow | null; error?: string }> {
   if (!supabase) return { row: null, error: NO_SUPABASE }
   const { data, error } = await supabase
-    .from('channels').select('code,title,has_view_password,created_at').eq('code', code).maybeSingle()
+    .from('channels').select('code,title,has_view_password,created_at,updated_at').eq('code', code).maybeSingle()
   if (error) return { row: null, error: error.message }
   return { row: (data as ChannelRow | null) ?? null }
 }
@@ -95,10 +95,15 @@ export async function listPublicChannels(): Promise<{ rows: PublicChannel[]; err
   return error ? { rows: [], error: error.message } : { rows: (data ?? []) as PublicChannel[] }
 }
 
+/**
+ * 채널 삭제 = 만든 계정으로 로그인만 되어 있으면(RLS owner = auth.uid()) 어느 기기에서든. 기기(호스트 토큰)는 보지 않는다.
+ * RLS 는 남의 채널·이미 없는 채널을 오류 없이 0건으로 걸러 내므로, 지워진 행 수로 확인한다.
+ */
 export async function deleteChannel(code: string): Promise<string | null> {
   if (!supabase) return NO_SUPABASE
-  const { error } = await supabase.from('channels').delete().eq('code', code)
-  return error ? error.message : null
+  const { data, error } = await supabase.from('channels').delete().eq('code', code).select('code')
+  if (error) return error.message
+  return data?.length ? null : '지우지 못했습니다 — 이미 삭제됐거나, 이 채널을 만든 계정으로 로그인하지 않았습니다'
 }
 
 export interface HostGrant { token: string; title: string; controlTopic: string; viewTopic: string; state: LiveState | null }

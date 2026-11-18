@@ -77,6 +77,38 @@ async function loadServer() {
   listErr.value = r.error ?? null
 }
 watch(session, loadServer)
+
+// 홈 로그인(로그인은 저장되지 않음 — 새로고침하면 다시). 내 계정의 채널(삭제 포함)을 보려면 필요
+const loginOpen = ref(false)
+watch(session, (s) => { if (s) loginOpen.value = false })
+
+/** 최근 사용(서버 상태 변경) 3시간 이내면 지금 예배 중일 수 있다고 강하게 경고 */
+const RECENT_MS = 3 * 60 * 60 * 1000
+function ago(iso: string): string {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (m < 1) return '방금'
+  if (m < 60) return `${m}분 전`
+  if (m < 60 * 24) return `${Math.floor(m / 60)}시간 전`
+  return `${Math.floor(m / 60 / 24)}일 전`
+}
+const delErr = ref<string | null>(null)
+/**
+ * 내 계정의 채널 삭제: 로그인만으로(어느 기기에서 만들었든). 채널을 열지 않으므로 이 기기가 호스트로 등록되지 않는다.
+ * 그 채널을 쓰던 호스트 PC 는 송출(출력 창)은 계속되고 '삭제됨' 표시로 바뀐다(sync.ts hostDeleted).
+ */
+async function removeRow(r: api.ChannelRow) {
+  delErr.value = null
+  const recent = Date.now() - new Date(r.updated_at).getTime() < RECENT_MS
+  const msg = (recent ? `⚠ 지금 예배 중일 수 있습니다 — ${ago(r.updated_at)} 사용됨\n\n` : '')
+    + `채널 "${r.title}" (${r.code}) 을(를) 삭제할까요?\n마지막 사용: ${ago(r.updated_at)}\n\n`
+    + '폰 리모컨·보기 연결이 모두 끊기고 되돌릴 수 없습니다.\n이 채널을 쓰는 PC 의 출력 창은 마지막 화면을 유지한 채 계속 송출됩니다.'
+  if (!confirm(msg)) return
+  const err = await api.deleteChannel(r.code)
+  if (err) { delErr.value = err; return }
+  forgetChannelLocal(r.code) // 이 기기에 남은 호스트 기록·콘티도
+  device.value = loadDevice()
+  await Promise.all([loadServer(), loadPublic()])
+}
 onMounted(() => { document.title = 'Biew'; void loadServer(); void loadPublic(); void loadCache() })
 
 // 제목 검색(대소문자·띄어쓰기 무시) — 세 목록 모두
@@ -139,7 +171,9 @@ const build = __APP_BUILD__
     <header>
       <h1>Biew</h1>
       <button v-if="session" class="ghost" @click="signOut()">로그아웃</button>
+      <button v-else-if="supabase" class="ghost" @click="loginOpen = !loginOpen">{{ loginOpen ? '닫기' : '로그인' }}</button>
     </header>
+    <LoginForm v-if="!session && loginOpen" class="home-login" hint="로그인하면 내 계정의 채널(삭제 포함)·곡 다운로드·채널 만들기를 쓸 수 있습니다. 로그인은 저장되지 않습니다." />
 
     <!-- ── 로컬 송출 ── -->
     <section v-if="!mobile" class="card local">
@@ -230,14 +264,16 @@ const build = __APP_BUILD__
       <h2>내 계정의 채널 <small>{{ rows.length }}</small></h2>
       <p class="muted">다른 PC 에서 만든 채널도 여기서 열면 이 PC 가 호스트로 등록됩니다.</p>
       <p v-if="listErr" class="err">{{ listErr }}</p>
-      <ul v-else-if="fRows.length" class="list">
-        <li v-for="r in fRows" :key="r.code" @click="router.push(`/control/${r.code}`)">
+      <p v-if="delErr" class="err">{{ delErr }}</p>
+      <ul v-if="!listErr && fRows.length" class="list">
+        <li v-for="r in fRows" :key="r.code" class="mine" @click="router.push(`/control/${r.code}`)">
           <span class="t">{{ r.title }}</span>
           <span class="c">{{ r.code }}</span>
           <span v-if="hostCodes.has(r.code)" class="badge">이 기기</span>
           <span v-else-if="r.has_view_password" class="badge" title="보기 비밀번호 있음">🔒</span>
-          <span v-else />
-          <span class="d">{{ fmt(r.created_at) }}</span>
+          <span v-else class="badge" />
+          <button class="del" title="채널 삭제(서버에서)" @click.stop="removeRow(r)">삭제</button>
+          <span class="d">{{ fmt(r.created_at) }} 만듦 · {{ ago(r.updated_at) }} 사용</span>
         </li>
       </ul>
     </section>
@@ -301,6 +337,11 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 /* 공개 채널: 줄 클릭 대신 입장 버튼 2개 */
 .list li.pub-item { grid-template-columns: 1fr auto; grid-template-areas: 't x' 'd d' 'g g'; cursor: default; }
 .pub-go { grid-area: g; margin-top: 6px; }
+/* 내 계정의 채널: 삭제 버튼 칸 추가 */
+.list li.mine { grid-template-columns: 1fr auto auto auto; grid-template-areas: 't c x del' 'd d d d'; }
+.del { grid-area: del; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+.del:hover { color: var(--pgm); border-color: var(--pgm); }
+.home.mobile > .home-login { order: -1; } /* 폰: 머리 바로 아래(번호로 입장보다 위) */
 .pub-go button { padding: 8px; }
 .t { grid-area: t; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c { grid-area: c; font: 12px ui-monospace, monospace; color: var(--muted); letter-spacing: 2px; }

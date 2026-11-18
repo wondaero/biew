@@ -24,6 +24,8 @@ export type Link = 'off' | 'connecting' | 'live' | 'error'
 export const hostLink = ref<Link>('off')
 /** 이 PC 의 호스트 토큰이 없거나 거부됨(30일 미사용·채널 삭제) → 로그인하면 새로 받는다. PC 송출은 계속된다 */
 export const hostNeedsLogin = ref(false)
+/** 이 채널이 서버에서 삭제됨(다른 기기에서 지움 등) → 재시도하지 않는다. PC 송출(출력 창, BroadcastChannel)은 계속된다 */
+export const hostDeleted = ref(false)
 export const remoteLink = ref<Link>('off')
 /** 리모컨의 토큰이 거부됨(접속 끊기·비밀번호 변경·만료·채널 삭제) → 입력 화면으로 돌아가야 함 */
 export const remoteRejected = ref(false)
@@ -45,6 +47,14 @@ let curView: string | null = null
 let gen = 0
 let pushing = false
 let queued: { s: LiveState; force: boolean } | null = null
+
+/** 채널이 서버에서 사라짐: 실시간 연결을 닫고 재시도·주기 확인을 멈춘다(로컬 상태·출력 창은 그대로) */
+function markDeleted() {
+  gen++
+  closeHostTransports()
+  hostDeleted.value = true
+  hostLink.value = 'error'
+}
 
 function closeHostTransports() {
   view?.close(); ctl?.close(); view = null; ctl = null
@@ -82,6 +92,7 @@ async function connectHost(retried = false) {
   const j = await api.hostJoin(code, token)
   if (my !== gen) return
   if (j.status === 'token_rejected') { if (!retried) await onRejected(code); return }
+  if (j.status === 'not_found') { markDeleted(); return }
   if (j.status !== 'ok' || !j.controlTopic || !j.viewTopic) { hostLink.value = 'error'; return }
   hostNeedsLogin.value = false
   patchHost(code, { title: j.title ?? loadHost(code)?.title ?? code, controlTopic: j.controlTopic, viewTopic: j.viewTopic })
@@ -125,6 +136,7 @@ function scheduleFetch(delay = 30) {
       if ((j.controlTopic && j.controlTopic !== curCtl) || (j.viewTopic && j.viewTopic !== curView)) { void connectHost(); return }
       if (j.state) adopt?.(j.state)
     } else if (j.status === 'token_rejected') void onRejected(code)
+    else if (j.status === 'not_found') markDeleted()
   }, delay)
 }
 
@@ -149,6 +161,8 @@ async function push(s: LiveState, force: boolean) {
     } else if (st === 'token_rejected') {
       setHostDirty(code, true)
       void onRejected(code)
+    } else if (st === 'not_found') {
+      markDeleted()
     } else {
       setHostDirty(code, true) // 인터넷 끊김 등 — PC 혼자 계속, 다시 연결되면 PC 기준으로
       hostLink.value = 'error'
@@ -161,10 +175,10 @@ async function push(s: LiveState, force: boolean) {
   }
 }
 
-const onOnline = () => { if (hostCode) void connectHost() }
+const onOnline = () => { if (hostCode && !hostDeleted.value) void connectHost() }
 const onOffline = () => { if (hostCode) hostLink.value = 'error' }
 // 로그인하면 이 PC 의 호스트 토큰을 새로 받아 다시 연결
-watch(session, (s) => { if (s && hostCode && hostLink.value !== 'live') { patchHost(hostCode, { token: hostNeedsLogin.value ? null : loadHost(hostCode)?.token ?? null }); void connectHost() } })
+watch(session, (s) => { if (s && hostCode && hostLink.value !== 'live' && !hostDeleted.value) { patchHost(hostCode, { token: hostNeedsLogin.value ? null : loadHost(hostCode)?.token ?? null }); void connectHost() } })
 
 export function startHostSync(code: string, opts: { getState: () => LiveState; adopt: (s: unknown) => void }) {
   stopHostSync()
@@ -174,7 +188,7 @@ export function startHostSync(code: string, opts: { getState: () => LiveState; a
   window.addEventListener('online', onOnline)
   window.addEventListener('offline', onOffline)
   retryTimer = window.setInterval(() => {
-    if (hostCode && hostLink.value === 'error' && !hostNeedsLogin.value) void connectHost()
+    if (hostCode && hostLink.value === 'error' && !hostNeedsLogin.value && !hostDeleted.value) void connectHost()
   }, 15000)
   // 10초마다 서버 확인: 다른 기기에서 바꾼 주소(리모컨 쫓아내기·보기 비밀번호)와 놓친 리모컨 변경을 따라잡는다.
   // 30초였을 때 타이밍에 따라 따라오기까지 21~42초로 들쭉날쭉했다 → 10초. 가벼운 조회 1회라 부담 없음
@@ -188,7 +202,7 @@ export function reconnectHost() { void connectHost() }
 /** liveStore 가 PC 조작으로 상태가 바뀔 때마다 호출 */
 export function publishHost(s: LiveState) {
   const code = hostCode
-  if (!code) return
+  if (!code || hostDeleted.value) return
   setHostDirty(code, true) // 서버 확인 전까지는 '못 올림'(중간에 새로고침돼도 다시 연결 시 PC 기준)
   void push(s, false)
 }
@@ -203,6 +217,7 @@ export function stopHostSync() {
   hostCode = null; getState = null; adopt = null; queued = null; pushing = false
   hostLink.value = 'off'
   hostNeedsLogin.value = false
+  hostDeleted.value = false
 }
 
 // ── 리모컨 ──────────────────────────────────────────

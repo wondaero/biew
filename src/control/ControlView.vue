@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLive } from '@/live/liveStore'
-import { hostLink, hostNeedsLogin, remoteLink } from '@/channel/sync'
+import { hostLink, hostNeedsLogin, hostDeleted, remoteLink } from '@/channel/sync'
 import { forgetToken } from '@/channel/api'
 import { LOCAL_CODE, forgetVisit } from '@/live/persistence'
 import { loadCache, syncNow } from '@/library/library'
@@ -29,6 +29,7 @@ const isLocalMode = computed(() => code.value === LOCAL_CODE)
 /** 인터넷 송출 호스트의 서버 연결 문제 — PC 송출(출력 창)은 어느 경우에도 계속된다 */
 const netWarn = computed(() => {
   if (!isHost.value || isLocalMode.value) return null
+  if (hostDeleted.value) return '이 채널은 삭제되었습니다 — PC 송출(출력 창)은 계속, 폰·보기는 끊김. 계속 쓰려면 새 채널을 만드세요'
   if (hostNeedsLogin.value) return '인터넷 송출 권한 만료 — 📡 관리에서 로그인하세요 (PC 송출은 계속)'
   if (hostLink.value === 'error') return '인터넷 끊김 — PC 송출은 계속, 폰·보기는 멈춤 (다시 연결되면 PC 기준으로 맞춤)'
   return null
