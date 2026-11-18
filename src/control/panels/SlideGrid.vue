@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
+import { vFitLines } from '@/components/fitLines'
 
 const live = useLive()
 const root = ref<HTMLElement>()
@@ -97,7 +98,7 @@ defineExpose({ scrollToItem })
           @dblclick="onDbl(i, j)"
         >
           <span class="idx">{{ j + 1 }}</span>
-          <span class="txt">{{ s }}</span>
+          <span v-fit-lines="s" class="txt">{{ s }}</span>
         </button>
       </div>
     </div>
@@ -128,7 +129,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .card {
   position: relative; display: flex; align-items: center; justify-content: center;
-  aspect-ratio: 16 / 9; padding: 8px 10px; text-align: center; background: #0d0d10;
+  /* 위 18px = 카드 번호 자리(글이 길어져도 번호와 겹치지 않게) */
+  aspect-ratio: 16 / 9; padding: 18px 10px 8px; text-align: center; background: #0d0d10;
   border: 2px solid var(--line); border-radius: 8px; overflow: hidden;
   box-shadow: none; margin: 0; /* 카드는 버튼이지만 3D 받침 없음(송출 표시는 아래 .live 의 테두리 빛) */
 }
@@ -148,11 +150,18 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   .cards { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .card { aspect-ratio: auto; min-height: 52px; justify-content: flex-start; gap: 12px; padding: 10px 12px; text-align: left; }
   .idx { position: static; min-width: 16px; text-align: center; font-size: 12px; }
-  .txt { font-size: 14px; -webkit-line-clamp: 10; }
+  /* .card .txt: 아래 기본 .txt 규칙보다 뒤에 있어도 이기도록(예전엔 순서 때문에 14px 가 안 먹고 12.5px 였음) */
+  .card .txt { font-size: 14px; }
   h3 { margin: 0 -10px 8px; padding: 10px 18px; }
 }
+/*
+ * 원래 줄바꿈 그대로(꺾지 않음) — 넘치면 v-fit-lines 가 이 요소의 글자 크기를 줄인다(출력 화면과 같은 규칙).
+ * flex: 1 = 쓸 수 있는 폭을 꽉 채워야 폭을 잴 수 있다. 공백은 접고 줄바꿈만 지킨다.
+ */
 .txt {
-  font-size: 12.5px; line-height: 1.35; white-space: pre-line; color: #ddd;
-  display: -webkit-box; -webkit-line-clamp: 10; -webkit-box-orient: vertical; overflow: hidden;
+  flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.35; color: #ddd; overflow: hidden;
+  white-space: pre; white-space-collapse: preserve-breaks; text-wrap-mode: nowrap;
 }
+/* 최소 크기로도 넘치면 잘림 — 아래쪽을 흐리게 해 잘렸다는 걸 보이게(마우스를 올리면 전체) */
+.txt.fit-clip { -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent); mask-image: linear-gradient(to bottom, #000 80%, transparent); }
 </style>

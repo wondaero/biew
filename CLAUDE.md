@@ -86,7 +86,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 값: `OutputStyle.topMargin`(cqh, 기본 5), `leftMargin`(cqw, 기본 5) — 기본값은 `shared/types.ts` 의 `DEFAULT_STYLE`.
 - 적용 위치: `src/components/FitText.vue` 의 `boxStyle`(top/left/bottom/right). 슬라이더 UI: `src/control/panels/StylePanel.vue`("위 여백"/"왼쪽 여백").
 - 기본값을 바꿔도 **이미 저장된 설정(localStorage `biew.live.v1`)이 우선**한다. 모든 기기에 새 기본값을 강제하려면 `src/live/persistence.ts` 의 `loadLive` 에 마이그레이션을 추가하거나, 사용자에게 "기본값으로" 버튼을 안내한다.
-- 글자 자동 축소 최소 배율 `MIN_SCALE = 0.2`(FitText.vue) — 최대 10줄까지 한 화면에 들어가도록. 슬라이드 카드 미리보기 줄 제한도 10줄(SlideGrid.vue).
+- 글자 자동 축소 최소 배율 `MIN_SCALE = 0.2`(FitText.vue) — 최대 10줄까지 한 화면에 들어가도록. 슬라이드 카드도 같은 규칙(`v-fit-lines`, src/components/fitLines.ts): 원래 줄바꿈 그대로 두고 긴 줄이 있으면 그 카드 글자만 줄임(최소 55%, 그래도 넘치면 아래를 흐리게 자르고 마우스 올리면 전체). 자간은 줄이지 않음. 폰 보기(/view) 가사 목록은 일부러 꺾는다(폰에서 읽기 좋게). E2E `e2e:cards`.
 - **송출 글꼴 Pretendard 는 앱에 포함**(`src/style.css` `@font-face`, `font-display: block`, PWA precache — `vite.config.ts` 의 woff2·`maximumFileSizeToCacheInBytes` 를 지우지 말 것 — 기본 2MiB 한도에 걸리면 조용히 빠져 오프라인에서 다른 글꼴로 나온다). FitText 는 글꼴 로드(`loadingdone`) 후 다시 맞춘다.
 - `position`: `'top'`(기본) / `'center'`(세로 중앙). 예전 저장값 `'bottom'` 은 `'top'` 으로 이전된다.
 - 같은 렌더러(`SlideRender`/`FitText`)를 출력·컨트롤러 모니터·카드 미리보기·폰 뷰어가 공유하므로 한 곳 수정이 전부에 반영된다.

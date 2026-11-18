@@ -75,7 +75,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 <style scoped>
 .sd-backdrop { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: rgba(0, 0, 0, .6); }
 .sd {
-  width: min(1180px, calc(100vw - 48px)); height: min(820px, calc(100vh - 48px)); display: flex; flex-direction: column;
+  width: min(1440px, calc(100vw - 48px)); height: min(1000px, calc(100vh - 48px)); /* 큰 화면에선 미리보기 두 개를 더 크게 */ display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 16px 48px rgba(0, 0, 0, .6);
 }
 header { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
@@ -84,13 +84,16 @@ h2 { margin: 0; font-size: 16px; }
 .spacer { flex: 1; }
 .dirty-tag { margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #dbe7ff; background: rgba(79, 140, 255, .25); vertical-align: middle; }
 .sd-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); }
-.sd-left { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow-y: auto; border-right: 1px solid var(--line); }
-/* 적용 전 미리보기는 왼쪽 폭을 다 쓴다(StylePreview 기본은 화면 높이 26% 제한) */
-.sd-pv :deep(.pv-screen) { width: 100%; }
-.sd-air { display: grid; gap: 4px; width: min(100%, 320px); }
+/*
+ * 왼쪽(보는 곳): 위 = 적용 전 미리보기, 아래 = 지금 송출 중 — 같은 크기(1:1)로, 둘 다 팝업 높이 안에(스크롤 없음, 사용자 요청).
+ * 각 칸을 크기 컨테이너로 두고 화면 폭 = min(칸 폭, (칸 높이 - 이름 줄) × 16/9) → 넓으면 높이에, 좁으면 폭에 맞춘다.
+ */
+.sd-left { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 14px 16px; overflow: hidden; border-right: 1px solid var(--line); }
+.sd-pv, .sd-air { container-type: size; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+.sd-pv :deep(.pv-screen), .sd-air-screen { width: min(100cqw, calc((100cqh - 22px) * 16 / 9)); aspect-ratio: 16 / 9; margin: 0 auto; }
 .sd-air-bar { font-size: 11px; font-weight: 600; color: var(--live); }
 .sd-air-bar small { color: var(--muted); font-weight: normal; }
-.sd-air-screen { aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.sd-air-screen { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .sd-right { min-height: 0; display: flex; flex-direction: column; }
 .sd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
 /* 버튼 줄: 설정을 스크롤해도 항상 보이게 아래에 고정 */
