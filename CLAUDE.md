@@ -67,6 +67,8 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 델타 동기화는 `updated_at >= lastSync`(gte, 멱등). 단건 저장은 lastSync 를 건드리지 않는다.
 - 연속 중복 슬라이드는 의도된 것 — 지우지 않는다.
 - 색: `--live`(초록) = 송출 중, `--preview`(파랑 점선) = PVW 선택, 노랑 = BLANK 전용, `--freeze`(하늘색) = FREEZE 전용, 빨강 = 오류/삭제만. (src/style.css)
+- **버튼 = 3D, 뱃지·입력칸과 구분**(2026-11-18, src/style.css): 버튼은 위가 밝은 면 + 받침(box-shadow, 색 `--edge`, 높이 `--lift` = 글자 크기 비례). 받침을 두꺼운 아래 테두리로 하면 아래 모서리 둥글기가 어긋나므로 쓰지 말 것. 색은 `background-color` 만 바꿀 것(면 그라데이션 유지). 평평한 글자형 버튼(✕·✎)은 `box-shadow: none; margin: 0` 필요. 단계: 기본 · `.primary` · `.danger` · `.danger-line`(확인창 거치는 위험 동작) · `.quiet`. 송출(TAKE)은 초록. 입력칸은 반대로 파인 모양(`--field`). 뱃지는 평평.
+- 기호 ◀ ▶ 는 Windows 가 이모지로 그릴 수 있음 → 뒤에 `&#xFE0E;`(글자로 그리기). 디자인 비교 스크린샷은 `node scripts/e2e/shot-control.mjs <이름>`.
 - **FREEZE**(단축키 F 는 **걸기만**, 해제는 버튼 클릭으로만 — 가사 수정 중 실수로 풀리는 것 방지): `LiveState.frozen` = 걸 때의 송출 위치 + **텍스트 스냅샷**. 컨트롤러 이동/BLANK 는 그대로 동작하지만 출력·뷰어·PGM 모니터는 `nav.onAir(state)`(freeze 중이면 스냅샷)를 그린다. 해제하면 컨트롤러의 현재 위치가 바로 송출. 목적: 예배 중 오타 발견 시 송출은 유지한 채 가사 수정. 송출을 그리는 곳은 `currentText(state)` 대신 반드시 `onAir()` 를 쓸 것. 컨트롤러가 freeze 중 가리키는 위치는 SlideGrid 에서 파란 점선(`.ctl`).
 - 즉시 모드: 카드 클릭 = 송출, 그리드엔 송출 중만 표시. PVW 모드: 클릭 = 미리보기, Enter/TAKE = 송출.
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.

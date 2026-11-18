@@ -359,7 +359,7 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .t { grid-area: t; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c { grid-area: c; font: 12px ui-monospace, monospace; color: var(--muted); letter-spacing: 2px; }
 .d { grid-area: d; font-size: 11px; color: var(--muted); }
-.x { grid-area: x; padding: 0 6px; border: none; background: none; color: var(--muted); }
+.x { grid-area: x; padding: 0 6px; border: none; background: none; color: var(--muted); box-shadow: none; margin: 0; }
 .x:hover { color: var(--pgm); }
 .badge { grid-area: x; font-size: 11px; color: var(--muted); }
 .role { grid-area: c; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #3a3a46; color: #ddd; white-space: nowrap; }

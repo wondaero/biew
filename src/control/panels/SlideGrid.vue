@@ -109,7 +109,7 @@ defineExpose({ scrollToItem })
 .grid-wrap { overflow-y: auto; padding: 0 8px 40vh; min-height: 0; }
 .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
 .song { margin-bottom: 18px; scroll-margin-top: 4px; }
-.tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { padding: 3px 10px; font-size: 12px; color: var(--muted); }
+.tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { padding: 4px 10px; font-size: 12px; color: var(--muted); }
 h3 {
   /* 좌우 -8px: 스크롤 영역 padding 을 뚫고 끝까지 → 옆 틈으로 카드 glow 가 비치지 않게 (글자 위치는 padding 으로 유지) */
   position: sticky; top: 0; z-index: 1; margin: 0 -8px 8px; padding: 6px 16px; font-size: 14px; cursor: pointer; user-select: none;
@@ -130,7 +130,9 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   position: relative; display: flex; align-items: center; justify-content: center;
   aspect-ratio: 16 / 9; padding: 8px 10px; text-align: center; background: #0d0d10;
   border: 2px solid var(--line); border-radius: 8px; overflow: hidden;
+  box-shadow: none; margin: 0; /* 카드는 버튼이지만 3D 받침 없음(송출 표시는 아래 .live 의 테두리 빛) */
 }
+.card:active { transform: none; }
 .card:hover { border-color: #5a5a68; }
 .card.pvw, .card.ctl { border-style: dashed; border-color: var(--preview-soft); }
 .card.live { border-color: var(--live); background: var(--live-bg); box-shadow: 0 0 0 2px var(--live-glow); }

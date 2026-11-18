@@ -125,8 +125,8 @@ onBeforeUnmount(() => {
       <span class="ch"><b>{{ title }}</b> <code v-if="!isLocalMode">{{ code }}</code><small v-else>이 PC 전용 · 인터넷 불필요</small></span>
 
       <div class="group">
-        <button title="이전 (←)" @click="live.actions.prev()">◀</button>
-        <button title="다음 (→ / Space)" @click="live.actions.next()">▶</button>
+        <button class="nav" title="이전 (←)" @click="live.actions.prev()">◀&#xFE0E;</button>
+        <button class="nav" title="다음 (→ / Space)" @click="live.actions.next()">▶&#xFE0E;</button>
         <button class="blank" :class="{ on: live.state.blank }" title="자막 내리기 (B)" @click="live.actions.toggleBlank()">
           {{ live.state.blank ? 'BLANK 해제' : 'BLANK' }}
         </button>
@@ -149,14 +149,14 @@ onBeforeUnmount(() => {
 
       <span v-if="netWarn" class="netwarn" role="status">{{ netWarn }}</span>
       <template v-if="isLocalMode">
-        <button class="endlocal" title="콘티를 비우고 다음 예배 준비(출력 창은 검은 화면으로 유지)" @click="endLocal">송출 종료</button>
+        <button class="endlocal danger-line" title="콘티를 비우고 다음 예배 준비(출력 창은 검은 화면으로 유지)" @click="endLocal">송출 종료</button>
         <button title="지금 송출을 그대로 인터넷 송출로 옮겨 폰 리모컨·보기를 씀" @click="showSwitch = true">🌐 인터넷 송출로 전환</button>
       </template>
       <template v-if="isHost">
         <span class="conn desk-only" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
         <button class="primary desk-only" @click="startOutput">출력 시작</button>
         <button v-if="!isLocalMode" class="share" :class="link" title="채널 번호 · QR · 접속 관리" @click="showChannel = !showChannel">📡 채널</button>
-        <button class="desk-only" title="단축키" @click="showHelp = !showHelp">?</button>
+        <button class="desk-only quiet" title="단축키" @click="showHelp = !showHelp">?</button>
       </template>
       <template v-else>
         <span class="conn" :class="{ on: link === 'live' }">{{ link === 'live' ? '연결됨' : link === 'connecting' ? '연결 중…' : '연결 안 됨' }}</span>
@@ -228,17 +228,27 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .top { grid-area: top; display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.brand { font-size: 15px; font-weight: 700; letter-spacing: .5px; background: none; border: none; padding: 0; }
+.brand { font-size: 15px; font-weight: 700; letter-spacing: .5px; background: none; border: none; padding: 0; box-shadow: none; margin: 0; }
 .ch { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 13px; }
 .ch b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 26ch; }
 .ch code, .ch small { color: var(--muted); font-size: 12px; }
-.endlocal { color: var(--muted); }
 .netwarn { font-size: 12px; color: var(--warn); padding: 3px 8px; border: 1px solid #5a4a1e; border-radius: 6px; background: #3a3014; }
 .share.live { border-color: var(--pvw); color: var(--pvw); }
 .share.error { border-color: var(--pgm); }
-.group { display: flex; gap: 4px; }
-.blank.on { background: var(--warn); border-color: var(--warn); color: #222; font-weight: 700; }
-.freeze.on { background: var(--freeze); border-color: var(--freeze); color: #04212e; font-weight: 700; }
+/* 송출 조작 묶음: 예배 중 가장 자주 누르는 버튼 — 조금 크게, 상태 버튼은 평소에도 자기 색 테두리 */
+.group { display: flex; gap: 6px; }
+.group button { min-height: 34px; font-weight: 600; }
+/* 3D: 색은 background-color 만(면 그라데이션 유지), 받침 색 --edge 는 더 어두운 같은 계열 */
+.nav { min-width: 52px; font-size: 16px; background-color: #33333f; border-color: #4e4e5b; }
+.nav:hover { background-color: #3d3d4a; border-color: #5e5e6c; }
+/* 최소 폭: 켜면 글자가 'BLANK 해제'로 길어져 옆 버튼이 밀리면 예배 중 잘못 누르기 쉽다 → 폭 고정 */
+.blank, .freeze { min-width: 7.6em; }
+.blank { --edge: #4d3407; color: var(--warn); border-color: rgba(245, 165, 36, .5); }
+.blank:hover { background-color: #3a3222; border-color: var(--warn); }
+.freeze { --edge: #0b3a50; color: var(--freeze); border-color: rgba(56, 189, 248, .5); }
+.freeze:hover { background-color: #1f3340; border-color: var(--freeze); }
+.blank.on, .blank.on:hover { --edge: #93600c; background-color: var(--warn); border-color: #ffc25a; color: #222; font-weight: 700; }
+.freeze.on, .freeze.on:hover { --edge: #13729b; background-color: var(--freeze); border-color: #7dd6fb; color: #04212e; font-weight: 700; }
 .mode { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .spacer { flex: 1; }
 .conn { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }

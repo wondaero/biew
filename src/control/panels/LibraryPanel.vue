@@ -127,8 +127,8 @@ defineExpose({ focus: () => input.value?.focus() })
 .lib { display: flex; flex-direction: column; min-height: 0; gap: 8px; }
 header .h { display: flex; align-items: center; gap: 6px; }
 header h2 { margin: 0; font-size: 14px; flex: 1; }
-.new { padding: 2px 8px; font-size: 12px; }
-.edit { padding: 0 6px; border: none; background: none; color: var(--muted); visibility: hidden; }
+.new { padding: 4px 10px; font-size: 12px; }
+.edit { padding: 0 6px; border: none; background: none; color: var(--muted); visibility: hidden; box-shadow: none; margin: 0; }
 .hits li:hover .edit, .hits li.sel .edit { visibility: visible; }
 .edit:hover { color: var(--accent); }
 @media (hover: none) { .edit { visibility: visible; } } /* 터치엔 hover 가 없어 ✎ 가 영영 안 보임 */
@@ -137,8 +137,8 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .status span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status.error span { color: var(--pgm); }
 .status.offline span { color: var(--warn); }
-.status button { padding: 2px 7px; font-size: 12px; }
-.login-toggle { text-align: left; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; }
+.status button { padding: 4px 8px; font-size: 12px; }
+.login-toggle { text-align: left; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; box-shadow: none; margin: 0; }
 .search { width: 100%; }
 .hits { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
 .hits li { display: flex; gap: 6px; align-items: center; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
@@ -146,8 +146,8 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #3a3a46; color: #bbb; }
 .badge.pc { background: #5a4a1e; color: #f5d27a; }
-.upload { margin-top: 6px; width: 100%; padding: 5px 8px; font-size: 12px; color: var(--warn); border-color: #5a4a1e; background: none; }
-.upload.ready { background: #3a3014; }
+.upload { margin-top: 6px; width: 100%; padding: 5px 8px; font-size: 12px; color: var(--warn); --edge: #2e260f; border-color: #5a4a1e; background-color: rgba(245, 165, 36, .06); }
+.upload.ready { background-color: #3a3014; }
 .notice { margin: 6px 0 0; font-size: 12px; color: var(--warn); cursor: pointer; }
 .dbnotice { margin: 6px 0 0; font-size: 12px; color: var(--warn); }
 .n { font-size: 11px; color: var(--muted); }

@@ -157,7 +157,7 @@ header { border-bottom: 1px solid var(--line); }
 footer { border-top: 1px solid var(--line); }
 h2 { margin: 0; font-size: 16px; }
 .spacer { flex: 1; }
-.x { border: none; background: none; }
+.x { border: none; background: none; box-shadow: none; margin: 0; }
 .body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; display: grid; gap: 10px; align-content: start; }
 .muted { margin: 0; color: var(--muted); font-size: 13px; }
 .err { margin: 0; color: var(--pgm); font-size: 13px; }
@@ -175,7 +175,7 @@ h2 { margin: 0; font-size: 16px; }
 .sub { margin: 0; font-size: 12px; color: var(--muted); }
 .warn { margin: 0; font-size: 12px; color: var(--warn); }
 select { width: 100%; }
-.ghost { justify-self: start; background: none; border: none; padding: 0; color: var(--muted); font-size: 12px; }
+.ghost { justify-self: start; background: none; border: none; padding: 0; color: var(--muted); font-size: 12px; box-shadow: none; margin: 0; }
 .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cmp h4 { margin: 0 0 4px; font-size: 12px; color: var(--muted); font-weight: normal; }
 .cmp pre { margin: 0; max-height: 240px; overflow: auto; white-space: pre-wrap; font: 12px/1.5 system-ui, 'Malgun Gothic', sans-serif; background: var(--bg); padding: 8px; border-radius: 6px; }

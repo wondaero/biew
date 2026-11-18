@@ -26,10 +26,83 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, 'Malgun Gothic', sans-serif; }
 html.is-output, html.is-output body { background: #000; overflow: hidden; }
-button { font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-button:hover { border-color: #4a4a56; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.danger { background: var(--pgm); border-color: var(--pgm); color: #fff; }
+/*
+ * 버튼 = 입체(3D): 위가 밝은 면(그라데이션) + 아래 받침(그림자 box-shadow). 누르면 받침 높이만큼 내려가며 받침이 사라진다.
+ * 받침을 두꺼운 아래 테두리로 하면 위·아래 테두리 두께가 달라 아래 모서리 둥글기가 어긋난다(겪음) → 그림자로.
+ * 받침 색 = --edge, 높이 = --lift(글자 크기 비례: 14px 이상 3px, 작은 버튼 2px). 색을 바꿀 땐 --edge 만.
+ * 뱃지(송출 중·미리보기·역할 표시 등)는 평평하게 두어 버튼과 구분한다(사용자 요청).
+ * 색: background 대신 background-color 만 바꿀 것 — 그래야 면의 그라데이션(background-image)이 유지된다.
+ * 평평한 글자형 버튼(✕·✎ 등 background: none)은 box-shadow: none 도 줄 것(안 주면 받침이 남는다).
+ * 단계(색 의미 규칙과 맞춤 — 초록=송출, 파랑=주요 동작/미리보기, 노랑=BLANK, 하늘=FREEZE, 빨강=위험):
+ *   기본(회색) · .primary(파랑, 영역마다 하나) · .danger(빨강, 최종 확인용)
+ *   .danger-line(빨강 글씨·테두리 — 확인창을 거치는 위험 동작) · .quiet(평평한 보조)
+ * 컴포넌트 scoped 스타일(클래스 2개 이상)이 이 규칙보다 우선하도록 :hover 등은 클래스 1개 수준으로 둔다.
+ */
+button {
+  --edge: #0b0b0e; --lift: max(2px, .22em);
+  font: inherit; color: inherit; cursor: pointer; padding: 6px 10px; border-radius: 7px;
+  background-color: #2b2b35;
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, .09), rgba(255, 255, 255, 0) 70%);
+  border: 1px solid #42424e;
+  box-shadow: 0 var(--lift) 0 var(--edge);
+  margin-bottom: var(--lift); /* 받침 자리(그림자는 자리를 차지하지 않아 아래 요소와 겹치지 않게) */
+  transition: background-color .12s, border-color .12s, color .12s, transform .05s, box-shadow .05s;
+}
+button:hover { background-color: #34343f; border-color: #52525f; }
+button:active { transform: translateY(var(--lift)); box-shadow: 0 0 0 var(--edge), inset 0 2px 4px rgba(0, 0, 0, .35); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { --edge: #2553b8; background-color: var(--accent); border-color: #6b9dff; color: #fff; font-weight: 600; }
+button.primary:hover { background-color: #6597ff; border-color: #80acff; }
+button.danger { --edge: #a01919; background-color: var(--pgm); border-color: #ff6262; color: #fff; font-weight: 600; }
+button.danger:hover { background-color: #ff5252; }
+button.danger-line { --edge: #4a1616; background-color: rgba(255, 59, 59, .06); border-color: rgba(255, 59, 59, .45); color: #ff8a8a; }
+button.danger-line:hover { background-color: rgba(255, 59, 59, .14); border-color: var(--pgm); color: #ffb3b3; }
+button.quiet { background: transparent; border-color: transparent; color: var(--muted); box-shadow: none; }
+button.quiet:hover { background: var(--panel-2); border-color: transparent; color: var(--text); }
+button.quiet:active { box-shadow: none; }
 button:disabled { opacity: .45; cursor: default; }
-input, select { font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button:disabled:active { transform: none; box-shadow: 0 var(--lift) 0 var(--edge); }
+/*
+ * 입력칸 = 파인 모양(주변보다 어둡게 + 안쪽 그림자). 버튼(튀어나온 3D)과 반대라 모양만으로 구분된다(사용자 요청 —
+ * 예전엔 입력칸이 패널과 같은 색이라 테두리로만 구분됐음). 글자 입력·검색·드롭다운·여러 줄 입력 공통.
+ */
+:root { --field: #131317; --field-line: #383843; }
+input, select, textarea {
+  font: inherit; color: inherit; border-radius: 6px; padding: 6px 8px;
+  background: var(--field); border: 1px solid var(--field-line); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .45);
+  transition: border-color .12s;
+}
+input:hover, select:hover, textarea:hover { border-color: #4a4a57; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+input::placeholder, textarea::placeholder { color: #6b6b78; }
+input[type='checkbox'], input[type='radio'] { box-shadow: none; }
+
+/*
+ * 슬라이더: 얇은 트랙 + 채운 부분 파랑 + 흰 원형 손잡이. 채움 비율은 요소의 --p(예: style="--p: 40%").
+ * 크롬·엣지는 진행 부분 의사요소가 없어 트랙 그라데이션으로, 파이어폭스는 ::-moz-range-progress 로.
+ */
+input[type='range'] {
+  --p: 50%;
+  -webkit-appearance: none; appearance: none;
+  height: 22px; padding: 0; border: 0; background: transparent; box-shadow: none; cursor: pointer;
+}
+input[type='range']:focus { outline: none; }
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--p), #3a3a46 var(--p));
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; margin-top: -5px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  transition: transform .1s, box-shadow .1s;
+}
+input[type='range']:hover::-webkit-slider-thumb { transform: scale(1.15); }
+input[type='range']:active::-webkit-slider-thumb { transform: scale(1.2); box-shadow: 0 0 0 5px rgba(79, 140, 255, .25); }
+input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(79, 140, 255, .4); }
+input[type='range']::-moz-range-track { height: 4px; border-radius: 2px; background: #3a3a46; }
+input[type='range']::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+input[type='range']::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+input[type='range']:disabled { opacity: .45; cursor: default; }

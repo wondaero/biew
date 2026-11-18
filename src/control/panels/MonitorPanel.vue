@@ -44,6 +44,8 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
 .bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .bar em { font-style: normal; color: var(--warn); font-weight: 700; }
 .bar em.frz { color: var(--freeze); }
-.take { padding: 2px 8px; font-size: 12px; background: var(--preview); border-color: var(--preview); color: #fff; font-weight: 700; }
+/* 송출(TAKE) = 누르면 이게 나간다 → 송출 색(초록)으로 채움. 미리보기 색(파랑)과 구분 */
+.take { padding: 4px 12px; font-size: 12px; --edge: #12803b; background-color: var(--live); border-color: #4be080; color: var(--live-ink); font-weight: 700; }
+.take:hover { background-color: #34d36b; border-color: #5fe891; }
 .screen { aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 </style>

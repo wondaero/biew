@@ -187,7 +187,7 @@ h2 { margin: 0; font-size: 16px; }
 .src { color: var(--muted); }
 .local { color: var(--warn); }
 .spacer { flex: 1; }
-.x { border: none; background: none; }
+.x { border: none; background: none; box-shadow: none; margin: 0; }
 .body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
 .edit { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; min-height: 0; border-right: 1px solid var(--line); }
 label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
@@ -196,8 +196,8 @@ label.grow { flex: 1; min-height: 0; }
 label.grow textarea { flex: 1; }
 input { font-size: 15px; color: var(--text); }
 textarea {
-  font: 15px/1.6 system-ui, 'Malgun Gothic', sans-serif; color: var(--text); background: var(--panel-2);
-  border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; resize: none; min-height: 0;
+  font: 15px/1.6 system-ui, 'Malgun Gothic', sans-serif; color: var(--text); background: var(--field);
+  border: 1px solid var(--field-line); border-radius: 6px; padding: 10px 12px; resize: none; min-height: 0;
 }
 textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .preview { display: flex; flex-direction: column; min-height: 0; padding: 14px 16px; }

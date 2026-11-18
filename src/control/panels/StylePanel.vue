@@ -9,6 +9,8 @@ import { presets, savePreset, deletePreset, findByName, exportJson, importJson, 
 const live = useLive()
 const st = computed(() => live.state.style)
 const set = <K extends keyof OutputStyle>(k: K, v: OutputStyle[K]) => live.setStyle({ [k]: v } as Partial<OutputStyle>)
+/** 슬라이더 채움 비율(--p) — 왼쪽(채운 부분)을 파랑으로. 크롬은 진행 부분 스타일이 없어 트랙 그라데이션으로 그린다(src/style.css) */
+const fill = (v: number, min: number, max: number) => ({ '--p': `${Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100))}%` })
 const num = (e: Event) => Number((e.target as HTMLInputElement).value)
 const str = (e: Event) => (e.target as HTMLInputElement).value
 
@@ -114,7 +116,7 @@ async function importFile(e: Event) {
       <p v-else class="muted">아직 없음 — 지금 설정에 이름을 붙여 저장해 두면 한 번에 불러올 수 있습니다.</p>
       <form class="p-save" @submit.prevent="save">
         <input v-model="presetName" :maxlength="NAME_MAX" placeholder="이름 (예: 본당 프로젝터)" />
-        <button :disabled="!presetName.trim()">현재 설정 저장</button>
+        <button class="primary" :disabled="!presetName.trim()">현재 설정 저장</button>
       </form>
       <div class="p-file">
         <button type="button" :disabled="!presets.length" title="다른 PC 로 옮기거나 백업할 때" @click="exportFile">파일로 내보내기</button>
@@ -134,7 +136,7 @@ async function importFile(e: Event) {
     </label>
 
     <label>크기 <output>{{ st.fontSize.toFixed(1) }}</output>
-      <input type="range" min="3" max="15" step="0.1" :value="st.fontSize" @input="set('fontSize', num($event))" />
+      <input type="range" min="3" max="15" step="0.1" :value="st.fontSize" :style="fill(st.fontSize, 3, 15)" @input="set('fontSize', num($event))" />
     </label>
     <label>굵기
       <select :value="st.fontWeight" @change="set('fontWeight', num($event) as OutputStyle['fontWeight'])">
@@ -142,14 +144,14 @@ async function importFile(e: Event) {
       </select>
     </label>
     <label>줄 간격 <output>{{ st.lineHeight.toFixed(2) }}</output>
-      <input type="range" min="1" max="2" step="0.05" :value="st.lineHeight" @input="set('lineHeight', num($event))" />
+      <input type="range" min="1" max="2" step="0.05" :value="st.lineHeight" :style="fill(st.lineHeight, 1, 2)" @input="set('lineHeight', num($event))" />
     </label>
-    <label>글자색 <input type="color" :value="st.color" @input="set('color', str($event))" /></label>
+    <label class="color">글자색 <output>{{ st.color.toUpperCase() }}</output><input type="color" :value="st.color" @input="set('color', str($event))" /></label>
 
     <label>외곽선 <output>{{ st.outlineWidth.toFixed(2) }}</output>
-      <input type="range" min="0" max="1" step="0.05" :value="st.outlineWidth" @input="set('outlineWidth', num($event))" />
+      <input type="range" min="0" max="1" step="0.05" :value="st.outlineWidth" :style="fill(st.outlineWidth, 0, 1)" @input="set('outlineWidth', num($event))" />
     </label>
-    <label>외곽선색 <input type="color" :value="st.outlineColor" @input="set('outlineColor', str($event))" /></label>
+    <label class="color">외곽선색 <output>{{ st.outlineColor.toUpperCase() }}</output><input type="color" :value="st.outlineColor" @input="set('outlineColor', str($event))" /></label>
     <label class="check"><input type="checkbox" :checked="st.shadow" @change="set('shadow', ($event.target as HTMLInputElement).checked)" /> 그림자</label>
 
     <div class="seg full">
@@ -158,10 +160,10 @@ async function importFile(e: Event) {
       <button :class="{ on: st.position === 'center' }" @click="set('position', 'center')">세로 중앙</button>
     </div>
     <label v-if="st.position === 'top'">위 여백 <output>{{ st.topMargin.toFixed(0) }}</output>
-      <input type="range" min="0" max="60" step="1" :value="st.topMargin" @input="set('topMargin', num($event))" />
+      <input type="range" min="0" max="60" step="1" :value="st.topMargin" :style="fill(st.topMargin, 0, 60)" @input="set('topMargin', num($event))" />
     </label>
     <label>왼쪽 여백 <output>{{ st.leftMargin.toFixed(0) }}</output>
-      <input type="range" min="0" max="40" step="1" :value="st.leftMargin" @input="set('leftMargin', num($event))" />
+      <input type="range" min="0" max="40" step="1" :value="st.leftMargin" :style="fill(st.leftMargin, 0, 40)" @input="set('leftMargin', num($event))" />
     </label>
 
     <div class="bg full">
@@ -175,7 +177,7 @@ async function importFile(e: Event) {
         <button :class="{ on: !!solidColor && !keyMode }" @click="toSolid">단색</button>
         <button :class="{ on: !!grad }" @click="toGradient">그라데이션</button>
       </div>
-      <label v-if="solidColor && !keyMode">색 <input type="color" :value="solidColor" @input="solid(str($event))" /></label>
+      <label v-if="solidColor && !keyMode" class="color">색 <output>{{ solidColor.toUpperCase() }}</output><input type="color" :value="solidColor" @input="solid(str($event))" /></label>
       <template v-if="grad">
         <div class="grad">
           <input type="color" :value="grad.from" title="시작 색" @input="setGrad({ from: str($event) })" />
@@ -196,26 +198,45 @@ async function importFile(e: Event) {
       <button :class="{ on: st.transition === 'fade' }" @click="set('transition', 'fade')">페이드</button>
     </div>
     <label v-if="st.transition === 'fade'">페이드 ms <output>{{ st.fadeMs }}</output>
-      <input type="range" min="100" max="1000" step="50" :value="st.fadeMs" @input="set('fadeMs', num($event))" />
+      <input type="range" min="100" max="1000" step="50" :value="st.fadeMs" :style="fill(st.fadeMs, 100, 1000)" @input="set('fadeMs', num($event))" />
     </label>
 
-    <button class="reset full" @click="live.setStyle({ ...DEFAULT_STYLE })">기본값으로</button>
+    <button class="reset full danger-line" @click="live.setStyle({ ...DEFAULT_STYLE })">기본값으로</button>
   </section>
 </template>
 
 <style scoped>
-.style { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; font-size: 12px; }
-h2 { grid-column: 1 / -1; margin: 0; font-size: 14px; }
-label { display: grid; gap: 3px; color: var(--muted); }
-label output { float: right; color: var(--text); }
+/*
+ * 한 줄에 하나(사용자 결정 — 2열은 긴 폰트 이름이 왼쪽 열을 밀어 2:1 로 보였음).
+ * 각 항목: 위 줄 = 이름(왼쪽) · 값(오른쪽), 아래 줄 = 조절(슬라이더·선택) 전체 폭. 색은 한 줄(이름 · 코드 · 견본).
+ */
+.style { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; font-size: 12px; }
+h2 { margin: 0; font-size: 14px; }
+label { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; color: var(--muted); }
+label > output { color: var(--text); font-variant-numeric: tabular-nums; }
+label > select, label > input:not([type='color']):not([type='checkbox']) { grid-column: 1 / -1; width: 100%; }
 label.check { display: flex; align-items: center; gap: 6px; }
+label.color { grid-template-columns: minmax(0, 1fr) auto auto; }
+label.color > output { color: var(--muted); font: 11px ui-monospace, monospace; }
 .full { grid-column: 1 / -1; }
-input[type='range'] { width: 100%; padding: 0; }
-input[type='color'] { width: 100%; height: 28px; padding: 2px; }
+/* 색 견본: 기본 막대 대신 작은 둥근 칸 */
+input[type='color'] {
+  -webkit-appearance: none; appearance: none; width: 44px; height: 24px; padding: 2px; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+}
+input[type='color']::-webkit-color-swatch-wrapper { padding: 0; }
+input[type='color']::-webkit-color-swatch { border: 0; border-radius: 4px; }
+input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
+.grad input[type='color'] { width: 100%; }
 .seg { display: flex; align-items: center; gap: 4px; }
 .seg span { color: var(--muted); width: 36px; }
 .seg button { flex: 1; padding: 4px; font-size: 12px; }
-.seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* 고르기(세그먼트): 주요 동작(파랑 채움)과 헷갈리지 않게 옅게 채움 + 파랑 테두리 */
+/* 고른 것 = 눌려 들어간 상태(평평 + 안쪽 그림자) — 3D 로 튀어나온 나머지와 구분 */
+.seg button.on, .seg button.on:hover {
+  background: rgba(79, 140, 255, .2); border-color: var(--accent);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, .35); transform: translateY(var(--lift)); color: #dbe7ff; font-weight: 600;
+}
 .reset { font-size: 12px; }
 .bg { display: grid; gap: 6px; }
 .grad { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
@@ -238,7 +259,14 @@ input[type='color'] { width: 100%; height: 28px; padding: 2px; }
 .p-save button, .p-file button, .p-import { font-size: 12px; padding: 4px 8px; white-space: nowrap; }
 .p-file { display: flex; gap: 4px; }
 .p-file > * { flex: 1; text-align: center; }
-.p-import { display: block; cursor: pointer; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); }
+/* 버튼처럼 보이는 파일 선택(label) — 버튼과 같은 3D 모양 */
+.p-import {
+  display: block; cursor: pointer; color: var(--text); border-radius: 7px;
+  background-color: #2b2b35; background-image: linear-gradient(to bottom, rgba(255, 255, 255, .09), rgba(255, 255, 255, 0) 70%);
+  border: 1px solid #42424e; box-shadow: 0 2px 0 #0b0b0e; margin-bottom: 2px;
+}
+.p-import:hover { background-color: #34343f; }
+.p-import:active { transform: translateY(2px); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .35); }
 .p-import input { display: none; }
 .p-msg { margin: 0; font-size: 11px; color: var(--muted); }
 .p-msg.err { color: var(--pgm); }

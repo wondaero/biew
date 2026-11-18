@@ -137,7 +137,7 @@ async function remove() {
 }
 header { display: flex; align-items: center; }
 h3 { margin: 0; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.x { border: none; background: none; padding: 2px 6px; }
+.x { border: none; background: none; padding: 2px 6px; box-shadow: none; margin: 0; }
 .muted { margin: 0; color: var(--muted); font-size: 12px; }
 .center { text-align: center; }
 .code { text-align: center; font: 700 28px/1 ui-monospace, monospace; letter-spacing: 4px; }
@@ -148,7 +148,7 @@ h3 { margin: 0; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-o
 .st.live { color: var(--pvw); }
 .st.error { color: var(--warn); }
 .warn { margin: 0; font-size: 12px; color: var(--warn); }
-.ghost { text-align: left; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; }
+.ghost { text-align: left; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; box-shadow: none; margin: 0; }
 .box { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
 .box b { font-size: 13px; }
 .box small { color: var(--muted); font-size: 11px; }

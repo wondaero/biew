@@ -108,7 +108,7 @@ onBeforeUnmount(() => { live.hotkeysPaused.value = false; window.removeEventList
 header { display: flex; align-items: center; }
 h2 { margin: 0; font-size: 16px; }
 .spacer { flex: 1; }
-.x { border: none; background: none; }
+.x { border: none; background: none; box-shadow: none; margin: 0; }
 .muted { margin: 0; color: var(--muted); font-size: 12px; }
 .err { margin: 0; color: var(--pgm); font-size: 13px; }
 .form { display: grid; gap: 10px; }
