@@ -13,6 +13,7 @@ import { isClean } from '@/library/pending'
 import { useLive } from '@/live/liveStore'
 import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
+import { usePauseHotkeys } from './usePauseHotkeys'
 
 const emit = defineEmits<{ close: [] }>()
 const live = useLive()
@@ -45,13 +46,12 @@ async function load() {
 }
 watch(session, (s) => { if (s) void load() })
 const UPLOAD_REASON = 'PC 에서 고친 곡을 서버에 올리려면 로그인하세요.'
+usePauseHotkeys()
 onMounted(() => {
-  live.hotkeysPaused.value = true
   // 로그인 안 돼 있으면 공용 로그인 팝업을 이 창 위에 바로 띄운다(로그인되면 watch(session) 이 이어서 load)
   if (!session.value) void requireLogin(UPLOAD_REASON)
   void load()
 })
-onBeforeUnmount(() => { live.hotkeysPaused.value = false })
 
 const clean = (r: Row) => isClean(r.item)
 /** 이번에 실제로 처리할 항목 */

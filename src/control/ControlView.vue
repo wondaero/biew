@@ -5,18 +5,19 @@ import { useLive } from '@/live/liveStore'
 import { hostLink, hostNeedsLogin, hostDeleted, remoteLink } from '@/channel/sync'
 import { forgetToken } from '@/channel/api'
 import { LOCAL_CODE, forgetVisit } from '@/live/persistence'
-import { loadCache, syncNow } from '@/library/library'
+import { loadCache, syncNow, useLibrary } from '@/library/library'
 import { openOutputWindow } from './outputWindow'
 import { isMobileOS } from '@/lib/device'
 import { useHotkeys } from './useHotkeys'
 import { useBackClose } from '@/lib/backClose'
-import LibraryPanel from './panels/LibraryPanel.vue'
+import SearchDialog from './SearchDialog.vue'
 import SetlistPanel from './panels/SetlistPanel.vue'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import StylePanel from './panels/StylePanel.vue'
 import StylePreview from './panels/StylePreview.vue'
 import StyleDialog from './StyleDialog.vue'
+import StyleSummary from './panels/StyleSummary.vue'
 import { useStyleDraft } from '@/live/styleDraft'
 import ChannelPopover from './panels/ChannelPopover.vue'
 import SwitchToInternet from './SwitchToInternet.vue'
@@ -39,10 +40,22 @@ const netWarn = computed(() => {
   return null
 })
 const link = computed(() => (isHost.value ? hostLink.value : remoteLink.value))
-const libRef = ref<InstanceType<typeof LibraryPanel>>()
 const gridRef = ref<InstanceType<typeof SlideGrid>>()
+const lib = useLibrary()
 
-useHotkeys(live, { focusSearch: () => libRef.value?.focus() })
+/**
+ * 곡 검색 = 팝업(SearchDialog, 사용자 결정 2026-11-18 — 메인은 핵심만). '/' 로 열고 검색칸에 바로 커서.
+ * newSong: 사이드바 "+ 새 곡" — 같은 팝업을 열고 편집기를 바로 띄운다(저장하면 검색 결과에 보여 바로 Enter 로 추가).
+ */
+const showSearch = ref(false)
+const searchNew = ref(false)
+function openSearch(newSong = false) {
+  if (!isHost.value) return
+  searchNew.value = newSong
+  showSearch.value = true
+  sheet.value = null
+}
+useHotkeys(live, { focusSearch: () => openSearch() })
 
 // 출력 창 연결 표시(2초마다 오는 생존 신호 기준)
 const now = ref(Date.now())
@@ -88,8 +101,8 @@ function leaveRemote() {
   router.push('/')
 }
 
-// 모바일 바텀시트 (PC 에선 CSS 가 무시하므로 상태만 있고 영향 없음)
-const sheet = ref<'find' | 'style' | null>(null)
+// 모바일 바텀시트: 콘티(set)·출력 설정(style). 곡 검색은 PC·모바일 모두 팝업(SearchDialog)
+const sheet = ref<'set' | 'style' | null>(null)
 /** 출력 설정에 적용 안 된 수정본이 있으면 하단 버튼에 표시(시트를 닫아도 수정본은 남음) */
 const styleDraft = useStyleDraft()
 /** PC 출력 설정 팝업(모바일은 바텀시트 sheet === 'style') */
@@ -106,11 +119,7 @@ onBeforeUnmount(() => narrowMq.removeEventListener('change', onNarrow))
 // 뒤로가기 = 열린 바텀시트·단축키 도움말 닫기(페이지를 나가지 않게)
 useBackClose(() => !!sheet.value, () => { sheet.value = null })
 useBackClose(() => showHelp.value, () => { showHelp.value = false })
-const tab = ref<'lib' | 'set'>('lib')
-function openSheet(kind: 'find' | 'style', t?: 'lib' | 'set') {
-  sheet.value = kind
-  if (t) tab.value = t
-}
+function openSheet(kind: 'set' | 'style') { sheet.value = kind }
 function onJump(i: number) {
   gridRef.value?.scrollToItem(i)
   sheet.value = null
@@ -174,7 +183,6 @@ onBeforeUnmount(() => {
       </template>
       <template v-if="isHost">
         <span class="conn desk-only" :class="{ on: outputOn }" :title="outputOn ? '출력 창 연결됨' : '출력 창 없음'"><span class="conn-word">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span></span>
-        <button class="desk-only" :class="{ dirty: styleDraft.dirty.value }" title="글꼴·크기·배경 등 — 바꾼 뒤 [적용]을 눌러야 송출" @click="showStyle = true">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
         <button class="primary desk-only" @click="startOutput">출력 시작</button>
         <button v-if="!isLocalMode" class="share" :class="link" title="채널 번호 · QR · 접속 관리" @click="showChannel = !showChannel">📡 채널</button>
         <button class="desk-only quiet" title="단축키" @click="showHelp = !showHelp">?</button>
@@ -204,40 +212,56 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="sheet" class="sheet-backdrop" @click="sheet = null" />
+    <SearchDialog v-if="isHost && showSearch" :start-new="searchNew" @close="showSearch = false" />
 
-    <aside v-if="isHost" class="left" :class="{ open: sheet === 'find' }" :data-tab="tab">
-      <div class="sheet-head">
-        <button :class="{ on: tab === 'lib' }" @click="tab = 'lib'">곡 검색</button>
-        <button :class="{ on: tab === 'set' }" @click="tab = 'set'">콘티 {{ live.state.setlist.length }}</button>
-        <span class="spacer" />
-        <button aria-label="닫기" @click="sheet = null">✕</button>
-      </div>
-      <LibraryPanel ref="libRef" class="lib" />
-      <SetlistPanel class="set" @jump="onJump" />
+    <!--
+      사이드바(PC 왼쪽, 사용자 결정 2026-11-18 — 메인은 핵심만, 자잘한 건 팝업):
+      송출 화면 → 출력 설정 한 줄 → [곡 검색][+ 새 곡] → 콘티(남는 높이 전부).
+      모바일: 송출 화면만 위에 보이고, 콘티는 바텀시트(sheet === 'set'), 곡 검색은 팝업, 버튼은 하단 도크.
+    -->
+    <aside class="side">
+      <MonitorPanel />
+      <template v-if="isHost">
+        <StyleSummary v-if="!narrow" @open="showStyle = true" />
+        <div class="side-actions desk-only">
+          <button class="find" title="곡 검색 — 찾아서 Enter 로 콘티에 추가 ( / )" @click="openSearch()">
+            🔍 곡 검색 <kbd>/</kbd><b v-if="lib.pendingCount.value" class="badge" title="PC 에서 고친 곡 — 서버에 올리기 대기">{{ lib.pendingCount.value }}</b>
+          </button>
+          <button title="새 곡 등록(오프라인이면 PC 에 저장)" @click="openSearch(true)">+ 새 곡</button>
+        </div>
+        <p v-if="!narrow && !lib.count.value" class="side-hint">저장된 곡이 없습니다 — <b>곡 검색</b>에서 로그인해 곡을 받으세요.</p>
+        <div class="set-wrap" :class="{ open: sheet === 'set' }">
+          <div class="sheet-head">
+            <b>콘티</b>
+            <span class="spacer" />
+            <button @click="openSearch()">🔍 곡 추가</button>
+            <button aria-label="닫기" @click="sheet = null">✕</button>
+          </div>
+          <SetlistPanel class="set" @jump="onJump" />
+        </div>
+      </template>
     </aside>
 
     <main class="center">
       <SlideGrid ref="gridRef" />
     </main>
 
-    <aside class="right">
-      <MonitorPanel />
-      <div v-if="isHost && narrow" class="style-sheet" :class="{ open: sheet === 'style' }">
-        <!-- 모바일: 머리 + 미리보기를 시트 위에 고정, 설정은 그 아래에서 스크롤(PC 에선 숨김 — 위 모니터가 고정됨) -->
-        <div class="sheet-top">
-          <div class="sheet-head">
-            <span class="spacer" />
-            <button aria-label="닫기" @click="sheet = null">✕</button>
-          </div>
-          <StylePreview class="sheet-pv" />
+    <!-- 모바일 출력 설정 바텀시트(PC 는 StyleDialog 팝업). 둘 중 하나만 그린다 -->
+    <div v-if="isHost && narrow" class="style-sheet" :class="{ open: sheet === 'style' }">
+      <!-- 머리 + 미리보기를 시트 위에 고정, 설정은 그 아래에서 스크롤 -->
+      <div class="sheet-top">
+        <div class="sheet-head">
+          <span class="spacer" />
+          <button aria-label="닫기" @click="sheet = null">✕</button>
         </div>
-        <StylePanel />
+        <StylePreview class="sheet-pv" />
       </div>
-    </aside>
+      <StylePanel />
+    </div>
 
     <nav v-if="isHost" class="dock">
-      <button @click="openSheet('find', 'lib')">🔍 곡 검색</button>
-      <button @click="openSheet('find', 'set')">☰ 콘티 {{ live.state.setlist.length }}</button>
+      <button @click="openSearch()">🔍 곡 검색<b v-if="lib.pendingCount.value" class="badge">{{ lib.pendingCount.value }}</b></button>
+      <button @click="openSheet('set')">☰ 콘티 {{ live.state.setlist.length }}</button>
       <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
     </nav>
   </div>
@@ -248,9 +272,10 @@ onBeforeUnmount(() => {
   height: 100vh;
   display: grid;
   /* minmax(0, …): 긴 제목/nowrap 텍스트가 열을 밀어내지 않도록 */
-  grid-template-columns: 300px minmax(0, 1fr) 400px;
+  /* 2단(사용자 결정 2026-11-18): 사이드바 320px(송출 화면 약 300px — 글자를 읽을 수 있는 크기) + 슬라이드 목록(나머지 전부) */
+  grid-template-columns: 320px minmax(0, 1fr);
   grid-template-rows: auto 1fr;
-  grid-template-areas: 'top top top' 'left center right';
+  grid-template-areas: 'top top' 'side center';
   overflow: hidden;
 }
 .top { grid-area: top; display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -293,32 +318,36 @@ onBeforeUnmount(() => {
 .conn.on { color: var(--text); }
 .conn.on::before { background: var(--pvw); box-shadow: 0 0 6px var(--pvw); }
 
-.left { grid-area: left; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; gap: 12px; padding: 10px; border-right: 1px solid var(--line); min-height: 0; background: var(--panel); }
-.lib, .set { min-height: 0; min-width: 0; }
+.side { grid-area: side; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-right: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+.side-actions { display: flex; gap: 6px; }
+.side-actions button { padding: 8px 10px; }
+.side-actions .find { flex: 1; }
+kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; }
+/* 서버에 올릴 곡 수(곡 검색 팝업 안에 올리기 버튼이 있음) */
+.badge { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; background: #5a4a1e; color: #f5d27a; }
+.side-hint { margin: 0; font-size: 12px; color: var(--warn); }
+.side-hint b { color: var(--text); }
+/* 콘티: 사이드바의 남는 높이 전부 */
+.set-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 10px; border-top: 1px solid var(--line); }
+.set-wrap .set { flex: 1; min-height: 0; }
 .center { grid-area: center; display: flex; flex-direction: column; min-height: 0; }
 .center > * { flex: 1; }
-.right { grid-area: right; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 10px; border-left: 1px solid var(--line); overflow-y: auto; background: var(--panel); }
-/* PC: 송출 모니터를 위에 고정 — 출력 설정을 아래로 스크롤해도 결과가 보이게(사용자 요청) */
-.right > .monitors { position: sticky; top: -10px; z-index: 3; margin: -10px -10px 0; padding: 10px 10px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .sheet-pv { display: none; }
-/* PC: 출력 설정은 팝업(StyleDialog) — 오른쪽 패널엔 송출 모니터만. 모바일에선 아래 미디어쿼리가 바텀시트로 다시 보인다 */
-.right > .style-sheet { display: none; }
 .dirty { color: #dbe7ff; border-color: var(--preview); }
 .dock-dot { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; background: var(--preview); vertical-align: middle; }
 
-/* 리모컨(폰, 계정 없음): 모니터 + 슬라이드 목록 + 이동 버튼만. 화면 폭과 무관하게 1열 */
+/* 리모컨(계정 없음): 모니터 + 슬라이드 목록 + 이동 버튼만. 화면 폭과 무관하게 1열 */
 .control.remote {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
-  grid-template-areas: 'top' 'right' 'center';
+  grid-template-areas: 'top' 'side' 'center';
 }
 .control.remote .top { flex-wrap: wrap; gap: 8px; }
 .control.remote .group { flex: 1; }
 .control.remote .group button { flex: 1; padding: 10px 12px; }
-.control.remote .right > .monitors { position: static; margin: 0; padding: 0; border-bottom: 0; }
-.control.remote .right { border-left: 0; border-bottom: 1px solid var(--line); overflow: visible; padding: 8px 12px; gap: 0; }
-.control.remote .right :deep(.monitors) { max-width: 520px; width: 100%; margin: 0 auto; }
-.control.remote .right :deep(.screen) { max-height: 32dvh; margin: 0 auto; }
+.control.remote .side { border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; padding: 8px 12px; gap: 0; }
+.control.remote .side :deep(.monitors) { max-width: 520px; width: 100%; margin: 0 auto; }
+.control.remote .side :deep(.screen) { max-height: 32dvh; margin: 0 auto; }
 
 .toast {
   position: fixed; left: 50%; top: 56px; transform: translateX(-50%); z-index: 20; max-width: 640px;
@@ -339,7 +368,7 @@ onBeforeUnmount(() => {
     height: 100dvh;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr) auto;
-    grid-template-areas: 'top' 'right' 'center' 'dock';
+    grid-template-areas: 'top' 'side' 'center' 'dock';
   }
   .desk-only { display: none !important; }
 
@@ -357,21 +386,23 @@ onBeforeUnmount(() => {
   }
   .mode { font-size: 12px; }
 
-  .right { padding: 6px 10px; border-left: 0; border-bottom: 1px solid var(--line); overflow: visible; gap: 0; }
-  .right :deep(.monitors) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
-  .right :deep(.screen) { width: min(100%, calc(30dvh * 16 / 9)); margin: 0 auto; }
+  /* 사이드바 = 위쪽 송출 화면 줄(콘티는 바텀시트로 빠짐) */
+  .side { padding: 6px 10px; border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; gap: 0; }
+  .side :deep(.monitors) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+  .side :deep(.screen) { width: min(100%, calc(30dvh * 16 / 9)); margin: 0 auto; }
 
   .sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(0, 0, 0, .5); }
 
-  .left, .style-sheet {
+  .set-wrap, .style-sheet {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    height: 92dvh; /* 내용을 더 보이게(사용자 요청) — 위에 한 줄 남겨 시트임을 알고, 그 틈을 눌러 닫을 수 있게 */ padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    height: 92dvh; /* 내용을 더 보이게(사용자 요청) — 위에 한 줄 남겨 시트임을 알고, 그 틈을 눌러 닫을 수 있게 */
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     background: var(--panel); border: 1px solid var(--line); border-bottom: 0; border-radius: 14px 14px 0 0;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
     transform: translateY(105%); visibility: hidden; transition: transform .2s, visibility 0s .2s;
   }
-  .left.open, .style-sheet.open { transform: none; visibility: visible; transition: transform .2s; }
-  .left { grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+  .set-wrap.open, .style-sheet.open { transform: none; visibility: visible; transition: transform .2s; }
+  .set-wrap { gap: 8px; }
   .style-sheet { overflow-y: auto; padding-top: 0; }
   /* 시트 머리 + 미리보기 고정, 설정만 스크롤 */
   .style-sheet .sheet-top { position: sticky; top: 0; z-index: 2; margin: 0 -12px 10px; padding: 10px 12px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -379,17 +410,16 @@ onBeforeUnmount(() => {
   /* 출력 설정 시트의 ✕ 는 작게 — 버튼 하나에 한 줄을 다 쓰지 않게 */
   .style-sheet .sheet-top .sheet-head button { padding: 3px 12px; font-size: 13px; }
   .sheet-pv { display: grid; }
-  .right > .monitors { position: static; margin: 0; padding: 0; border-bottom: 0; }
-  .left[data-tab='lib'] .set, .left[data-tab='set'] .lib { display: none; }
 
-  .sheet-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-  .left .sheet-head { margin-bottom: 0; }
+  .sheet-head { display: flex; align-items: center; gap: 6px; }
+  .sheet-head b { font-size: 15px; }
   .sheet-head .spacer { display: block; flex: 1; }
-  .sheet-head button { padding: 8px 14px; }
-  .sheet-head button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sheet-head button { padding: 8px 14px; margin-bottom: 0; }
+  /* 시트 안의 콘티 제목 줄은 머리와 겹치므로 숨김 */
+  .set-wrap .set :deep(header h2) { display: none; }
+  .set-wrap .set :deep(header) { justify-content: flex-end; }
 
   .dock { grid-area: dock; display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
-  .right > .style-sheet { display: block; }
   .dock button { flex: 1; padding: 12px 6px; font-size: 13px; white-space: nowrap; }
 }
 </style>

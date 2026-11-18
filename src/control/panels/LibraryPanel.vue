@@ -18,10 +18,16 @@ const input = ref<HTMLInputElement>()
 const hits = computed(() => lib.search(q.value, 60))
 watch(q, () => { sel.value = 0 })
 
+/** 추가 알림 — 곡 검색이 팝업이라 뒤의 콘티가 안 보이므로 '몇 번째로 들어갔는지' 잠깐 보여 준다 */
+const added = ref<string | null>(null)
+let addedTimer: number | undefined
 function add(i = sel.value) {
   const h = hits.value[i]
   if (!h) return
   live.setlist.add(h.song)
+  added.value = `"${h.song.title}" — 콘티 ${live.state.setlist.length}번째로 추가`
+  clearTimeout(addedTimer)
+  addedTimer = window.setTimeout(() => { added.value = null }, 2500)
   input.value?.select()
 }
 /** v-model 은 한글 조합이 끝날 때까지 값을 갱신하지 않아("안녕" 입력 중에도 "안"으로 검색) — 입력마다 바로 반영 */
@@ -33,7 +39,8 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'ArrowDown') { sel.value = Math.min(sel.value + 1, hits.value.length - 1); e.preventDefault() }
   else if (e.key === 'ArrowUp') { sel.value = Math.max(sel.value - 1, 0); e.preventDefault() }
   else if (e.key === 'Enter') { add(); e.preventDefault() }
-  else if (e.key === 'Escape') { q.value = '' }
+  // 검색어가 있으면 Esc = 검색어만 지움(팝업은 닫지 않게 preventDefault). 비어 있으면 그대로 올라가 팝업이 닫힌다
+  else if (e.key === 'Escape' && q.value) { q.value = ''; e.preventDefault() }
 }
 
 // 로그인: 곡 받기(동기화)·곡 편집에만 필요. 공용 로그인 팝업(requireLogin) — 예전엔 여기에 로그인 칸이 펼쳐져 패널 위쪽을 차지했음
@@ -61,7 +68,13 @@ const online = ref(navigator.onLine)
 window.addEventListener('online', () => (online.value = true))
 window.addEventListener('offline', () => (online.value = false))
 
-defineExpose({ focus: () => input.value?.focus() })
+defineExpose({
+  focus: () => input.value?.focus(),
+  /** 새 곡 편집기 바로 열기(사이드바 "+ 새 곡") */
+  newSong: () => { editing.value = null },
+  /** 안에 편집기·서버 올리기 창이 떠 있는지(그땐 바깥 검색 팝업이 Esc 로 닫히면 안 됨) */
+  hasModal: () => editing.value !== undefined || showUpload.value,
+})
 </script>
 
 <template>
@@ -101,6 +114,7 @@ defineExpose({ focus: () => input.value?.focus() })
       @input="onInput"
       @keydown="onKey"
     />
+    <p v-if="added" class="added" role="status">✓ {{ added }}</p>
     <ol class="hits">
       <li
         v-for="(h, i) in hits"
@@ -153,4 +167,5 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .dbnotice { margin: 6px 0 0; font-size: 12px; color: var(--warn); }
 .n { font-size: 11px; color: var(--muted); }
 .empty { color: var(--muted); cursor: default !important; }
+.added { margin: 0; font-size: 12px; color: var(--live); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

@@ -13,7 +13,8 @@ import { useStyleDraft } from '@/live/styleDraft'
 import { onAir, currentText } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
 
-withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
+/** actions=false: 버튼 없이 미리보기만(PC 팝업 — 버튼은 오른쪽 설정 아래에) */
+withDefaults(defineProps<{ compact?: boolean; actions?: boolean }>(), { compact: false, actions: true })
 const live = useLive()
 const s = live.state
 const draft = useStyleDraft()
@@ -36,11 +37,11 @@ const label = computed(() => (draft.dirty.value ? '적용 전 미리보기 — �
     <div v-if="!compact || draft.dirty.value" class="pv-screen">
       <SlideRender :text="text.text" :style-cfg="draft.shown.value" :animate="false" />
     </div>
-    <div v-if="draft.dirty.value" class="pv-actions">
+    <div v-if="actions && draft.dirty.value" class="pv-actions">
       <button title="수정본을 버리고 지금 송출 중인 설정으로" @click="draft.revert()">되돌리기</button>
       <button class="apply" title="수정본을 송출(프로젝터)에 반영" @click="draft.apply()">적용 — 송출에 반영</button>
     </div>
-    <div v-else-if="draft.canUndo.value" class="pv-actions">
+    <div v-else-if="actions && draft.canUndo.value" class="pv-actions">
       <button class="undo" title="방금 적용한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 적용 취소 (이전 설정으로)</button>
     </div>
   </div>

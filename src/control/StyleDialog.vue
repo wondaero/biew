@@ -1,17 +1,20 @@
 <script setup lang="ts">
 /**
  * PC 출력 설정 팝업(사용자 결정 2026-11-18). 예전엔 오른쪽 패널에서 송출 모니터와 설정·미리보기가 한 줄에 쌓여 답답했다.
- *  - 왼쪽: 적용 전 미리보기(크게) + 적용/되돌리기, 그 아래 지금 송출 중(작게) — 비교용.
- *  - 오른쪽: 설정(스크롤). 규칙은 모바일 시트와 같다(src/live/styleDraft.ts): 바꾸면 수정본, [적용]을 눌러야 송출.
+ *  - 왼쪽(보는 곳): 적용 전 미리보기(크게), 그 아래 지금 송출 중 — 비교용.
+ *  - 오른쪽(만지는 곳): 설정(스크롤) + 맨 아래 고정 줄 [기본값으로] … [되돌리기][적용] — 버튼은 설정 가까이(사용자 요청).
+ *    기본값으로는 위험 동작이라 왼쪽 끝에 따로(적용 옆에 두면 잘못 누르기 쉬움). 규칙은 모바일 시트와 같다(src/live/styleDraft.ts): 바꾸면 수정본, [적용]을 눌러야 송출.
  *  - 열려 있는 동안 송출 단축키는 막고(hotkeysPaused) 팝업 단축키만: Esc = 닫기(수정본 유지), Ctrl/⌘+Enter = 적용.
  *    그냥 Enter 로 적용하지 않는 이유: 저장 이름을 입력하다 Enter 를 누르면 송출에 나가 버린다.
  *  - 뒤로가기 = 닫기(useBackClose). 모바일은 이 팝업 대신 바텀시트.
  */
 import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { DEFAULT_STYLE } from '@shared/types'
 import { useLive } from '@/live/liveStore'
 import { useStyleDraft } from '@/live/styleDraft'
 import { onAir } from '@/live/nav'
 import { useBackClose } from '@/lib/backClose'
+import { usePauseHotkeys } from './usePauseHotkeys'
 import SlideRender from '@/components/SlideRender.vue'
 import StylePanel from './panels/StylePanel.vue'
 import StylePreview from './panels/StylePreview.vue'
@@ -27,8 +30,9 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') { e.preventDefault(); emit('close') }
   else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); draft.apply() }
 }
-onMounted(() => { live.hotkeysPaused.value = true; window.addEventListener('keydown', onKey) })
-onBeforeUnmount(() => { live.hotkeysPaused.value = false; window.removeEventListener('keydown', onKey) })
+usePauseHotkeys()
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
@@ -42,7 +46,7 @@ onBeforeUnmount(() => { live.hotkeysPaused.value = false; window.removeEventList
       </header>
       <div class="sd-body">
         <section class="sd-left">
-          <StylePreview class="sd-pv" />
+          <StylePreview class="sd-pv" :actions="false" />
           <div class="sd-air">
             <div class="sd-air-bar">지금 송출 중 <small>(비교용)</small></div>
             <div class="sd-air-screen">
@@ -51,7 +55,17 @@ onBeforeUnmount(() => { live.hotkeysPaused.value = false; window.removeEventList
           </div>
         </section>
         <section class="sd-right">
-          <StylePanel />
+          <div class="sd-scroll"><StylePanel /></div>
+          <footer class="sd-foot">
+            <button class="danger-line" title="수정본을 기본값으로(적용을 눌러야 송출)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
+            <span class="spacer" />
+            <template v-if="draft.dirty.value">
+              <button class="revert" title="수정본을 버리고 지금 송출 중인 설정으로" @click="draft.revert()">되돌리기</button>
+              <button class="apply" title="수정본을 송출에 반영 (Ctrl+Enter)" @click="draft.apply()">적용 — 송출에 반영</button>
+            </template>
+            <button v-else-if="draft.canUndo.value" class="undo" title="방금 적용한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 적용 취소</button>
+            <small v-else class="foot-hint">바꾸면 여기서 [적용]</small>
+          </footer>
         </section>
       </div>
     </div>
@@ -77,7 +91,17 @@ h2 { margin: 0; font-size: 16px; }
 .sd-air-bar { font-size: 11px; font-weight: 600; color: var(--live); }
 .sd-air-bar small { color: var(--muted); font-weight: normal; }
 .sd-air-screen { aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.sd-right { min-height: 0; overflow-y: auto; padding: 14px 16px; }
+.sd-right { min-height: 0; display: flex; flex-direction: column; }
+.sd-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
+/* 버튼 줄: 설정을 스크롤해도 항상 보이게 아래에 고정 */
+.sd-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--panel); }
+.sd-foot button { margin-bottom: 0; padding: 8px 12px; }
+.sd-foot .apply { --edge: #12803b; background-color: var(--live); border-color: #4be080; color: var(--live-ink); font-weight: 700; }
+.sd-foot .apply:hover { background-color: #34d36b; border-color: #5fe891; }
+.sd-foot .undo { color: var(--muted); }
+.foot-hint { color: var(--muted); font-size: 12px; }
+/* 패널 안의 기본값으로 버튼은 숨김(아래 버튼 줄에 있음) */
+.sd-right :deep(.reset) { display: none; }
 /* 제목·'적용 안 된 변경' 표시는 팝업 머리에 있으므로 패널 안의 것은 숨김 */
 .sd-right :deep(.style > h2) { display: none; }
 </style>

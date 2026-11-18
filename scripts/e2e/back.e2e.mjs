@@ -31,7 +31,8 @@ try {
   const m = await open(390, 844)
   let dialog = null
   m.on('dialog', (d) => { dialog = d })
-  const sheetOpen = () => m.$('.left.open')
+  const sheetOpen = () => m.$('.set-wrap.open')
+  const searchOpen = () => m.$('.srch')
   await m.$$eval('.dock button', (bs) => bs[1].click()) // 콘티
   check('폰: 콘티 시트 열림', await until(sheetOpen))
   await back(m)
@@ -40,25 +41,25 @@ try {
   // 버튼(✕)으로 닫은 뒤 뒤로가기 → 이번엔 페이지 이동(쌓아 둔 칸이 치워졌는지)
   await m.$$eval('.dock button', (bs) => bs[1].click())
   await until(sheetOpen)
-  await m.$$eval('.left .sheet-head button', (bs) => bs.find((b) => b.getAttribute('aria-label') === '닫기')?.click())
+  await m.$$eval('.set-wrap .sheet-head button', (bs) => bs.find((b) => b.getAttribute('aria-label') === '닫기')?.click())
   check('✕ 로 닫힘', await until(async () => !(await sheetOpen())))
   await sleep(300)
   check('✕ 로 닫은 뒤 경로 그대로(/local)', (await path(m)) === '/local')
 
-  // 겹친 팝업: 곡 검색 시트 → 새 곡 편집기 → 뒤로가기 2번
-  await m.$$eval('.dock button', (bs) => bs[0].click()) // 곡 검색
-  await until(sheetOpen)
-  await m.$$eval('button.new', (bs) => bs[0].click())
-  check('곡 편집기 열림(시트 위)', await until(() => m.$('.dialog')))
+  // 겹친 팝업: 곡 검색 팝업 → 새 곡 편집기 → 뒤로가기 2번
+  await m.$$eval('.dock button', (bs) => bs[0].click()) // 곡 검색(팝업)
+  check('폰: 곡 검색 = 팝업(아래 시트), 검색칸에 커서', await until(searchOpen) && await until(() => m.evaluate(() => document.activeElement?.classList.contains('search'))))
+  await m.$$eval('.srch button.new', (bs) => bs[0].click())
+  check('곡 편집기 열림(검색 팝업 위)', await until(() => m.$('.dialog')))
   await back(m)
-  check('뒤로가기 1번 → 편집기만 닫힘, 시트는 열림', await until(async () => !(await m.$('.dialog'))) && !!(await sheetOpen()))
+  check('뒤로가기 1번 → 편집기만 닫힘, 검색 팝업은 열림', await until(async () => !(await m.$('.dialog'))) && !!(await searchOpen()))
   await back(m)
-  check('뒤로가기 2번 → 시트도 닫힘, 페이지 그대로', await until(async () => !(await sheetOpen())) && (await path(m)) === '/local')
+  check('뒤로가기 2번 → 검색 팝업도 닫힘, 페이지 그대로', await until(async () => !(await searchOpen())) && (await path(m)) === '/local')
 
   // 저장 안 한 변경: 뒤로가기 → 확인창 취소 → 그대로 → 다시 뒤로가기 → 확인 → 닫힘
   await m.$$eval('.dock button', (bs) => bs[0].click())
-  await until(sheetOpen)
-  await m.$$eval('button.new', (bs) => bs[0].click())
+  await until(searchOpen)
+  await m.$$eval('.srch button.new', (bs) => bs[0].click())
   await until(() => m.$('.dialog'))
   await m.type('.dialog input', 'Lorem draft')
   dialog = null
@@ -72,8 +73,8 @@ try {
   check('다시 뒤로가기 → 또 확인창(칸이 다시 쌓였음)', await until(() => dialog !== null))
   await dialog.accept()
   check('확인 → 편집기 닫힘, 페이지 그대로', await until(async () => !(await m.$('.dialog'))) && (await path(m)) === '/local')
-  await back(m) // 시트 닫기
-  await until(async () => !(await sheetOpen()))
+  await back(m) // 검색 팝업 닫기
+  await until(async () => !(await searchOpen()))
 
   // 팝업이 없을 때 뒤로가기 → 정상적으로 이전 페이지(홈)
   await back(m)
@@ -114,8 +115,8 @@ try {
   await back(d)
   check('PC: 뒤로가기 → 도움말만 닫힘', await until(async () => !(await d.$('.help'))) && (await path(d)) === '/local')
   // ── PC: 출력 설정 = 팝업 ──
-  check('PC: 오른쪽 패널엔 출력 설정 없음(송출 모니터만)', !(await d.$('aside.right .style')))
-  const openStyle = () => d.$$eval('.top button', (bs) => bs.find((b) => b.textContent?.includes('출력 설정'))?.click())
+  check('PC: 2단 — 사이드바(송출 화면·설정 한 줄·곡 검색·콘티), 오른쪽 패널 없음, 위 줄에 출력 설정 버튼 없음', !(await d.$('aside.right')) && !!(await d.$('aside.side .monitors')) && !!(await d.$('aside.side .style-sum')) && !!(await d.$('aside.side .side-actions .find')) && !!(await d.$('aside.side .set-wrap .setlist')) && !(await d.$$eval('.top button', (bs) => bs.some((b) => b.textContent?.includes('출력 설정')))))
+  const openStyle = () => d.click('.style-sum button')
   const live = () => d.evaluate(() => JSON.parse(localStorage.getItem('biew.live.v1:LOCAL') ?? '{}'))
   await openStyle()
   check('PC: ⚙ 출력 설정 → 팝업 열림', await until(() => d.$('.sd')))
@@ -126,7 +127,7 @@ try {
   await d.$eval('.sd input[type=range]', (e) => { e.value = '12'; e.dispatchEvent(new Event('input', { bubbles: true })) })
   check('설정 바꾸면 "적용 안 된 변경"(송출 그대로)', await until(() => d.$('.sd header .dirty-tag')) && (await live()).style?.fontSize !== 12)
   await d.keyboard.press('Escape')
-  check('Esc → 닫힘, 수정본은 남음(버튼에 •)', await until(async () => !(await d.$('.sd'))) && !!(await d.$('.top button.dirty .dock-dot')))
+  check('Esc → 닫힘, 수정본은 남음(버튼에 •)', await until(async () => !(await d.$('.sd'))) && !!(await d.$('.style-sum button.dirty .dot')))
   await openStyle()
   await until(() => d.$('.sd'))
   await d.keyboard.down('Control'); await d.keyboard.press('Enter'); await d.keyboard.up('Control')

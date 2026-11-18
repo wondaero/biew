@@ -12,6 +12,7 @@ import { findDuplicates } from '@shared/songCompare'
 import { useLive } from '@/live/liveStore'
 import SlideRender from '@/components/SlideRender.vue'
 import { useBackClose } from '@/lib/backClose'
+import { usePauseHotkeys } from './usePauseHotkeys'
 
 const props = defineProps<{ song: Song | null }>() // null = 새 곡
 const emit = defineEmits<{ close: []; saved: [song: Song, local: boolean] }>()
@@ -109,13 +110,12 @@ function onKey(e: KeyboardEvent) {
   else if (e.key === 'Escape') { e.preventDefault(); close() }
 }
 
+usePauseHotkeys()
 onMounted(() => {
-  live.hotkeysPaused.value = true
   window.addEventListener('keydown', onKey)
   nextTick(() => titleInput.value?.focus())
 })
 onBeforeUnmount(() => {
-  live.hotkeysPaused.value = false
   window.removeEventListener('keydown', onKey)
 })
 </script>

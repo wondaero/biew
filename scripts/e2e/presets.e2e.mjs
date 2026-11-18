@@ -38,7 +38,7 @@ try {
   const applyBtn = (n) => c.$$eval('.p-list li', (lis, n) => lis.find((l) => l.querySelector('.p-name')?.textContent?.trim() === n)?.querySelector('.p-apply')?.click(), n)
   const delBtn = (n) => c.$$eval('.p-list li', (lis, n) => lis.find((l) => l.querySelector('.p-name')?.textContent?.trim() === n)?.querySelector('.p-del')?.click(), n)
   // PC 출력 설정 = 팝업(StyleDialog) — 열고 시작, 새로고침 뒤 다시 연다
-  const openStyle = async () => { await c.$$eval('button', (bs) => bs.find((b) => b.textContent?.includes('출력 설정'))?.click()); await c.waitForSelector('.sd .presets', { timeout: 5000 }) }
+  const openStyle = async () => { await c.click('.style-sum button'); await c.waitForSelector('.sd .presets', { timeout: 5000 }) }
   await openStyle()
   const bgBtn = (t) => c.$$eval('.bg button', (bs, t) => bs.find((x) => x.textContent?.trim() === t)?.click(), t)
   // 설정·불러오기는 수정본만 바꾼다 → [적용]을 눌러야 송출(src/live/styleDraft.ts)

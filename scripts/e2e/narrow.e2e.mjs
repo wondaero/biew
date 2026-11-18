@@ -87,7 +87,7 @@ try {
   const dock = (i) => c.$$eval('.dock button', (bs, i) => bs[i].click(), i)
   const closeSheet = () => c.evaluate(() => history.back())
   await dock(0); await audit(c, 'sheet-search')
-  await c.$$eval('button.new', (bs) => bs[0].click()); await audit(c, 'song-editor')
+  await c.$$eval('.srch button.new', (bs) => bs[0].click()); await audit(c, 'song-editor')
   await closeSheet(); await sleep(300); await closeSheet(); await sleep(300)
   await dock(1); await audit(c, 'sheet-setlist'); await closeSheet(); await sleep(300)
   await dock(2); await audit(c, 'sheet-style')

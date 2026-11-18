@@ -14,6 +14,7 @@ import { saveHost, saveLive, LOCAL_CODE } from '@/live/persistence'
 import { retargetOutputWindow } from './outputWindow'
 import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
+import { usePauseHotkeys } from './usePauseHotkeys'
 
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
@@ -65,8 +66,9 @@ async function run() {
 }
 
 const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && step.value !== 'working') emit('close') }
-onMounted(() => { live.hotkeysPaused.value = true; window.addEventListener('keydown', onKey) })
-onBeforeUnmount(() => { live.hotkeysPaused.value = false; window.removeEventListener('keydown', onKey) })
+usePauseHotkeys()
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>

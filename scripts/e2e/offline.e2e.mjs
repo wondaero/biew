@@ -78,13 +78,18 @@ try {
   await page.reload({ waitUntil: 'domcontentloaded' })
   check('오프라인 새로고침해도 앱이 열림', await until(async () => (await text('h1')) === 'Biew'))
   await page.goto(BASE + '/local', { waitUntil: 'domcontentloaded' })
-  check('오프라인에서 /local 직접 열기', await until(() => page.$('aside.left')))
+  check('오프라인에서 /local 직접 열기', await until(() => page.$('aside.side .set-wrap')))
   check('오프라인 모드: 채널 버튼 없음', !(await page.$('button.share')))
 
   // ── 4. 오프라인 모드 송출: 저장된 곡 검색 → 콘티 → 출력 창 ──
+  // 곡 검색 = 팝업: '/' 로 열고 → 입력 → Enter 추가 → Esc(검색어 지움) → Esc(닫기)
+  await page.keyboard.press('/')
+  await page.waitForSelector('.srch input.search', { timeout: 5000 })
   await page.type('input.search', `${tag} Alpha`)
   await page.keyboard.press('Enter')
-  check('저장된 곡으로 콘티 추가', await until(async () => (await page.$$('.song')).length === 1))
+  check('저장된 곡으로 콘티 추가(검색 팝업에 추가 알림)', await until(async () => (await page.$$('.song')).length === 1) && !!(await page.$('.srch .added')))
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape')
+  check('Esc 두 번 → 검색 팝업 닫힘', await until(async () => !(await page.$('.srch'))))
   await page.locator('.song .card').click()
   const out = await ctx.newPage()
   await out.goto(BASE + '/output/LOCAL', { waitUntil: 'domcontentloaded' })
@@ -102,6 +107,9 @@ try {
   await out.close()
 
   // ── 5. 오프라인 곡 수정·등록 ──
+  // 곡 검색 팝업을 열어 둔 채로 수정·등록·올리기(라이브러리 기능은 모두 이 팝업 안)
+  await page.click('.side-actions .find')
+  await page.waitForSelector('.srch input.search', { timeout: 5000 })
   const editSong = async (q, newText) => {
     await page.$eval('input.search', (e) => { e.value = ''; e.dispatchEvent(new Event('input')) })
     await page.type('input.search', q)
@@ -115,7 +123,7 @@ try {
   await editSong(`${tag} Alpha`, 'Lorem ipsum alpha one FIXED\n\nLorem ipsum alpha two')
   await editSong(`${tag} Beta`, 'Sed do beta one MINE\n\nSed do beta two')
   // 새 곡: Alpha 의 '원래' 가사와 같음 → 서버 곡과 가사 중복
-  await page.click('button.new')
+  await page.click('.srch button.new')
   await page.waitForSelector('.dialog textarea')
   await page.type('.dialog input', `${tag} Gamma`)
   await page.$eval('.dialog textarea', (e) => { e.value = 'Lorem ipsum alpha one\n\nLorem ipsum alpha two'; e.dispatchEvent(new Event('input')) })
