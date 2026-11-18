@@ -232,10 +232,11 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
 .seg span { color: var(--muted); width: 36px; }
 .seg button { flex: 1; padding: 4px; font-size: 12px; }
 /* 고르기(세그먼트): 주요 동작(파랑 채움)과 헷갈리지 않게 옅게 채움 + 파랑 테두리 */
-/* 고른 것 = 눌려 들어간 상태(평평 + 안쪽 그림자) — 3D 로 튀어나온 나머지와 구분 */
+/* 고른 것 = 눌린 상태(평평 + 안쪽 그림자). 제자리(내려가지 않음) — 받침은 어두운 패널에서 거의 안 보여
+   내리면 옆 버튼보다 아래로 처져 보인다(사용자 지적) → 위·아래를 옆 버튼의 보이는 면에 맞춘다 */
 .seg button.on, .seg button.on:hover {
   background: rgba(79, 140, 255, .2); border-color: var(--accent);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, .35); transform: translateY(var(--lift)); color: #dbe7ff; font-weight: 600;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, .45); color: #dbe7ff; font-weight: 600;
 }
 .reset { font-size: 12px; }
 .bg { display: grid; gap: 6px; }

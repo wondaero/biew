@@ -14,6 +14,7 @@ import { useLive } from '@/live/liveStore'
 import { saveHost, saveLive, LOCAL_CODE } from '@/live/persistence'
 import { retargetOutputWindow } from './outputWindow'
 import LoginForm from '@/components/LoginForm.vue'
+import { useBackClose } from '@/lib/backClose'
 
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
@@ -25,6 +26,8 @@ const controlPw = ref('')
 const viewPw = ref('')
 type Step = 'form' | 'login' | 'working'
 const step = ref<Step>('form')
+// 뒤로가기 = 닫기. 옮기는 중(working)엔 닫지 않는다(✕ 도 숨김)
+useBackClose(() => true, () => { if (step.value !== 'working') emit('close') })
 const err = ref<string | null>(null)
 const valid = computed(() => title.value.trim().length > 0 && controlPw.value.length >= 4 && (!viewPw.value || viewPw.value.length >= 4))
 

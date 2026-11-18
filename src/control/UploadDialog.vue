@@ -12,6 +12,7 @@ import { prepareUpload, uploadOne, isLocalNewId, type UploadItem, type UploadAct
 import { isClean } from '@/library/pending'
 import { useLive } from '@/live/liveStore'
 import LoginForm from '@/components/LoginForm.vue'
+import { useBackClose } from '@/lib/backClose'
 
 const emit = defineEmits<{ close: [] }>()
 const live = useLive()
@@ -24,6 +25,8 @@ const rows = ref<Row[]>([])
 const loading = ref(false)
 const err = ref<string | null>(null)
 const busy = ref(false)
+// 뒤로가기 = 닫기. 올리는 중엔 닫지 않는다
+useBackClose(() => true, () => { if (!busy.value) emit('close') })
 const ran = ref(false)
 
 async function load() {

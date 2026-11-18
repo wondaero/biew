@@ -9,6 +9,7 @@ import { loadCache, syncNow } from '@/library/library'
 import { openOutputWindow } from './outputWindow'
 import { isMobileOS } from '@/lib/device'
 import { useHotkeys } from './useHotkeys'
+import { useBackClose } from '@/lib/backClose'
 import LibraryPanel from './panels/LibraryPanel.vue'
 import SetlistPanel from './panels/SetlistPanel.vue'
 import SlideGrid from './panels/SlideGrid.vue'
@@ -86,6 +87,9 @@ function leaveRemote() {
 
 // 모바일 바텀시트 (PC 에선 CSS 가 무시하므로 상태만 있고 영향 없음)
 const sheet = ref<'find' | 'style' | null>(null)
+// 뒤로가기 = 열린 바텀시트·단축키 도움말 닫기(페이지를 나가지 않게)
+useBackClose(() => !!sheet.value, () => { sheet.value = null })
+useBackClose(() => showHelp.value, () => { showHelp.value = false })
 const tab = ref<'lib' | 'set'>('lib')
 function openSheet(kind: 'find' | 'style', t?: 'lib' | 'set') {
   sheet.value = kind

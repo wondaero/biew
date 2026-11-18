@@ -48,6 +48,8 @@ button {
   margin-bottom: var(--lift); /* 받침 자리(그림자는 자리를 차지하지 않아 아래 요소와 겹치지 않게) */
   transition: background-color .12s, border-color .12s, color .12s, transform .05s, box-shadow .05s;
 }
+/* 받침 높이를 정수 px 로(소수점이면 경계가 흐릿하고 눌림 이동이 어긋나 보임). round() 없는 옛 브라우저는 위 값 그대로 */
+@supports (width: round(down, 2.5px, 1px)) { button { --lift: round(down, max(2px, .22em), 1px); } }
 button:hover { background-color: #34343f; border-color: #52525f; }
 button:active { transform: translateY(var(--lift)); box-shadow: 0 0 0 var(--edge), inset 0 2px 4px rgba(0, 0, 0, .35); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

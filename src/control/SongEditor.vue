@@ -11,6 +11,7 @@ import { saveSong, deleteSong, useLibrary, isLocalNewId } from '@/library/librar
 import { findDuplicates } from '@shared/songCompare'
 import { useLive } from '@/live/liveStore'
 import SlideRender from '@/components/SlideRender.vue'
+import { useBackClose } from '@/lib/backClose'
 
 const props = defineProps<{ song: Song | null }>() // null = 새 곡
 const emit = defineEmits<{ close: []; saved: [song: Song, local: boolean] }>()
@@ -35,6 +36,8 @@ const initial = { title: title.value, text: text.value }
 const slides = computed(() => textToSlides(text.value))
 const dirty = computed(() => title.value !== initial.title || text.value !== initial.text)
 const busy = ref(false)
+// 뒤로가기 = 닫기(저장 안 한 변경이 있으면 확인 — 취소하면 그대로 열려 있음)
+useBackClose(() => true, () => close())
 const err = ref<string | null>(null)
 const titleInput = ref<HTMLInputElement>()
 const isNew = !props.song

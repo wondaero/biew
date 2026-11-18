@@ -72,6 +72,8 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - **FREEZE**(단축키 F 는 **걸기만**, 해제는 버튼 클릭으로만 — 가사 수정 중 실수로 풀리는 것 방지): `LiveState.frozen` = 걸 때의 송출 위치 + **텍스트 스냅샷**. 컨트롤러 이동/BLANK 는 그대로 동작하지만 출력·뷰어·PGM 모니터는 `nav.onAir(state)`(freeze 중이면 스냅샷)를 그린다. 해제하면 컨트롤러의 현재 위치가 바로 송출. 목적: 예배 중 오타 발견 시 송출은 유지한 채 가사 수정. 송출을 그리는 곳은 `currentText(state)` 대신 반드시 `onAir()` 를 쓸 것. 컨트롤러가 freeze 중 가리키는 위치는 SlideGrid 에서 파란 점선(`.ctl`).
 - 즉시 모드: 카드 클릭 = 송출, 그리드엔 송출 중만 표시. PVW 모드: 클릭 = 미리보기, Enter/TAKE = 송출.
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.
+- **뒤로가기 = 팝업 닫기**(`src/lib/backClose.ts` `useBackClose(isOpen, request)`): 팝업이 열리면 같은 주소로 히스토리 칸을 쌓고, 뒤로가기는 맨 위 팝업에 닫기를 요청(거절하면 칸을 다시 쌓음). 새 팝업·시트를 만들면 반드시 연결할 것(안 하면 모바일 뒤로가기가 페이지를 나감). 처리 중엔 request 에서 무시. E2E `e2e:back`.
+- 세그먼트(고르기) 버튼의 선택 상태는 제자리 + 안쪽 그림자 — 내리면(translate) 받침이 안 보이는 어두운 패널에서 옆 버튼보다 처져 보인다.
 - **저장된 출력 설정(프리셋)** = `src/live/stylePresets.ts`, localStorage `biew.stylePresets.v1` 하나(채널 무관). **서버에 절대 올리지 않는다**(사용자 결정). 옮기기·백업은 JSON 파일 내보내기/가져오기. 불러오기는 `setStyle` 한 번(송출에 즉시 반영). OutputStyle 필드를 바꾸면 `shared/outputStyle.ts` 의 `normalizeStyle` 도 같이.
 - **PWA**: 앱 파일 전체 precache, 새 버전은 **알림 후 적용**(자동 교체 금지 — 예배 중 화면이 바뀌면 안 됨). 알림은 /output 에 절대 띄우지 않는다. Supabase 요청은 캐시하지 않는다.
 - **로컬 송출 `/local`** = 채널 없는 PC 전용 송출(`LOCAL_CODE`). 예배의 기본. 서버 기능을 여기에 섞지 말 것. 콘티는 그날 하루 임시 — 송출 방식 간 콘티 가져오기·보관 기능은 만들지 않기로 함.

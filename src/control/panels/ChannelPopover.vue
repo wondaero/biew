@@ -11,10 +11,12 @@ import { hostLink, hostNeedsLogin, hostDeleted, reconnectHost } from '@/channel/
 import { session } from '@/lib/auth'
 import { forgetChannelLocal } from '@/live/persistence'
 import LoginForm from '@/components/LoginForm.vue'
+import { useBackClose } from '@/lib/backClose'
 
 const props = defineProps<{ code: string; title: string }>()
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
+useBackClose(() => true, () => emit('close')) // 뒤로가기 = 닫기
 
 const viewUrl = computed(() => `${location.origin}/view/${props.code}`)
 const controlUrl = computed(() => `${location.origin}/control/${props.code}`)
