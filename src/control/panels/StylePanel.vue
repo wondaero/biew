@@ -254,12 +254,13 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, .45); color: #dbe7ff; font-weight: 600;
 }
 .reset { font-size: 12px; }
-.bg { display: grid; gap: 6px; }
-.grad { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
+.bg { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.grad { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
 .grad button { padding: 4px 10px; }
 .swatch { height: 22px; border-radius: 4px; border: 1px solid var(--line); }
 .warn { margin: 0; font-size: 11px; color: var(--warn); }
-.presets { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+/* minmax(0,1fr)·입력칸 width 0: 입력칸 기본 폭이 열을 넓혀 좁은 폰에서 오른쪽으로 넘쳤음(사용자 지적) */
+.presets { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .p-head { display: flex; align-items: baseline; justify-content: space-between; color: var(--muted); }
 .p-head small { font-size: 11px; }
 .p-box { margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0, 0, 0, .18); }
@@ -280,7 +281,7 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
 .dirty-tag { margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #dbe7ff; background: rgba(79, 140, 255, .25); vertical-align: middle; }
 .p-del { flex: none; padding: 0 8px; color: var(--muted); }
 .p-save { display: flex; gap: 4px; }
-.p-save input { flex: 1; min-width: 0; }
+.p-save input { flex: 1; min-width: 0; width: 0; }
 .p-save button, .p-file button, .p-import { font-size: 12px; padding: 4px 8px; white-space: nowrap; }
 .p-file { display: flex; gap: 4px; }
 .p-file > * { flex: 1; text-align: center; }

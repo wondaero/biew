@@ -86,7 +86,7 @@ input[type='checkbox'], input[type='radio'] { box-shadow: none; }
 input[type='range'] {
   --p: 50%;
   -webkit-appearance: none; appearance: none;
-  height: 22px; padding: 0; border: 0; background: transparent; box-shadow: none; cursor: pointer;
+  height: 22px; padding: 0; margin: 0; border: 0; background: transparent; box-shadow: none; cursor: pointer; /* margin 0: 브라우저 기본 바깥 여백(2px) 때문에 폭 100% 슬라이더가 넘쳤음 */
 }
 input[type='range']:focus { outline: none; }
 input[type='range']::-webkit-slider-runnable-track {

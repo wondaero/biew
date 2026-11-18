@@ -25,8 +25,16 @@ const seed = () => ({
 const overflow = (p) => p.evaluate(() => {
   const vw = document.documentElement.clientWidth
   const out = []
-  // 가로 스크롤 상자 안은 예외(일부러 옆으로 넘기는 목록). 'hidden' 은 예외 아님 — 잘려서 안 보이는 것도 문제(겪음: FREEZE 버튼)
-  const scrollsX = (el) => { for (let a = el.parentElement; a; a = a.parentElement) { const o = getComputedStyle(a).overflowX; if (o === 'auto' || o === 'scroll') return true } return false }
+  // 옆으로 넘기는 상자(가로 스크롤만 — 곡 편집기 미리보기 줄 등) 안은 예외. 'hidden' 은 예외 아님 — 잘려서 안 보이는 것도 문제(겪음: FREEZE 버튼)
+  const sideScroller = (el) => { for (let a = el.parentElement; a; a = a.parentElement) { const c = getComputedStyle(a); if ((c.overflowX === 'auto' || c.overflowX === 'scroll') && c.overflowY !== 'auto' && c.overflowY !== 'scroll') return true } return false }
+  // 세로로 스크롤되는 상자(바텀시트·팝업 본문) 안이면 그 상자 안쪽(여백 제외)의 오른쪽 끝이 기준 — 시트 안에서 넘쳐도 잡히게(겪음: 저장 줄)
+  const boxRight = (el) => { for (let a = el.parentElement; a; a = a.parentElement) { const c = getComputedStyle(a); if (c.overflowY === 'auto' || c.overflowY === 'scroll') { const r = a.getBoundingClientRect(); return r.left + a.clientLeft + a.clientWidth - parseFloat(c.paddingRight) } } return vw }
+  // 음수 여백으로 일부러 가장자리까지 꽉 채운 요소(곡 제목 줄·시트 머리)와 그 안은 예외 — 화면(vw) 밖으로 나가는 건 여전히 잡힌다
+  const bleed = (el) => {
+    if (el.getBoundingClientRect().right > vw + 1) return false
+    for (let a = el; a && a !== document.body; a = a.parentElement) { const c = getComputedStyle(a); if (parseFloat(c.marginRight) < 0 || parseFloat(c.marginLeft) < 0) return true }
+    return false
+  }
   // 글이 길어 말줄임(…)으로 일부러 자른 요소는 예외
   const ellipsis = (el) => { for (let a = el; a; a = a.parentElement) { if (getComputedStyle(a).textOverflow === 'ellipsis') return true } return false }
   for (const el of document.querySelectorAll('body *')) {
@@ -34,8 +42,8 @@ const overflow = (p) => p.evaluate(() => {
     if (cs.visibility === 'hidden' || cs.display === 'none') continue
     const r = el.getBoundingClientRect()
     if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight * 3) continue
-    if (r.right > vw + 1 || r.left < -1) {
-      if (scrollsX(el) || ellipsis(el)) continue
+    if (r.right > Math.min(vw, boxRight(el)) + 1 || r.left < -1) {
+      if (sideScroller(el) || ellipsis(el) || bleed(el)) continue
       const name = el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '')
       out.push(`${name} [${Math.round(r.left)}~${Math.round(r.right)}] "${(el.textContent ?? '').trim().slice(0, 24)}"`)
     }

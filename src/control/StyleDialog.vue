@@ -46,7 +46,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       </header>
       <div class="sd-body">
         <section class="sd-left">
-          <StylePreview class="sd-pv" :actions="false" />
+          <StylePreview class="sd-pv" :actions="false" :toggle="false" />
           <div class="sd-air">
             <div class="sd-air-bar">지금 송출 중 <small>(비교용)</small></div>
             <div class="sd-air-screen">
@@ -61,7 +61,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             <span class="spacer" />
             <template v-if="draft.dirty.value">
               <button class="revert" title="수정본을 버리고 지금 송출 중인 설정으로" @click="draft.revert()">되돌리기</button>
-              <button class="apply" title="수정본을 송출에 반영 (Ctrl+Enter)" @click="draft.apply()">적용 — 송출에 반영</button>
+              <button class="apply" title="수정본을 송출에 반영 (Ctrl+Enter)" @click="draft.apply()">적용</button>
             </template>
             <button v-else-if="draft.canUndo.value" class="undo" title="방금 적용한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 적용 취소</button>
             <small v-else class="foot-hint">바꾸면 여기서 [적용]</small>

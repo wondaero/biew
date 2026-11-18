@@ -93,6 +93,14 @@ try {
   const fs0 = await m.$eval('.sheet-pv .txt', (e) => parseFloat(getComputedStyle(e).fontSize))
   await m.$eval('.style-sheet input[type=range]', (e) => { e.value = '12'; e.dispatchEvent(new Event('input', { bubbles: true })) })
   check('크기 바꾸면 미리보기에 바로 반영', await until(async () => (await m.$eval('.sheet-pv .txt', (e) => parseFloat(getComputedStyle(e).fontSize))) > fs0 * 1.3))
+  // 비교 전환: [적용 전 | 송출 중] — 같은 자리에서 바꿔 보기
+  const pvFont = () => m.$eval('.sheet-pv .txt', (e) => parseFloat(getComputedStyle(e).fontSize))
+  const fsDraft = await pvFont()
+  check('고친 내용 있으면 비교 전환 [적용 전 | 송출 중] 표시', (await m.$$eval('.sheet-pv .pv-tabs button', (bs) => bs.map((b) => b.textContent?.trim()).join('|'))) === '적용 전|송출 중')
+  await m.$$eval('.sheet-pv .pv-tabs button', (bs) => bs[1].click())
+  check('[송출 중] → 원래(송출 중) 크기로, 이름 "지금 송출 중"', await until(async () => (await pvFont()) < fsDraft * 0.8) && (await m.$eval('.sheet-pv .pv-bar', (e) => e.textContent ?? '')).startsWith('지금 송출 중'))
+  await m.$$eval('.sheet-pv .pv-tabs button', (bs) => bs[0].click())
+  check('[적용 전] → 고친 크기로 돌아옴', await until(async () => Math.abs((await pvFont()) - fsDraft) < 0.5))
   // 수정본: 송출(저장된 송출 상태)은 그대로, 적용을 눌러야 나간다
   const airFont = () => m.evaluate(() => JSON.parse(localStorage.getItem('biew.live.v1:LOCAL') ?? '{}').style?.fontSize)
   const before = await airFont()
