@@ -13,8 +13,8 @@ const check = (n, ok, d = '') => { ok ? pass++ : fail++; console.log(`${ok ? '�
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 async function until(fn, ms = 10000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await fn()) return true } catch {} await sleep(250) } return false }
 const tag = randomBytes(2).toString('hex')
-const mkUser = async () => {
-  const email = `e2e-${randomBytes(4).toString('hex')}@example.test`, password = randomBytes(12).toString('base64url')
+const mkUser = async (domain = 'example.test') => {
+  const email = `e2e-${randomBytes(4).toString('hex')}@${domain}`, password = randomBytes(12).toString('base64url')
   const u = await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { role: 'staff' } })
   if (u.error) throw new Error('임시 계정 생성 실패: ' + u.error.message)
   const c = createClient(process.env.SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY, opts)
@@ -24,7 +24,7 @@ const mkUser = async () => {
 const users = [], codes = []
 let browser
 try {
-  const me = await mkUser(), other = await mkUser()
+  const me = await mkUser('jv.jv'), other = await mkUser() // me = 로그인 도메인 계정(아이디만으로 로그인 확인)
   users.push(me, other)
   const A = (await me.c.rpc('create_channel', { p_title: `Lorem 삭제 ${tag}`, p_control_password: 'ctlpass1' })).data
   const O = (await other.c.rpc('create_channel', { p_title: `Ipsum 남의 것 ${tag}`, p_control_password: 'ctlpass2' })).data
@@ -36,11 +36,11 @@ try {
 
   browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
   const page = async (w, h) => { const p = await (await browser.createBrowserContext()).newPage(); await p.setViewport({ width: w, height: h }); return p }
-  const login = async (p, u) => {
+  const login = async (p, u, idOnly = false) => {
     await p.goto(BASE + '/', { waitUntil: 'networkidle0' })
     await p.click('main.home > header button.ghost')
     await p.waitForSelector('.home-login input[name=username]', { timeout: 5000 })
-    await p.type('.home-login input[name=username]', u.email)
+    await p.type('.home-login input[name=username]', idOnly ? u.email.split('@')[0] : u.email)
     await p.type('.home-login input[name=password]', u.password)
     await p.click('.home-login button')
   }
@@ -49,8 +49,8 @@ try {
   // ── 호스트 PC: 홈에서 로그인 → 내 계정의 채널에서 A 열기(이 PC 가 호스트) ──
   const host = await page(1400, 900)
   check('홈(로그아웃 상태): 머리에 로그인 버튼', (await host.goto(BASE + '/', { waitUntil: 'networkidle0' }), (await host.$eval('main.home > header button.ghost', (b) => b.textContent?.trim())) === '로그인'))
-  await login(host, me)
-  check('홈 로그인 → 내 계정의 채널에 A, 로그인 칸 닫힘', await until(async () => (await mineText(host)).includes(`Lorem 삭제 ${tag}`)) && !(await host.$('.home-login')))
+  await login(host, me, true) // 아이디만(도메인 자동)
+  check('아이디만 입력(도메인 없이)으로 로그인 → 내 계정의 채널에 A, 로그인 칸 닫힘', await until(async () => (await mineText(host)).includes(`Lorem 삭제 ${tag}`)) && !(await host.$('.home-login')))
   await host.$$eval('section.card li.mine', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.click(), `Lorem 삭제 ${tag}`)
   await host.waitForSelector('.control', { timeout: 10000 })
   check('호스트 PC: A 연결됨(경고 없음)', await until(async () => !(await host.$('.netwarn')) && (await host.$eval('.share', (e) => e.className)).includes('live'), 15000))

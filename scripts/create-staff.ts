@@ -5,11 +5,13 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'node:crypto'
+import { toLoginEmail } from '../shared/loginId'
 
 process.loadEnvFile()
-const email = process.argv[2]
-if (!email || !email.includes('@')) {
-  console.error('usage: npm run staff -- <이메일>')
+// 아이디만 주면 로그인과 같은 도메인을 붙인다(shared/loginId) — 앱에서 아이디만으로 로그인되게
+const email = toLoginEmail(process.argv[2] ?? '')
+if (!email) {
+  console.error('usage: npm run staff -- <아이디 또는 이메일>')
   process.exit(1)
 }
 

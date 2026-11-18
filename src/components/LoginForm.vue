@@ -27,7 +27,8 @@ async function submit() {
   <form class="login" @submit.prevent="submit">
     <p v-if="hint" class="hint">{{ hint }}</p>
     <p v-if="!supabase" class="err">Supabase 설정(.env)이 없습니다.</p>
-    <input v-model="email" name="username" type="email" placeholder="이메일" autocomplete="username" required />
+    <!-- type=text: 아이디만(예: jv) 입력해도 되도록. 도메인은 signIn 이 붙인다(shared/loginId) -->
+    <input v-model="email" name="username" type="text" placeholder="아이디" autocomplete="username" autocapitalize="off" spellcheck="false" required />
     <input v-model="pw" name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required />
     <button class="primary" :disabled="busy || !supabase">{{ busy ? '로그인 중…' : '로그인' }}</button>
     <p v-if="err" class="err">{{ err }}</p>
