@@ -86,6 +86,8 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 ## 모바일 컨트롤러 (≤768px, CSS 미디어쿼리)
 - 위: 상단 바 → 송출 모니터 → 슬라이드 목록(곡별 아코디언, 접힌 곡 헤더에도 "● 송출 중 n/m" 표시, 1열 행 목록). 아래 도크 버튼 3개(곡 검색/콘티/출력 설정)가 바텀시트를 연다. 컴포넌트를 복제하지 않고 같은 DOM 을 CSS 로 재배치한다(`ControlView.vue` 하단 스타일).
 - 모바일에선 출력 시작·출력 연결 표시·📱 폰·`?` 를 숨긴다(`desk-only`).
+- **기기 종류(폰·태블릿 vs PC) 판단은 화면 폭이 아니라 `isMobileOS()`(src/lib/device.ts, OS 기준)**. pointer:coarse 는 터치 노트북을 모바일로 잘못 잡으므로 쓰지 않는다. 판정은 경고·배치용이고 기능을 막지 않는다.
+- 넓은 화면 `/view` 는 송출 화면(`onStage`) — 새 UI 를 띄울 때 `/output` 과 마찬가지로 여기에도 뜨지 않게 할 것.
 
 ## 작업 방식
 - 새 컴퓨터에서 이어서 할 때는 PROGRESS.md "새 컴퓨터에서 이어서 작업하기" 순서대로(.env → link → 확인 명령).

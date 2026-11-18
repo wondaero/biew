@@ -98,6 +98,7 @@ async function remove() {
       <input :value="controlUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
       <button @click="copy('control', controlUrl)">{{ copied === 'control' ? '복사됨' : '컨트롤 링크' }}</button>
     </div>
+    <p class="muted"><b>다른 기기에서 빔(프로젝터)으로 띄우기</b>: 빔에 연결된 PC 에서 <b>보기 링크</b>를 열면 넓은 화면에선 송출 화면이 그대로 나옵니다(클릭하면 전체화면). 인터넷을 거치므로 끊기면 멈춥니다 — 이 기기가 빔에 연결돼 있다면 <b>출력 시작</b>이 더 안전합니다.</p>
     <p class="st" :class="hostNeedsLogin ? 'error' : hostLink">{{ linkText }}</p>
     <p v-if="isLocal" class="warn">지금 주소가 localhost 라서 폰에서는 열리지 않습니다. 배포된 주소(Vercel)에서 여세요.</p>
 

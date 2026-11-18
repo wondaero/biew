@@ -20,6 +20,7 @@
     "e2e:internet": "node scripts/e2e/internet.e2e.mjs",
     "e2e:local": "node scripts/e2e/local.e2e.mjs",
     "e2e:home": "node scripts/e2e/home.e2e.mjs",
+    "e2e:device": "node scripts/e2e/device.e2e.mjs",
     "e2e:bg": "node scripts/e2e/bg.e2e.mjs",
     "e2e:presets": "node scripts/e2e/presets.e2e.mjs",
     "e2e:ime": "node scripts/e2e/ime.e2e.mjs",

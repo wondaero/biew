@@ -22,8 +22,16 @@ import UploadDialog from '@/control/UploadDialog.vue'
 import { dbNotice } from '@/library/db'
 import { needRefresh, applyUpdate } from '@/pwa'
 import { useLibrary, loadCache, syncNow, resetCache, syncStatus, syncError, lastSync } from '@/library/library'
+import { isMobileOS } from '@/lib/device'
 
 const router = useRouter()
+
+/**
+ * 폰·태블릿: 출력 창을 띄울 수 없으므로 로컬 송출·곡 다운로드 카드는 숨기고 '번호로 입장'을 맨 위로.
+ * 채널 만들기는 남긴다 — 폰·태블릿이 호스트가 되고 빔 PC 는 보기 주소(/view, 넓은 화면 = 송출 화면)로 띄울 수 있으므로.
+ * 곡은 컨트롤러의 곡 라이브러리에서도 로그인해 받을 수 있다. 고친 곡이 이 기기에 남아 있으면 곡 카드는 보인다(올리기 버튼).
+ */
+const mobile = isMobileOS()
 
 // 이 기기의 채널: 호스트(PC) 기록 + 리모컨·보기로 들어간 기록
 type Role = 'host' | VisitRole
@@ -127,21 +135,21 @@ const build = __APP_BUILD__
 </script>
 
 <template>
-  <main class="home">
+  <main class="home" :class="{ mobile }">
     <header>
       <h1>Biew</h1>
       <button v-if="session" class="ghost" @click="signOut()">로그아웃</button>
     </header>
 
     <!-- ── 로컬 송출 ── -->
-    <section class="card local">
+    <section v-if="!mobile" class="card local">
       <h2>로컬 송출 <small>예배용 기본</small></h2>
       <p class="muted">이 PC 하나에서만 송출합니다(컨트롤러 + 출력 창). 인터넷·로그인·서버가 전혀 필요 없고, 다른 PC·폰은 접근할 수 없습니다. 곡은 아래에서 미리 다운로드해 두세요.</p>
       <button class="primary" @click="router.push('/local')">로컬 송출 열기</button>
     </section>
 
     <!-- 곡 다운로드 -->
-    <section class="card">
+    <section v-if="!mobile || lib.pendingCount.value" class="card">
       <h2>곡 <small>{{ lib.count.value }}곡 저장됨</small></h2>
       <p class="muted" :class="{ err: syncStatus === 'error' }">{{ dlText }}</p>
       <p v-if="dbNotice" class="warn">{{ dbNotice }}</p>
@@ -234,8 +242,8 @@ const build = __APP_BUILD__
       </ul>
     </section>
 
-    <!-- 번호로 입장 -->
-    <section class="card">
+    <!-- 번호로 입장 (폰·태블릿에선 맨 위) -->
+    <section class="card join">
       <h2>채널 번호로 입장</h2>
       <input
         :value="joinCode"
@@ -271,6 +279,9 @@ h2 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px;
 h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .group { margin: 8px 0 -6px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .card.local { border-color: var(--live); }
+/* 폰·태블릿: 머리 → 번호로 입장 → 나머지(DOM 순서) */
+.home.mobile > header { order: -2; }
+.home.mobile > .join { order: -1; }
 .card { display: grid; gap: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .form { display: grid; gap: 8px; }
 .muted { margin: 0; color: var(--muted); font-size: 12px; }

@@ -15,6 +15,8 @@ import { SyncHub } from '@/sync/SyncHub'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import { onAir } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
+import { useWakeLock } from '@/output/useWakeLock'
+import { onStage } from '@/lib/stage'
 
 // 넓은 화면(PC/태블릿)이면 송출 화면 그대로, 폰이면 가사 목록. 폰 가로(높이 작음)는 목록 유지
 const mq = window.matchMedia('(min-width: 900px) and (min-height: 520px)')
@@ -22,10 +24,35 @@ const wide = ref(mq.matches)
 const onMq = () => { wide.value = mq.matches }
 mq.addEventListener('change', onMq)
 
+const status = ref<'loading' | 'live' | 'reconnecting' | 'notfound' | 'error' | 'password'>('loading')
+
+/**
+ * 넓은 화면 = 송출 화면. 다른 기기(폰·태블릿 호스트)의 채널을 빔 PC 에 띄울 때 쓰므로 /output 과 같게:
+ * 커서 숨김 · 클릭하면 전체화면 · 화면 꺼짐 방지 · 연결 점은 문제 있을 때만 · 새 버전 알림 안 띄움.
+ * (/output 은 같은 PC 컨트롤러에서 BroadcastChannel 로 받아 인터넷 없이 동작 — 이 화면은 서버를 거친다)
+ */
+const stage = computed(() => wide.value && status.value !== 'password')
+watch(stage, (on) => {
+  onStage.value = on
+  document.documentElement.classList.toggle('is-output', on)
+}, { immediate: true })
+useWakeLock() // 폰 가사 목록에서도 화면이 꺼지지 않게
+
+const isFullscreen = ref(!!document.fullscreenElement)
+const hintVisible = ref(true)
+let hintTimer: number | undefined
+function goFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {})
+}
+const onFs = () => { isFullscreen.value = !!document.fullscreenElement; if (isFullscreen.value) hintVisible.value = false }
+document.addEventListener('fullscreenchange', onFs)
+
+// 창이 가려지면 페이드가 끝나지 않을 수 있음 → 숨김 상태에선 컷(/output 과 같음)
+const visible = ref(document.visibilityState === 'visible')
+
 const route = useRoute()
 const code = computed(() => api.normalizeCode(String(route.params.code ?? '')))
 const state = ref<LiveState | null>(null)
-const status = ref<'loading' | 'live' | 'reconnecting' | 'notfound' | 'error' | 'password'>('loading')
 const title = ref('')
 const pw = ref('')
 const pwErr = ref<string | null>(null)
@@ -111,13 +138,23 @@ watch(
 )
 
 const onVis = () => { if (document.visibilityState === 'visible') void catchUp() }
+// teardown 이 onVis 를 떼므로 화면 보임 여부(페이드/컷)는 따로
+const onVisibility = () => { visible.value = document.visibilityState === 'visible' }
 
 onMounted(() => {
   document.title = `${code.value} — 실시간 가사`
+  document.addEventListener('visibilitychange', onVisibility)
+  // 안내 문구가 송출 화면에 오래 남지 않도록 자동 숨김(/output 과 같음)
+  hintTimer = window.setTimeout(() => { hintVisible.value = false }, 8000)
   void enter()
 })
 onBeforeUnmount(() => {
   mq.removeEventListener('change', onMq)
+  document.removeEventListener('fullscreenchange', onFs)
+  document.removeEventListener('visibilitychange', onVisibility)
+  clearTimeout(hintTimer)
+  onStage.value = false
+  document.documentElement.classList.remove('is-output')
   teardown()
 })
 </script>
@@ -135,11 +172,13 @@ onBeforeUnmount(() => {
   </main>
 
   <!-- 넓은 화면: 송출 화면(출력과 같은 렌더러)만 전체로 -->
-  <div v-else-if="wide" class="stage">
-    <SlideRender v-if="state" :text="text" :blank="air?.blank ?? false" :style-cfg="state.style" :layer-key="layerKey" />
+  <div v-else-if="wide" class="stage" @click="goFullscreen" @dblclick="goFullscreen">
+    <SlideRender v-if="state" :text="text" :blank="air?.blank ?? false" :style-cfg="state.style" :layer-key="layerKey" :animate="visible" />
     <p v-if="status === 'notfound'" class="wmsg">채널을 찾을 수 없습니다 — 번호 <b>{{ code }}</b> 가 삭제되었거나 잘못되었습니다.</p>
     <p v-else-if="!state" class="wmsg">{{ waitText }}</p>
-    <span class="dot wdot" :class="status" :title="status" />
+    <!-- 연결 점은 문제가 있을 때만(정상일 땐 송출 화면에 아무것도 안 보이게) -->
+    <span v-if="status !== 'live'" class="dot wdot" :class="status" :title="status" />
+    <div v-if="hintVisible && !isFullscreen" class="hint">클릭하면 전체화면 (또는 F11)</div>
   </div>
 
   <div v-else class="viewer">
@@ -178,7 +217,11 @@ onBeforeUnmount(() => {
 .join p { margin: 0; color: #999; font-size: 13px; }
 .join .err { color: var(--pgm); }
 .join button { padding: 12px; font-size: 16px; }
-.stage { position: fixed; inset: 0; background: #000; color: #aaa; }
+.stage { position: fixed; inset: 0; background: #000; color: #aaa; cursor: none; user-select: none; }
+.hint {
+  position: absolute; top: 12px; left: 12px; padding: 6px 10px; border-radius: 6px;
+  font: 13px system-ui, sans-serif; color: #aaa; background: rgba(40, 40, 40, .85);
+}
 .wmsg { position: absolute; inset: 0; display: grid; place-content: center; margin: 0; font-size: 18px; text-align: center; }
 .wdot { position: absolute; top: 12px; right: 12px; opacity: .6; }
 .viewer { min-height: 100dvh; display: flex; flex-direction: column; background: #0e0e11; color: #eee; }

@@ -7,6 +7,7 @@ import { forgetToken } from '@/channel/api'
 import { LOCAL_CODE, forgetVisit } from '@/live/persistence'
 import { loadCache, syncNow } from '@/library/library'
 import { openOutputWindow } from './outputWindow'
+import { isMobileOS } from '@/lib/device'
 import { useHotkeys } from './useHotkeys'
 import LibraryPanel from './panels/LibraryPanel.vue'
 import SetlistPanel from './panels/SetlistPanel.vue'
@@ -51,6 +52,14 @@ function say(msg: string, ms = 7000) {
   toastTimer = window.setTimeout(() => { toast.value = null }, ms)
 }
 async function startOutput() {
+  // 폰·태블릿은 출력 창이 새 탭으로 열려 컨트롤러와 동시에 못 쓰고, HDMI 는 보통 미러링이라 가사만 내보낼 수 없다.
+  // 판정이 틀릴 수 있으므로(DeX 등) 막지 않고 확인만
+  if (isMobileOS() && !confirm(
+    '이 기기(폰·태블릿)에서는 출력 창을 제대로 쓸 수 없을 가능성이 큽니다.\n'
+    + '· 출력이 새 탭으로 열려 컨트롤러와 동시에 볼 수 없고, 뒤로 간 탭은 멈출 수 있습니다.\n'
+    + '· 프로젝터에 연결해도 보통 이 화면 전체가 그대로 나옵니다(미러링).\n\n'
+    + '송출은 PC 에서 하고, 폰·태블릿은 인터넷 송출의 리모컨으로 쓰는 것을 권합니다.\n그래도 출력 창을 열까요?',
+  )) return
   const r = await openOutputWindow(code.value)
   say(r.message)
 }
