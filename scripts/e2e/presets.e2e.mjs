@@ -37,9 +37,12 @@ try {
   const activeName = () => c.$eval('.p-list li.on .p-name', (e) => e.textContent?.trim()).catch(() => null)
   const applyBtn = (n) => c.$$eval('.p-list li', (lis, n) => lis.find((l) => l.querySelector('.p-name')?.textContent?.trim() === n)?.querySelector('.p-apply')?.click(), n)
   const delBtn = (n) => c.$$eval('.p-list li', (lis, n) => lis.find((l) => l.querySelector('.p-name')?.textContent?.trim() === n)?.querySelector('.p-del')?.click(), n)
+  // PC 출력 설정 = 팝업(StyleDialog) — 열고 시작, 새로고침 뒤 다시 연다
+  const openStyle = async () => { await c.$$eval('button', (bs) => bs.find((b) => b.textContent?.includes('출력 설정'))?.click()); await c.waitForSelector('.sd .presets', { timeout: 5000 }) }
+  await openStyle()
   const bgBtn = (t) => c.$$eval('.bg button', (bs, t) => bs.find((x) => x.textContent?.trim() === t)?.click(), t)
   // 설정·불러오기는 수정본만 바꾼다 → [적용]을 눌러야 송출(src/live/styleDraft.ts)
-  const applyNow = async () => { await c.waitForSelector('.desk-apply .apply', { timeout: 3000 }); await c.click('.desk-apply .apply') }
+  const applyNow = async () => { await c.waitForSelector('.sd .apply', { timeout: 3000 }); await c.click('.sd .apply') }
 
   check('처음엔 저장된 설정 없음(빈 목록 상자 표시)', !(await c.$('.p-list')) && !!(await c.$('.p-box.p-empty')))
   check('백업(파일) 버튼은 접혀 있음', !(await c.$('.p-file')) && !!(await c.$('.p-more')))
@@ -60,6 +63,7 @@ try {
   await c.screenshot({ path: OUT + '/presets-panel.png' })
 
   await c.reload({ waitUntil: 'networkidle0' })
+  await openStyle()
   check('다시 열어도 목록 유지(이 PC)', await until(async () => (await names()).join() === 'Lorem 검정,Ipsum 초록'))
   await bgBtn('초록 (크로마키)')
   await save('lorem 검정') // 같은 이름(대소문자 무시) → 덮어쓰기 확인 → 수락

@@ -10,7 +10,7 @@ import * as api from '@/channel/api'
 import { hostLink, hostNeedsLogin, hostDeleted, reconnectHost } from '@/channel/sync'
 import { session } from '@/lib/auth'
 import { forgetChannelLocal } from '@/live/persistence'
-import LoginForm from '@/components/LoginForm.vue'
+import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
 
 const props = defineProps<{ code: string; title: string }>()
@@ -106,7 +106,7 @@ async function remove() {
 
     <button class="ghost" @click="showManage = !showManage">{{ showManage ? '▾' : '▸' }} 관리 (리모컨 쫓아내기 · 보기 비밀번호 · 삭제)</button>
     <template v-if="showManage">
-      <LoginForm v-if="!session" hint="관리 기능은 채널을 만든 계정으로 로그인해야 합니다." />
+      <button v-if="!session" class="primary" @click="requireLogin('관리 기능(리모컨 쫓아내기·보기 비밀번호·삭제)은 채널을 만든 계정으로 로그인해야 합니다.')">관리하려면 로그인</button>
       <template v-else>
         <div class="box">
           <b>리모컨 모두 쫓아내기</b>

@@ -16,6 +16,7 @@ import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import StylePanel from './panels/StylePanel.vue'
 import StylePreview from './panels/StylePreview.vue'
+import StyleDialog from './StyleDialog.vue'
 import { useStyleDraft } from '@/live/styleDraft'
 import ChannelPopover from './panels/ChannelPopover.vue'
 import SwitchToInternet from './SwitchToInternet.vue'
@@ -91,6 +92,17 @@ function leaveRemote() {
 const sheet = ref<'find' | 'style' | null>(null)
 /** 출력 설정에 적용 안 된 수정본이 있으면 하단 버튼에 표시(시트를 닫아도 수정본은 남음) */
 const styleDraft = useStyleDraft()
+/** PC 출력 설정 팝업(모바일은 바텀시트 sheet === 'style') */
+const showStyle = ref(false)
+/**
+ * 모바일 배치(≤768px, CSS 미디어쿼리와 같은 기준)면 출력 설정 = 바텀시트, 아니면 = 팝업. 둘 중 하나만 그린다
+ * (예전엔 PC 에서도 숨긴 시트가 같이 그려져 설정 패널이 두 벌이었음).
+ */
+const narrowMq = window.matchMedia('(max-width: 768px)')
+const narrow = ref(narrowMq.matches)
+const onNarrow = () => { narrow.value = narrowMq.matches }
+narrowMq.addEventListener('change', onNarrow)
+onBeforeUnmount(() => narrowMq.removeEventListener('change', onNarrow))
 // 뒤로가기 = 열린 바텀시트·단축키 도움말 닫기(페이지를 나가지 않게)
 useBackClose(() => !!sheet.value, () => { sheet.value = null })
 useBackClose(() => showHelp.value, () => { showHelp.value = false })
@@ -158,10 +170,11 @@ onBeforeUnmount(() => {
       <span v-if="netWarn" class="netwarn" role="status">{{ netWarn }}</span>
       <template v-if="isLocalMode">
         <button class="endlocal danger-line" title="콘티를 비우고 다음 예배 준비(출력 창은 검은 화면으로 유지)" @click="endLocal">송출 종료</button>
-        <button title="지금 송출을 그대로 인터넷 송출로 옮겨 폰 리모컨·보기를 씀" @click="showSwitch = true">🌐 인터넷 송출로 전환</button>
+        <button title="지금 송출을 그대로 인터넷 송출로 옮겨 폰 리모컨·보기를 씀" @click="showSwitch = true">🌐 인터넷 송출<span class="wide-word">로 전환</span></button>
       </template>
       <template v-if="isHost">
-        <span class="conn desk-only" :class="{ on: outputOn }">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span>
+        <span class="conn desk-only" :class="{ on: outputOn }" :title="outputOn ? '출력 창 연결됨' : '출력 창 없음'"><span class="conn-word">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span></span>
+        <button class="desk-only" :class="{ dirty: styleDraft.dirty.value }" title="글꼴·크기·배경 등 — 바꾼 뒤 [적용]을 눌러야 송출" @click="showStyle = true">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
         <button class="primary desk-only" @click="startOutput">출력 시작</button>
         <button v-if="!isLocalMode" class="share" :class="link" title="채널 번호 · QR · 접속 관리" @click="showChannel = !showChannel">📡 채널</button>
         <button class="desk-only quiet" title="단축키" @click="showHelp = !showHelp">?</button>
@@ -175,6 +188,7 @@ onBeforeUnmount(() => {
     <div v-if="toast" class="toast" @click="toast = null">{{ toast }}</div>
     <ChannelPopover v-if="isHost && !isLocalMode && showChannel" :code="code" :title="title" @close="showChannel = false" />
     <SwitchToInternet v-if="showSwitch" @close="showSwitch = false" />
+    <StyleDialog v-if="isHost && showStyle && !narrow" @close="showStyle = false" />
     <div v-if="showHelp" class="help" @click="showHelp = false">
       <table>
         <tr><td>→ / Space</td><td>다음 슬라이드 (미리보기 후 송출 모드: 골라 둔 미리보기를 송출)</td></tr>
@@ -208,7 +222,7 @@ onBeforeUnmount(() => {
 
     <aside class="right">
       <MonitorPanel />
-      <div v-if="isHost" class="style-sheet" :class="{ open: sheet === 'style' }">
+      <div v-if="isHost && narrow" class="style-sheet" :class="{ open: sheet === 'style' }">
         <!-- 모바일: 머리 + 미리보기를 시트 위에 고정, 설정은 그 아래에서 스크롤(PC 에선 숨김 — 위 모니터가 고정됨) -->
         <div class="sheet-top">
           <div class="sheet-head">
@@ -261,6 +275,17 @@ onBeforeUnmount(() => {
 .freeze:hover { background-color: #1f3340; border-color: var(--freeze); }
 .blank.on, .blank.on:hover { --edge: #93600c; background-color: var(--warn); border-color: #ffc25a; color: #222; font-weight: 700; }
 .freeze.on, .freeze.on:hover { --edge: #13729b; background-color: var(--freeze); border-color: #7dd6fb; color: #04212e; font-weight: 700; }
+/* 위 버튼 줄: 글자는 꺾지 않고, PC 화면이 좁을수록 덜 중요한 글자부터 줄인다(1280px 에서 버튼 글자가 두 줄로 꺾였음) */
+.top button, .mode, .conn { white-space: nowrap; }
+@media (max-width: 1440px) {
+  .ch small, .wide-word { display: none; }
+}
+@media (max-width: 1150px) {
+  .blank, .freeze { min-width: 0; }
+  .conn-word { display: none; }
+}
+/* 769~1023px(세로 태블릿 등): 한 줄에 안 들어가면 두 줄로(잘리지 않게). 이 구간은 3단 배치 자체가 좁다 — 별도 과제 */
+@media (max-width: 1023px) { .top { flex-wrap: wrap; row-gap: 6px; } }
 .mode { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
 .spacer { flex: 1; }
 .conn { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
@@ -276,6 +301,10 @@ onBeforeUnmount(() => {
 /* PC: 송출 모니터를 위에 고정 — 출력 설정을 아래로 스크롤해도 결과가 보이게(사용자 요청) */
 .right > .monitors { position: sticky; top: -10px; z-index: 3; margin: -10px -10px 0; padding: 10px 10px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .sheet-pv { display: none; }
+/* PC: 출력 설정은 팝업(StyleDialog) — 오른쪽 패널엔 송출 모니터만. 모바일에선 아래 미디어쿼리가 바텀시트로 다시 보인다 */
+.right > .style-sheet { display: none; }
+.dirty { color: #dbe7ff; border-color: var(--preview); }
+.dock-dot { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; background: var(--preview); vertical-align: middle; }
 
 /* 리모컨(폰, 계정 없음): 모니터 + 슬라이드 목록 + 이동 버튼만. 화면 폭과 무관하게 1열 */
 .control.remote {
@@ -360,8 +389,7 @@ onBeforeUnmount(() => {
   .sheet-head button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .dock { grid-area: dock; display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
-  .dock button.dirty { color: #dbe7ff; border-color: var(--preview); }
-  .dock-dot { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; background: var(--preview); vertical-align: middle; }
+  .right > .style-sheet { display: block; }
   .dock button { flex: 1; padding: 12px 6px; font-size: 13px; white-space: nowrap; }
 }
 </style>

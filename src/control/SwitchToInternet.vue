@@ -5,15 +5,14 @@
  *       지금 송출(콘티·위치·FREEZE·출력 설정)을 그대로 옮김 → 출력 창은 화면을 유지한 채 새 채널로 갈아탐 → 📡 창 열기.
  * 로컬 송출의 콘티는 옮겨 갔으므로 비운다(출력 설정은 유지).
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { nextVersion, emptyLiveState } from '@shared/types'
-import { session } from '@/lib/auth'
 import * as api from '@/channel/api'
 import { useLive } from '@/live/liveStore'
 import { saveHost, saveLive, LOCAL_CODE } from '@/live/persistence'
 import { retargetOutputWindow } from './outputWindow'
-import LoginForm from '@/components/LoginForm.vue'
+import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
 
 const emit = defineEmits<{ close: [] }>()
@@ -24,7 +23,7 @@ const d = new Date()
 const title = ref(`${d.getMonth() + 1}/${d.getDate()} 예배`)
 const controlPw = ref('')
 const viewPw = ref('')
-type Step = 'form' | 'login' | 'working'
+type Step = 'form' | 'working'
 const step = ref<Step>('form')
 // 뒤로가기 = 닫기. 옮기는 중(working)엔 닫지 않는다(✕ 도 숨김)
 useBackClose(() => true, () => { if (step.value !== 'working') emit('close') })
@@ -36,11 +35,9 @@ function next() {
   if (!title.value.trim()) { err.value = '채널 이름을 입력하세요'; return }
   if (controlPw.value.length < 4) { err.value = '컨트롤 비밀번호는 4자 이상이어야 합니다'; return }
   if (viewPw.value && viewPw.value.length < 4) { err.value = '보기 비밀번호는 4자 이상이어야 합니다(비우면 누구나 볼 수 있음)'; return }
-  if (session.value) void run()
-  else step.value = 'login'
+  // 로그인 안 돼 있으면 공용 로그인 팝업 → 로그인되면 바로 이어서
+  void requireLogin('인터넷 송출 채널을 만들려면 로그인하세요.').then((ok) => { if (ok) void run() })
 }
-// 로그인되면 바로 이어서
-watch(session, (s) => { if (s && step.value === 'login') void run() })
 
 async function run() {
   step.value = 'working'
@@ -92,12 +89,6 @@ onBeforeUnmount(() => { live.hotkeysPaused.value = false; window.removeEventList
         </label>
         <button class="primary" :disabled="!valid">다음</button>
       </form>
-
-      <template v-else-if="step === 'login'">
-        <p class="muted">채널을 만들려면 로그인하세요.</p>
-        <LoginForm />
-        <button @click="step = 'form'">← 이전</button>
-      </template>
 
       <p v-else class="muted">채널을 만들고 송출을 옮기는 중…</p>
       <p v-if="err" class="err">{{ err }}</p>

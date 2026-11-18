@@ -132,7 +132,7 @@ try {
   await page.click('button.upload')
   // 로그인은 이 기기에 저장 → 오프라인을 거쳐 돌아와도 다시 로그인하지 않고 바로 분류
   await sleep(1500)
-  check('올리기: 저장된 로그인으로 바로(로그인 칸 없음)', !(await page.$('.dialog input[name=username]')))
+  check('올리기: 저장된 로그인으로 바로(로그인 칸 없음)', !(await page.$('.login-dlg')))
   check('3건 분류됨', await until(async () => (await page.$$('.rows li')).length === 3, 30000))
   const rowInfo = await page.$$eval('.rows li', (lis) => lis.map((li) => ({
     t: li.querySelector('.t')?.textContent, problem: li.classList.contains('problem'), warn: li.textContent?.includes('서버에서도') ? 'changed' : li.textContent?.includes('가사가 같은') ? 'dup' : '',

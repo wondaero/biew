@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useLibrary, syncStatus, syncError, lastSync, syncNow, resetCache } from '@/library/library'
 import { session, signOut, authReady } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import LoginForm from '@/components/LoginForm.vue'
+import { requireLogin } from '@/lib/loginPrompt'
 import { useLive } from '@/live/liveStore'
 import type { Song } from '@shared/types'
 import SongEditor from '../SongEditor.vue'
@@ -36,8 +36,8 @@ function onKey(e: KeyboardEvent) {
   else if (e.key === 'Escape') { q.value = '' }
 }
 
-// 로그인: 곡 받기(동기화)·곡 편집에만 필요. 로그인은 이 기기에 저장된다
-const showLogin = ref(false)
+// 로그인: 곡 받기(동기화)·곡 편집에만 필요. 공용 로그인 팝업(requireLogin) — 예전엔 여기에 로그인 칸이 펼쳐져 패널 위쪽을 차지했음
+const login = () => requireLogin('로그인하면 새 곡을 받고 곡을 추가·수정할 수 있습니다. 받아 둔 곡은 로그인 없이 계속 쓸 수 있습니다.')
 
 const statusText = computed(() => {
   switch (syncStatus.value) {
@@ -87,10 +87,9 @@ defineExpose({ focus: () => input.value?.focus() })
     </header>
 
     <template v-if="authReady && !session && supabase">
-      <button class="login-toggle" @click="showLogin = !showLogin">
-        {{ showLogin ? '▾' : '▸' }} 로그인 — 새 곡 받기 · 곡 추가/수정{{ lib.count.value ? '' : ' (처음엔 곡을 받아야 합니다)' }}
-      </button>
-      <LoginForm v-if="showLogin || !lib.count.value" hint="받아 둔 곡은 로그인 없이 계속 쓸 수 있습니다." @done="showLogin = false" />
+      <!-- 곡이 하나도 없으면 눈에 띄게(처음엔 받아야 함), 있으면 작은 글자 버튼 -->
+      <button v-if="!lib.count.value" class="primary login-first" @click="login">로그인해서 곡 받기 <small>(처음엔 곡을 받아야 합니다)</small></button>
+      <button v-else class="login-toggle" @click="login">로그인 — 새 곡 받기 · 곡 추가/수정</button>
     </template>
 
     <input
@@ -139,6 +138,8 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .status.offline span { color: var(--warn); }
 .status button { padding: 4px 8px; font-size: 12px; }
 .login-toggle { text-align: left; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; box-shadow: none; margin: 0; }
+.login-first { width: 100%; padding: 8px; }
+.login-first small { font-weight: normal; opacity: .8; }
 .search { width: 100%; }
 .hits { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
 .hits li { display: flex; gap: 6px; align-items: center; padding: 5px 8px; border-radius: 5px; cursor: pointer; }

@@ -5,7 +5,6 @@ import { useLive } from '@/live/liveStore'
 import { KEY_BLACK, KEY_GREEN, keyable, backdropCss, type Backdrop, type BgDirection } from '@shared/backdrop'
 import { normalizeStyle, sameStyle } from '@shared/outputStyle'
 import { useStyleDraft } from '@/live/styleDraft'
-import StylePreview from './StylePreview.vue'
 import { presets, savePreset, deletePreset, findByName, exportJson, importJson, NAME_MAX, type StylePreset } from '@/live/stylePresets'
 
 const live = useLive()
@@ -218,9 +217,6 @@ async function importFile(e: Event) {
     </label>
 
     <button class="reset full danger-line" title="수정본을 기본값으로(적용을 눌러야 송출)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
-
-    <!-- PC: 적용 전 미리보기 + 적용/되돌리기 — 패널 아래쪽에 붙어 스크롤해도 보인다(모바일은 시트 위쪽에 따로 있음) -->
-    <StylePreview v-if="draft.dirty.value || draft.canUndo.value" class="desk-apply full" compact />
   </section>
 </template>
 
@@ -282,9 +278,6 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
 .p-cur { flex: none; font-size: 10px; color: var(--live); font-weight: 600; }
 .p-cur.pv { color: var(--preview); }
 .dirty-tag { margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #dbe7ff; background: rgba(79, 140, 255, .25); vertical-align: middle; }
-/* PC: 적용 바 — 패널(.right) 아래쪽에 붙음. 모바일은 시트 위쪽 고정 미리보기가 같은 일을 하므로 숨김 */
-.desk-apply { position: sticky; bottom: -10px; z-index: 3; margin: 4px -10px -10px; padding: 8px 10px 10px; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -8px 16px rgba(0, 0, 0, .35); }
-@media (max-width: 768px) { .desk-apply { display: none; } }
 .p-del { flex: none; padding: 0 8px; color: var(--muted); }
 .p-save { display: flex; gap: 4px; }
 .p-save input { flex: 1; min-width: 0; }

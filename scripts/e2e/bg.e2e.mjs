@@ -26,11 +26,14 @@ try {
   const outBg = () => out.$eval('.stage', (e) => getComputedStyle(e).backgroundImage + '|' + getComputedStyle(e).backgroundColor)
   check("예전 저장값 'green' → 초록(크로마키) 이어받음", await until(async () => (await outBg()).includes('rgb(0, 177, 64)')))
   await c.bringToFront()
+  // PC 출력 설정 = 팝업(StyleDialog)
+  await c.$$eval('button', (bs) => bs.find((b) => b.textContent?.includes('출력 설정'))?.click())
+  await c.waitForSelector('.sd .bg', { timeout: 5000 })
   const warn = () => c.$('.bg .warn')
   check('키잉 색(초록)일 땐 경고 없음', !(await warn()))
   // 설정은 수정본만 바꾸고 [적용]을 눌러야 송출(src/live/styleDraft.ts) → 버튼마다 적용까지
   const pick = (t) => c.$$eval('.bg button', (bs, t) => bs.find((x) => x.textContent?.trim() === t)?.click(), t)
-  const applyNow = async () => { await c.waitForSelector('.desk-apply .apply', { timeout: 3000 }); await c.click('.desk-apply .apply') }
+  const applyNow = async () => { await c.waitForSelector('.sd .apply', { timeout: 3000 }); await c.click('.sd .apply') }
   const btn = async (t) => { await pick(t); await applyNow() }
   await pick('그라데이션')
   await sleep(500)
@@ -50,12 +53,12 @@ try {
   await btn('초록 (크로마키)')
   check('초록(크로마키) 버튼', await until(async () => (await outBg()).includes('rgb(0, 177, 64)')))
   // 방금 적용 취소 → 그 전(검정)으로 바로 송출
-  await c.click('.desk-apply .undo')
+  await c.click('.sd .undo')
   check('방금 적용 취소 → 이전 설정(검정)으로', await until(async () => (await outBg()).startsWith('none|rgb(0, 0, 0)')), await outBg())
   // 되돌리기 → 수정본 버림(송출 그대로)
   await pick('초록 (크로마키)')
-  await c.waitForSelector('.desk-apply')
-  await c.$$eval('.desk-apply button', (bs) => bs.find((b) => b.textContent?.trim() === '되돌리기')?.click())
+  await c.waitForSelector('.sd .pv-actions')
+  await c.$$eval('.sd .pv-actions button', (bs) => bs.find((b) => b.textContent?.trim() === '되돌리기')?.click())
   await sleep(300)
   check('되돌리기 → 수정본 버림, 송출 그대로(검정)', !(await c.$('.dirty-tag')) && (await outBg()).startsWith('none|rgb(0, 0, 0)'))
   await btn('초록 (크로마키)')

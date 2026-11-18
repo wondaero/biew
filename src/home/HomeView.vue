@@ -18,7 +18,7 @@ import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
 import { listHosts, listVisits, saveHost, forgetChannelLocal, forgetVisit, type VisitRole } from '@/live/persistence'
 import { titleMatches } from '@shared/searchText'
-import LoginForm from '@/components/LoginForm.vue'
+import { requireLogin } from '@/lib/loginPrompt'
 import UploadDialog from '@/control/UploadDialog.vue'
 import { dbNotice } from '@/library/db'
 import { needRefresh, applyUpdate } from '@/pwa'
@@ -79,9 +79,8 @@ async function loadServer() {
 }
 watch(session, loadServer)
 
-// 홈 로그인(이 기기에 저장 — 로그아웃할 때까지). 내 계정의 채널(삭제 포함)을 보려면 필요
-const loginOpen = ref(false)
-watch(session, (s) => { if (s) loginOpen.value = false })
+
+
 /** 머리에 늘 보이는 로그인 상태(공용 PC 에 로그인된 채로 두고 가는 일을 줄이려고). 로그인 도메인이면 아이디만 */
 const who = computed(() => {
   const e = session.value?.user.email ?? ''
@@ -130,7 +129,7 @@ const anyList = computed(() => device.value.length + pub.value.length + rows.val
 
 // 곡 다운로드(오프라인용). 로그인하면 library 가 자동으로 받는다(바뀐 곡만)
 const lib = useLibrary()
-const dlOpen = ref(false)
+
 const showUpload = ref(false)
 const dlText = computed(() => {
   switch (syncStatus.value) {
@@ -142,8 +141,9 @@ const dlText = computed(() => {
   }
 })
 
-// 새 채널
+// 새 채널(로그인 팝업 → 로그인되면 바로 폼)
 const creatingOpen = ref(false)
+async function openCreate() { if (await requireLogin('채널을 만들려면 로그인하세요.')) creatingOpen.value = true }
 const title = ref('')
 const controlPw = ref('')
 const viewPw = ref('')
@@ -182,9 +182,9 @@ const build = __APP_BUILD__
       <h1>Biew</h1>
       <span v-if="session" class="who" title="이 기기에 로그인이 저장돼 있습니다(로그아웃할 때까지)">{{ who }} 로그인됨</span>
       <button v-if="session" class="ghost" @click="logout">로그아웃</button>
-      <button v-else-if="supabase" class="ghost" @click="loginOpen = !loginOpen">{{ loginOpen ? '닫기' : '로그인' }}</button>
+      <button v-else-if="supabase" class="ghost" @click="requireLogin('로그인하면 내 계정의 채널(삭제 포함)·곡 다운로드·채널 만들기를 쓸 수 있습니다.')">로그인</button>
     </header>
-    <LoginForm v-if="!session && loginOpen" class="home-login" hint="로그인하면 내 계정의 채널(삭제 포함)·곡 다운로드·채널 만들기를 쓸 수 있습니다." />
+
 
     <!-- ── 로컬 송출 ── -->
     <section v-if="!mobile" class="card local">
@@ -205,8 +205,8 @@ const build = __APP_BUILD__
         </div>
       </template>
       <template v-else>
-        <button v-if="!dlOpen" class="primary" @click="dlOpen = true">곡 다운로드</button>
-        <LoginForm v-else hint="곡은 저작권 데이터라 로그인해야 받을 수 있습니다. 받은 곡은 로그인·인터넷 없이 계속 쓸 수 있습니다." />
+        <button class="primary" @click="requireLogin('곡은 저작권 데이터라 로그인해야 받을 수 있습니다. 받은 곡은 로그인·인터넷 없이 계속 쓸 수 있습니다.')">곡 다운로드</button>
+
       </template>
       <button v-if="lib.pendingCount.value" class="upload" @click="showUpload = true">↑ PC 에서 고친 곡 서버에 올리기 {{ lib.pendingCount.value }}건</button>
     </section>
@@ -255,10 +255,10 @@ const build = __APP_BUILD__
 
     <!-- 새 채널 -->
     <section class="card">
-      <button v-if="!creatingOpen" @click="creatingOpen = true">＋ 인터넷 송출 채널 만들기</button>
+      <button v-if="!creatingOpen" @click="openCreate">＋ 인터넷 송출 채널 만들기</button>
       <template v-else>
         <h2>새 채널 <button class="ghost" @click="creatingOpen = false">닫기</button></h2>
-        <LoginForm v-if="!session" hint="채널을 만들려면 로그인하세요." />
+        <button v-if="!session" class="primary" @click="openCreate">로그인</button>
         <form v-else class="form" @submit.prevent="create">
           <input v-model="title" placeholder="채널 제목 (예: 주일 2부)" maxlength="60" />
           <input v-model="controlPw" type="password" placeholder="컨트롤 비밀번호 (필수, 4자 이상)" autocomplete="new-password" />
@@ -354,7 +354,7 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .list li.mine { grid-template-columns: 1fr auto auto auto; grid-template-areas: 't c x del' 'd d d d'; }
 .del { grid-area: del; padding: 2px 8px; font-size: 11px; color: var(--muted); }
 .del:hover { color: var(--pgm); border-color: var(--pgm); }
-.home.mobile > .home-login { order: -1; } /* 폰: 머리 바로 아래(번호로 입장보다 위) */
+
 .pub-go button { padding: 8px; }
 .t { grid-area: t; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c { grid-area: c; font: 12px ui-monospace, monospace; color: var(--muted); letter-spacing: 2px; }

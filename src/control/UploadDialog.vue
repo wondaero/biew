@@ -11,7 +11,7 @@ import { session } from '@/lib/auth'
 import { prepareUpload, uploadOne, isLocalNewId, type UploadItem, type UploadAction } from '@/library/library'
 import { isClean } from '@/library/pending'
 import { useLive } from '@/live/liveStore'
-import LoginForm from '@/components/LoginForm.vue'
+import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
 
 const emit = defineEmits<{ close: [] }>()
@@ -44,7 +44,13 @@ async function load() {
   }))
 }
 watch(session, (s) => { if (s) void load() })
-onMounted(() => { live.hotkeysPaused.value = true; void load() })
+const UPLOAD_REASON = 'PC 에서 고친 곡을 서버에 올리려면 로그인하세요.'
+onMounted(() => {
+  live.hotkeysPaused.value = true
+  // 로그인 안 돼 있으면 공용 로그인 팝업을 이 창 위에 바로 띄운다(로그인되면 watch(session) 이 이어서 load)
+  if (!session.value) void requireLogin(UPLOAD_REASON)
+  void load()
+})
 onBeforeUnmount(() => { live.hotkeysPaused.value = false })
 
 const clean = (r: Row) => isClean(r.item)
@@ -87,7 +93,7 @@ const compareWith = (r: Row) => r.item.server ?? r.item.dup.sameLyrics[0] ?? r.i
       </header>
 
       <div class="body">
-        <LoginForm v-if="!session" hint="서버에 올리려면 로그인하세요." />
+        <p v-if="!session" class="muted">서버에 올리려면 로그인해야 합니다. <button class="primary" @click="requireLogin(UPLOAD_REASON)">로그인</button></p>
         <p v-else-if="loading" class="muted">서버의 최신 곡을 받고 비교하는 중…</p>
         <p v-else-if="err" class="err">{{ err }}</p>
         <p v-else-if="!rows.length" class="muted">올릴 변경이 없습니다.</p>
