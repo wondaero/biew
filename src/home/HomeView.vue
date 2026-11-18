@@ -5,7 +5,7 @@
  *  - 이 기기의 채널: 이 기기가 호스트(PC)·리모컨·보기로 들어간 채널(누르면 바로, 저장된 입장 정보로)
  *  - 공개 채널: 보기 비밀번호가 있고 최근 7일 안에 사용된 채널(로그인 불필요, 들어갈 때 보기 비밀번호)
  *  - 제목 검색: 대소문자·띄어쓰기 무시(shared/searchText)
- *  - 새 채널: 누를 때 로그인(로그인은 저장되지 않음)
+ *  - 새 채널: 누를 때 로그인(로그인은 이 기기에 저장)
  *  - 로그인 중이면 내 계정의 전체 채널(다른 PC 에서 만든 것 포함)도 보이고, 열면 이 PC 가 호스트로 등록된다
  *  - 로컬 송출(/local): 채널·서버 없이 이 PC 하나에서만 송출(예배용 기본). 그 외는 전부 인터넷 송출(채널)
  *  - 곡 다운로드: 곡 전체를 PC 에 저장(그때 로그인). PC 에서 고친 곡은 '서버에 올리기'
@@ -13,6 +13,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { session, signOut } from '@/lib/auth'
+import { LOGIN_DOMAIN } from '@shared/loginId'
 import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
 import { listHosts, listVisits, saveHost, forgetChannelLocal, forgetVisit, type VisitRole } from '@/live/persistence'
@@ -78,9 +79,18 @@ async function loadServer() {
 }
 watch(session, loadServer)
 
-// 홈 로그인(로그인은 저장되지 않음 — 새로고침하면 다시). 내 계정의 채널(삭제 포함)을 보려면 필요
+// 홈 로그인(이 기기에 저장 — 로그아웃할 때까지). 내 계정의 채널(삭제 포함)을 보려면 필요
 const loginOpen = ref(false)
 watch(session, (s) => { if (s) loginOpen.value = false })
+/** 머리에 늘 보이는 로그인 상태(공용 PC 에 로그인된 채로 두고 가는 일을 줄이려고). 로그인 도메인이면 아이디만 */
+const who = computed(() => {
+  const e = session.value?.user.email ?? ''
+  return e.endsWith(`@${LOGIN_DOMAIN}`) ? e.slice(0, -LOGIN_DOMAIN.length - 1) : e
+})
+async function logout() {
+  await signOut()
+  rows.value = []
+}
 
 /** 최근 사용(서버 상태 변경) 3시간 이내면 지금 예배 중일 수 있다고 강하게 경고 */
 const RECENT_MS = 3 * 60 * 60 * 1000
@@ -170,10 +180,11 @@ const build = __APP_BUILD__
   <main class="home" :class="{ mobile }">
     <header>
       <h1>Biew</h1>
-      <button v-if="session" class="ghost" @click="signOut()">로그아웃</button>
+      <span v-if="session" class="who" title="이 기기에 로그인이 저장돼 있습니다(로그아웃할 때까지)">{{ who }} 로그인됨</span>
+      <button v-if="session" class="ghost" @click="logout">로그아웃</button>
       <button v-else-if="supabase" class="ghost" @click="loginOpen = !loginOpen">{{ loginOpen ? '닫기' : '로그인' }}</button>
     </header>
-    <LoginForm v-if="!session && loginOpen" class="home-login" hint="로그인하면 내 계정의 채널(삭제 포함)·곡 다운로드·채널 만들기를 쓸 수 있습니다. 로그인은 저장되지 않습니다." />
+    <LoginForm v-if="!session && loginOpen" class="home-login" hint="로그인하면 내 계정의 채널(삭제 포함)·곡 다운로드·채널 만들기를 쓸 수 있습니다." />
 
     <!-- ── 로컬 송출 ── -->
     <section v-if="!mobile" class="card local">
@@ -247,7 +258,7 @@ const build = __APP_BUILD__
       <button v-if="!creatingOpen" @click="creatingOpen = true">＋ 인터넷 송출 채널 만들기</button>
       <template v-else>
         <h2>새 채널 <button class="ghost" @click="creatingOpen = false">닫기</button></h2>
-        <LoginForm v-if="!session" hint="채널을 만들려면 로그인하세요. (로그인은 저장되지 않습니다)" />
+        <LoginForm v-if="!session" hint="채널을 만들려면 로그인하세요." />
         <form v-else class="form" @submit.prevent="create">
           <input v-model="title" placeholder="채널 제목 (예: 주일 2부)" maxlength="60" />
           <input v-model="controlPw" type="password" placeholder="컨트롤 비밀번호 (필수, 4자 이상)" autocomplete="new-password" />
@@ -266,7 +277,7 @@ const build = __APP_BUILD__
       <p v-if="listErr" class="err">{{ listErr }}</p>
       <p v-if="delErr" class="err">{{ delErr }}</p>
       <ul v-if="!listErr && fRows.length" class="list">
-        <li v-for="r in fRows" :key="r.code" class="mine" @click="router.push(`/control/${r.code}`)">
+        <li v-for="r in fRows" :key="r.code" class="mine" @click="router.push(`/control/${r.code}?as=host`)">
           <span class="t">{{ r.title }}</span>
           <span class="c">{{ r.code }}</span>
           <span v-if="hostCodes.has(r.code)" class="badge">이 기기</span>
@@ -328,6 +339,8 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .row button { flex: 1; padding: 10px; }
 .card > button, .form > button { padding: 10px; }
 .ghost { margin-left: auto; padding: 2px 8px; font-size: 12px; font-weight: normal; }
+.who { font-size: 12px; color: var(--live); }
+.who + .ghost { margin-left: 8px; }
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .list li {
   display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: 't c x' 'd d d'; gap: 2px 10px; align-items: baseline;

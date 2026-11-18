@@ -2,9 +2,11 @@
 /**
  * /control/:code 진입 게이트. 접속한 기기에 따라 역할을 정한다.
  *  1. 이 PC 가 이 채널의 호스트 기록(만들 때 받은 호스트 토큰)을 갖고 있음 → 호스트. 로그인·인터넷 불필요
- *  2. 기록은 없지만 지금 채널을 만든 계정으로 로그인돼 있음 → 이 PC 용 호스트 토큰을 받아 저장하고 호스트로
+ *  2. 기록은 없지만 지금 채널을 만든 계정으로 로그인돼 있음 → 호스트로 등록할지 리모컨으로 들어갈지 고른다
+ *     (로그인이 저장되므로 로그인된 폰이 컨트롤 링크를 열 때마다 두 번째 호스트가 되면 안 된다).
+ *     홈 "내 계정의 채널"에서 연 경우(?as=host)는 묻지 않고 호스트로.
  *  3. 그 외 → 리모컨: 저장된 토큰 또는 컨트롤 비밀번호로 입장(이동·BLANK·점프만)
- * 로그인은 저장되지 않으므로(lib/supabase.ts) 호스트 판정을 로그인에 기대지 않는다 — 새로고침·오프라인에도 호스트 유지.
+ * 호스트 판정은 로그인이 아니라 호스트 토큰 기준 — 로그아웃·오프라인에도 호스트 유지.
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
@@ -20,7 +22,7 @@ const route = useRoute()
 const live = useLive()
 const code = computed(() => api.normalizeCode(String(route.params.code ?? '')))
 
-type Phase = 'loading' | 'password' | 'ready' | 'error'
+type Phase = 'loading' | 'choose' | 'password' | 'ready' | 'error'
 const phase = ref<Phase>('loading')
 const title = ref('')
 const msg = ref('')
@@ -54,21 +56,32 @@ async function enter() {
   await waitAuth()
   if (my !== ticket) return
 
-  // 2. 로그인한 소유자 → 이 PC 를 호스트로 등록
+  // 2. 로그인한 소유자 → 호스트로 등록할지 고르기(홈 "내 계정의 채널"에서 왔으면 바로 호스트)
   if (session.value) {
     const { row } = await api.getChannel(c)
     if (my !== ticket) return
     if (row) {
-      const g = await api.issueHostToken(c)
-      if (my !== ticket) return
-      if (!g.grant) return fail(g.error ?? '호스트 권한을 받지 못했습니다.')
-      saveHost(c, { title: g.grant.title, token: g.grant.token, controlTopic: g.grant.controlTopic, viewTopic: g.grant.viewTopic })
-      return enterHost(c, g.grant.title, g.grant.state)
+      title.value = row.title
+      if (route.query.as === 'host') return registerHost(c, my)
+      phase.value = 'choose'
+      return
     }
   }
   // 3. 리모컨
   await enterRemote(c, undefined, my)
 }
+
+/** 이 기기를 호스트로 등록(채널 전용 호스트 토큰 발급·저장) */
+async function registerHost(c: string, my: number) {
+  phase.value = 'loading'
+  const g = await api.issueHostToken(c)
+  if (my !== ticket) return
+  if (!g.grant) return fail(g.error ?? '호스트 권한을 받지 못했습니다.')
+  saveHost(c, { title: g.grant.title, token: g.grant.token, controlTopic: g.grant.controlTopic, viewTopic: g.grant.viewTopic })
+  enterHost(c, g.grant.title, g.grant.state)
+}
+const chooseHost = () => void registerHost(code.value, ++ticket)
+const chooseRemote = () => { phase.value = 'loading'; void enterRemote(code.value, undefined, ++ticket) }
 
 /** serverState: 처음 등록할 때 받은 서버 상태(다른 PC·리모컨이 쓰던 것) — 더 새로우면 이어받는다 */
 function enterHost(c: string, t: string, serverState: unknown) {
@@ -124,6 +137,16 @@ onBeforeUnmount(() => { ticket++; teardown() })
   <main v-else class="gate">
     <div v-if="phase === 'loading'" class="card"><p>불러오는 중…</p></div>
 
+    <!-- 로그인한 소유자가 이 기기에서 처음 연 채널: 역할 고르기 -->
+    <div v-else-if="phase === 'choose'" class="card choose">
+      <h1>{{ title || '채널' }}</h1>
+      <p>이 채널을 만든 계정으로 로그인돼 있습니다. 이 기기를 어떻게 쓸까요?</p>
+      <button class="primary" @click="chooseHost">이 기기를 호스트로<br /><small>송출 PC — 콘티·곡·출력 설정 전체 조작, 출력 창</small></button>
+      <button @click="chooseRemote">리모컨으로<br /><small>이동·BLANK·점프만 (컨트롤 비밀번호)</small></button>
+      <p><small>송출하는 PC 가 따로 있다면 리모컨을 고르세요. 호스트로 등록한 기기는 홈 "이 기기의 채널"에서 지울 수 있습니다.</small></p>
+      <router-link to="/">← 처음으로</router-link>
+    </div>
+
     <form v-else-if="phase === 'password'" class="card" @submit.prevent="submit">
       <h1>{{ title || '채널' }}</h1>
       <p>컨트롤 비밀번호를 입력하세요.<br /><small>한 번 입력하면 이 기기가 기억합니다.</small></p>
@@ -149,5 +172,6 @@ p { margin: 0; color: var(--muted); font-size: 13px; }
 small { color: var(--muted); }
 .err { color: var(--pgm); }
 button { padding: 12px; font-size: 16px; }
+.choose button small { font-size: 12px; color: inherit; opacity: .75; }
 a { color: var(--accent); font-size: 13px; }
 </style>

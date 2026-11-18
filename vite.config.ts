@@ -43,7 +43,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest}'],
+        // woff2 = 송출 글꼴(Pretendard, 앱에 포함) — 오프라인에서도 모든 PC 에 같은 글꼴
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,woff2}'],
+        // 기본 한도 2MiB 를 넘는 파일은 조용히 빠진다 — PretendardVariable.woff2(약 2.0MB)가 빠지지 않게
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // SPA: /control/ABC234 같은 주소도 오프라인에서 index.html 로
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,

@@ -65,10 +65,13 @@ onMounted(() => {
   fit()
   ro = new ResizeObserver(() => fit())
   if (box.value) ro.observe(box.value)
-  // 웹폰트 로딩 후 메트릭이 바뀌면 다시 맞춤
+  // 웹폰트(Pretendard) 로딩 후 메트릭이 바뀌면 다시 맞춤. 글꼴은 처음 쓰일 때 로드되므로
+  // ready(지금 시점) 하나로는 부족 — 나중에 끝나는 로딩(loadingdone)도 받는다
   document.fonts?.ready.then(() => fit())
+  document.fonts?.addEventListener?.('loadingdone', onFontsLoaded)
 })
-onBeforeUnmount(() => ro?.disconnect())
+const onFontsLoaded = () => fit()
+onBeforeUnmount(() => { ro?.disconnect(); document.fonts?.removeEventListener?.('loadingdone', onFontsLoaded) })
 watch(() => [props.text, props.styleCfg], () => nextTick(fit), { deep: true })
 </script>
 

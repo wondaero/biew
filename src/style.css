@@ -1,3 +1,18 @@
+/*
+ * 송출 글꼴 Pretendard(가변, OFL-1.1) — 앱에 포함(npm pretendard@1.3.9). PWA 가 PC 에 저장하므로 오프라인에서도 동작.
+ * 이름을 'Pretendard' 로 선언 → 저장된 설정(fontFamily: 'Pretendard, ...')이 그대로 이 파일을 쓰고,
+ * PC 에 Pretendard 가 설치돼 있어도 @font-face 가 우선 → 어느 PC 든 같은 글꼴·같은 줄 길이(글자 자동 축소 결과 동일).
+ * font-display: block — 잠깐 다른 글꼴로 그렸다가 바뀌며 송출 화면이 흔들리지 않게(저장된 파일이라 거의 즉시 로드).
+ */
+@font-face {
+  font-family: 'Pretendard';
+  src: url('../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2') format('woff2-variations'),
+       url('../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2') format('woff2');
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: block;
+}
+
 :root {
   --bg: #141418; --panel: #1d1d23; --panel-2: #25252d; --line: #33333d;
   --text: #e7e7ea; --muted: #8b8b96; --accent: #4f8cff;

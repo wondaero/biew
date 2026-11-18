@@ -89,6 +89,13 @@ try {
   const out = await ctx.newPage()
   await out.goto(BASE + '/output/LOCAL', { waitUntil: 'domcontentloaded' })
   check('오프라인에서 출력 창 열림 + 송출 표시', await until(async () => (await text('.txt', out)).startsWith('Lorem ipsum alpha one')))
+  // 송출 글꼴 = 앱에 포함된 Pretendard(서버 없이 PC 저장본에서). 테스트 Chrome 엔 Pretendard 가 설치돼 있지 않으므로 로드 성공 = 앱 파일
+  check('오프라인 출력: 앱에 포함된 Pretendard 로 그림', await until(() => out.evaluate(async () => {
+    const fam = getComputedStyle(document.querySelector('.txt')).fontFamily
+    await document.fonts.load(`700 40px Pretendard`)
+    const face = [...document.fonts].find((f) => f.family.replace(/"/g, '') === 'Pretendard')
+    return fam.startsWith('Pretendard') && face?.status === 'loaded'
+  })))
   await page.bringToFront()
   await page.click('button[title^="다음"]')
   check('컨트롤러 ▶ → 출력 창 따라감(서버 없이)', await until(async () => (await text('.txt', out)).startsWith('Lorem ipsum alpha two')))
@@ -123,10 +130,9 @@ try {
   await page.setOfflineMode(false)
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await page.click('button.upload')
-  check('올리기: 로그인 요구(로그인은 저장 안 됨)', !!(await page.waitForSelector('.dialog input[name=username]', { timeout: 8000 }).catch(() => null)))
-  await page.type('.dialog input[name=username]', email)
-  await page.type('.dialog input[name=password]', password)
-  await page.click('.dialog form.login button')
+  // 로그인은 이 기기에 저장 → 오프라인을 거쳐 돌아와도 다시 로그인하지 않고 바로 분류
+  await sleep(1500)
+  check('올리기: 저장된 로그인으로 바로(로그인 칸 없음)', !(await page.$('.dialog input[name=username]')))
   check('3건 분류됨', await until(async () => (await page.$$('.rows li')).length === 3, 30000))
   const rowInfo = await page.$$eval('.rows li', (lis) => lis.map((li) => ({
     t: li.querySelector('.t')?.textContent, problem: li.classList.contains('problem'), warn: li.textContent?.includes('서버에서도') ? 'changed' : li.textContent?.includes('가사가 같은') ? 'dup' : '',

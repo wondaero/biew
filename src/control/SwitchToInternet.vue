@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 로컬 송출 → 인터넷 송출 전환(반대 방향은 없음 — 인터넷 송출은 끊겨도 PC 송출이 계속되므로).
- * 순서: 채널 이름·비밀번호 → 로그인(저장 안 됨) → 채널 생성 + 이 PC 를 호스트로 등록 →
+ * 순서: 채널 이름·비밀번호 → 로그인 → 채널 생성 + 이 PC 를 호스트로 등록 →
  *       지금 송출(콘티·위치·FREEZE·출력 설정)을 그대로 옮김 → 출력 창은 화면을 유지한 채 새 채널로 갈아탐 → 📡 창 열기.
  * 로컬 송출의 콘티는 옮겨 갔으므로 비운다(출력 설정은 유지).
  */
@@ -91,7 +91,7 @@ onBeforeUnmount(() => { live.hotkeysPaused.value = false; window.removeEventList
       </form>
 
       <template v-else-if="step === 'login'">
-        <p class="muted">채널을 만들려면 로그인하세요. (로그인은 저장되지 않습니다)</p>
+        <p class="muted">채널을 만들려면 로그인하세요.</p>
         <LoginForm />
         <button @click="step = 'form'">← 이전</button>
       </template>

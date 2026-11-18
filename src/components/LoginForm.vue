@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 로그인 폼(공용). 로그인은 저장되지 않는다 — 새로고침하면 다시 로그인.
+ * 로그인 폼(공용). 로그인은 이 기기에 저장된다(로그아웃할 때까지 — lib/supabase.ts).
  * ID/PW 는 브라우저 비밀번호 저장 기능이 채워 주도록 name/autocomplete 를 표준대로 둔다(앱이 비밀번호를 저장하지 않음).
  */
 import { ref } from 'vue'

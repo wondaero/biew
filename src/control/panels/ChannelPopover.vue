@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 호스트 전용: 채널 번호·링크·QR, 관리(리모컨 쫓아내기 · 보기 비밀번호 · 채널 삭제).
- * 관리는 계정 권한이라 그때 로그인한다(로그인은 저장되지 않음). 이 PC(호스트)는 어느 관리를 해도 끊기지 않는다.
+ * 관리는 계정 권한이라 로그인이 필요하다. 이 PC(호스트)는 어느 관리를 해도 끊기지 않는다.
  */
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -104,7 +104,7 @@ async function remove() {
 
     <button class="ghost" @click="showManage = !showManage">{{ showManage ? '▾' : '▸' }} 관리 (리모컨 쫓아내기 · 보기 비밀번호 · 삭제)</button>
     <template v-if="showManage">
-      <LoginForm v-if="!session" hint="관리 기능은 채널을 만든 계정으로 로그인해야 합니다. (로그인은 저장되지 않습니다)" />
+      <LoginForm v-if="!session" hint="관리 기능은 채널을 만든 계정으로 로그인해야 합니다." />
       <template v-else>
         <div class="box">
           <b>리모컨 모두 쫓아내기</b>

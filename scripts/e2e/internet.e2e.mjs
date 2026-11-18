@@ -63,8 +63,11 @@ try {
   code = host.url().split('/').pop()
   check('호스트 화면 + 서버 연결', !!(await host.$('aside.left')) && await until(() => host.$('button.share.live')))
 
-  // 콘티(Lorem) → 새로고침(로그아웃) → 호스트 유지 + 서버에 올라감
-  await host.evaluate((c, s) => localStorage.setItem('biew.live.v1:' + c, JSON.stringify(s)), code, seed())
+  // 콘티(Lorem) → 로그아웃(저장된 로그인 지움) + 새로고침 → 호스트 토큰만으로 호스트 유지 + 서버에 올라감
+  await host.evaluate((c, s) => {
+    localStorage.setItem('biew.live.v1:' + c, JSON.stringify(s))
+    for (const k of Object.keys(localStorage)) if (/^sb-.+-auth-token$/.test(k)) localStorage.removeItem(k)
+  }, code, seed())
   await host.reload({ waitUntil: 'networkidle0' })
   check('로그아웃 상태 새로고침에도 호스트 + 서버 연결', !!(await host.$('aside.left')) && await until(() => host.$('button.share.live')))
   const serverState = async () => (await admin.from('channels').select('state').eq('code', code).single()).data?.state

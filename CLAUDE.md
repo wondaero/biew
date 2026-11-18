@@ -59,7 +59,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - **콘티 순서 변경 시** 송출 중 곡을 `key` 로 추적해 itemIndex 보정. 송출 중 곡 삭제 → blank.
 - **인터넷 송출 = 서버가 상태의 원본**(`channels.state`, 자세한 확정 설계는 PROGRESS.md 맨 위). PC 는 화면을 먼저 바꾸고 `host_set_state` 로 올림 — 인터넷이 끊기면 PC 혼자 계속(dirty), 다시 연결되면 PC 기준으로 덮어씀(force). 리모컨 명령은 서버가 검사·적용(`remote_command`/`_apply_command` = 앱 `nav.ts` 규칙, 바꾸면 둘 다 바꾸고 `verify:channels` 대조 통과 확인). PC 가 꺼져도 리모컨·보기 동작.
 - **로그인 아이디**: 아이디만 입력하면 `@jv.jv` 를 붙인다(`shared/loginId.ts` `LOGIN_DOMAIN`, `@` 가 있으면 그대로). `npm run staff -- <아이디>` 도 같은 규칙. 스태프 계정은 이 도메인으로 만들 것.
-- **로그인은 저장하지 않는다**(`persistSession:false`). 인터넷 송출 호스트 PC 권한 = 채널 전용 **호스트 토큰**(`biew.host.<code>`, 로그인 아님) → 새로고침·오프라인에도 호스트. 비밀번호는 bcrypt 해시만, 리모컨·보기는 기기 토큰. 비밀번호 실패 잠금은 **기기(브라우저)별**(서버 잠금 없음 — 사용자 결정).
+- **로그인은 이 기기(localStorage)에 저장**(`persistSession:true`, 2026-11-18 사용자 결정 — 스태프 계정이 하나라 방송실 PC 사용자는 어차피 비밀번호를 앎. 계정을 사람마다 나누면 재검토). 홈 머리에 "아이디 로그인됨 · 로그아웃" 상시 표시. **로그인돼 있어도 컨트롤 링크를 연 기기가 자동으로 호스트가 되지 않는다** — ControlGate 가 호스트/리모컨을 묻고, 홈 "내 계정의 채널"(`?as=host`)만 바로 호스트. 인터넷 송출 호스트 PC 권한 = 채널 전용 **호스트 토큰**(`biew.host.<code>`, 로그인 아님) → 새로고침·오프라인에도 호스트. 비밀번호는 bcrypt 해시만, 리모컨·보기는 기기 토큰. 비밀번호 실패 잠금은 **기기(브라우저)별**(서버 잠금 없음 — 사용자 결정).
 - **실시간 알림은 변경한 쪽(PC/리모컨)이 직접 보낸다**(DB 발 `realtime.send` 공개 알림은 전달 안 됨 — 검증). **호스트 PC 는 알림 내용을 믿지 말고 서버에서 다시 읽을 것**(리모컨도 같은 주소에 보낼 수 있음). 리모컨은 control 주소에서만 상태를 받는다. 보기 기기·호스트 PC 는 주소가 바뀌면(리모컨 쫓아내기·보기 비밀번호 변경) 다시 연결(호스트는 30초마다 확인).
 - **채널 관리는 호스트 PC 를 끊지 않는다**: "모든 기기 접속 끊기" 없음. 리모컨 쫓아내기 = 컨트롤 비밀번호 변경(새 비밀번호 필수), 보기 비밀번호 설정·변경·없애기. PC 분실 = 채널 삭제. **삭제는 로그인만으로**(기기 무관, 홈 "내 계정의 채널"의 삭제 버튼). 쓰던 채널이 지워진 호스트 PC 는 `hostDeleted` 로 재시도 없이 "삭제됨" 표시(송출은 계속).
 - 송출은 항상 호스트 PC 를 거친다. 호스트↔출력 창은 BroadcastChannel `biew-live:<code>` 라 인터넷이 끊겨도 동작.
@@ -81,6 +81,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 적용 위치: `src/components/FitText.vue` 의 `boxStyle`(top/left/bottom/right). 슬라이더 UI: `src/control/panels/StylePanel.vue`("위 여백"/"왼쪽 여백").
 - 기본값을 바꿔도 **이미 저장된 설정(localStorage `biew.live.v1`)이 우선**한다. 모든 기기에 새 기본값을 강제하려면 `src/live/persistence.ts` 의 `loadLive` 에 마이그레이션을 추가하거나, 사용자에게 "기본값으로" 버튼을 안내한다.
 - 글자 자동 축소 최소 배율 `MIN_SCALE = 0.2`(FitText.vue) — 최대 10줄까지 한 화면에 들어가도록. 슬라이드 카드 미리보기 줄 제한도 10줄(SlideGrid.vue).
+- **송출 글꼴 Pretendard 는 앱에 포함**(`src/style.css` `@font-face`, `font-display: block`, PWA precache — `vite.config.ts` 의 woff2·`maximumFileSizeToCacheInBytes` 를 지우지 말 것 — 기본 2MiB 한도에 걸리면 조용히 빠져 오프라인에서 다른 글꼴로 나온다). FitText 는 글꼴 로드(`loadingdone`) 후 다시 맞춘다.
 - `position`: `'top'`(기본) / `'center'`(세로 중앙). 예전 저장값 `'bottom'` 은 `'top'` 으로 이전된다.
 - 같은 렌더러(`SlideRender`/`FitText`)를 출력·컨트롤러 모니터·카드 미리보기·폰 뷰어가 공유하므로 한 곳 수정이 전부에 반영된다.
 

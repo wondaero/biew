@@ -14,12 +14,13 @@ const str = (e: Event) => (e.target as HTMLInputElement).value
 
 // 오프라인에서도 바뀌지 않도록 웹폰트가 아닌 PC 설치 폰트만 사용
 const FONTS: { label: string; value: string }[] = [
-  { label: '기본 (Pretendard → 맑은 고딕)', value: DEFAULT_STYLE.fontFamily },
-  { label: '맑은 고딕', value: '"Malgun Gothic", sans-serif' },
-  { label: '나눔고딕', value: '"NanumGothic", "나눔고딕", sans-serif' },
-  { label: '나눔스퀘어', value: '"NanumSquare", "나눔스퀘어", sans-serif' },
-  { label: '나눔명조', value: '"NanumMyeongjo", "나눔명조", serif' },
-  { label: 'Noto Sans KR', value: '"Noto Sans KR", sans-serif' },
+  // Pretendard 만 앱에 포함(src/style.css, 어느 PC 든 같음). 나머지는 그 PC 에 설치돼 있어야 하고, 없으면 다른 글꼴로 보인다
+  { label: '기본 (Pretendard — 앱에 포함, 모든 PC 동일)', value: DEFAULT_STYLE.fontFamily },
+  { label: '맑은 고딕 (PC 설치 글꼴)', value: '"Malgun Gothic", sans-serif' },
+  { label: '나눔고딕 (PC 설치 글꼴)', value: '"NanumGothic", "나눔고딕", sans-serif' },
+  { label: '나눔스퀘어 (PC 설치 글꼴)', value: '"NanumSquare", "나눔스퀘어", sans-serif' },
+  { label: '나눔명조 (PC 설치 글꼴)', value: '"NanumMyeongjo", "나눔명조", serif' },
+  { label: 'Noto Sans KR (PC 설치 글꼴)', value: '"Noto Sans KR", sans-serif' },
 ]
 const isPreset = computed(() => FONTS.some((f) => f.value === st.value.fontFamily))
 

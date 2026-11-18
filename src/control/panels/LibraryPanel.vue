@@ -36,7 +36,7 @@ function onKey(e: KeyboardEvent) {
   else if (e.key === 'Escape') { q.value = '' }
 }
 
-// 로그인: 곡 받기(동기화)·곡 편집에만 필요. 저장되지 않으므로 필요할 때 펼쳐서 로그인
+// 로그인: 곡 받기(동기화)·곡 편집에만 필요. 로그인은 이 기기에 저장된다
 const showLogin = ref(false)
 
 const statusText = computed(() => {
@@ -90,7 +90,7 @@ defineExpose({ focus: () => input.value?.focus() })
       <button class="login-toggle" @click="showLogin = !showLogin">
         {{ showLogin ? '▾' : '▸' }} 로그인 — 새 곡 받기 · 곡 추가/수정{{ lib.count.value ? '' : ' (처음엔 곡을 받아야 합니다)' }}
       </button>
-      <LoginForm v-if="showLogin || !lib.count.value" hint="받아 둔 곡은 로그인 없이 계속 쓸 수 있습니다. 로그인은 저장되지 않습니다." @done="showLogin = false" />
+      <LoginForm v-if="showLogin || !lib.count.value" hint="받아 둔 곡은 로그인 없이 계속 쓸 수 있습니다." @done="showLogin = false" />
     </template>
 
     <input

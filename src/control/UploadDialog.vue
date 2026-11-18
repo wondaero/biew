@@ -4,7 +4,7 @@
  * 열면 서버 최신 곡을 먼저 받고(동기화), 항목마다 중복(새 곡)·충돌(수정)을 검사한다.
  *  - 문제 없는 항목: 체크박스(기본 선택)로 올릴지 고름
  *  - 중복/충돌 항목: 처리 방법을 직접 고름(기본 '보류' — 고르지 않으면 올리지 않음)
- * 로그인은 저장되지 않으므로 여기서 로그인한다.
+ * 로그인돼 있지 않으면 여기서 로그인한다.
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { session } from '@/lib/auth'
@@ -84,7 +84,7 @@ const compareWith = (r: Row) => r.item.server ?? r.item.dup.sameLyrics[0] ?? r.i
       </header>
 
       <div class="body">
-        <LoginForm v-if="!session" hint="서버에 올리려면 로그인하세요. (로그인은 저장되지 않습니다)" />
+        <LoginForm v-if="!session" hint="서버에 올리려면 로그인하세요." />
         <p v-else-if="loading" class="muted">서버의 최신 곡을 받고 비교하는 중…</p>
         <p v-else-if="err" class="err">{{ err }}</p>
         <p v-else-if="!rows.length" class="muted">올릴 변경이 없습니다.</p>
