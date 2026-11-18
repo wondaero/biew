@@ -4,11 +4,19 @@ import { DEFAULT_STYLE, type OutputStyle } from '@shared/types'
 import { useLive } from '@/live/liveStore'
 import { KEY_BLACK, KEY_GREEN, keyable, backdropCss, type Backdrop, type BgDirection } from '@shared/backdrop'
 import { normalizeStyle, sameStyle } from '@shared/outputStyle'
+import { useStyleDraft } from '@/live/styleDraft'
+import StylePreview from './StylePreview.vue'
 import { presets, savePreset, deletePreset, findByName, exportJson, importJson, NAME_MAX, type StylePreset } from '@/live/stylePresets'
 
 const live = useLive()
-const st = computed(() => live.state.style)
-const set = <K extends keyof OutputStyle>(k: K, v: OutputStyle[K]) => live.setStyle({ [k]: v } as Partial<OutputStyle>)
+/**
+ * 설정을 바꾸면 수정본(적용 전)만 바뀐다 — 송출엔 '적용'을 눌러야 나간다(src/live/styleDraft.ts).
+ * st = 화면에 보이는 설정(수정본이 있으면 수정본, 없으면 송출 중 설정)
+ */
+const draft = useStyleDraft()
+const st = draft.shown
+const set = <K extends keyof OutputStyle>(k: K, v: OutputStyle[K]) => draft.patch(k, v)
+const applied = computed(() => live.state.style)
 /** 슬라이더 채움 비율(--p) — 왼쪽(채운 부분)을 파랑으로. 크롬은 진행 부분 스타일이 없어 트랙 그라데이션으로 그린다(src/style.css) */
 const fill = (v: number, min: number, max: number) => ({ '--p': `${Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100))}%` })
 const num = (e: Event) => Number((e.target as HTMLInputElement).value)
@@ -55,6 +63,8 @@ const DIRS: { v: BgDirection; label: string; title: string }[] = [
 
 // ── 저장된 설정(이 PC 에만 — src/live/stylePresets.ts) ──
 const presetName = ref('')
+/** 백업·옮기기(파일 내보내기/가져오기)는 가끔 쓰므로 접어 둔다 — 펼쳐 놓으면 '파일로 저장하는 기능'처럼 보였음(사용자 지적) */
+const showBackup = ref(false)
 const presetMsg = ref<{ text: string; err?: boolean } | null>(null)
 const say = (text: string, err = false) => { presetMsg.value = { text, err } }
 const activeId = computed(() => presets.value.find((p) => sameStyle(p.style, st.value))?.id ?? null)
@@ -66,11 +76,15 @@ function save() {
   presetName.value = ''
   say(`"${name}" 저장됨 (이 PC)`)
 }
-/** 불러오기 = 한 번의 변경으로 전체 교체 → 송출 화면도 한 번에 바뀐다 */
+/** 불러오기 = 수정본으로 통째로(송출엔 아직 안 나감 — 미리보기로 확인 후 적용) */
 function apply(p: StylePreset) {
-  live.setStyle(normalizeStyle(p.style))
-  say(`"${p.name}" 적용됨`)
+  if (sameStyle(p.style, applied.value)) { draft.revert(); say(`"${p.name}" — 이미 송출 중인 설정입니다`); return }
+  draft.replace(normalizeStyle(p.style))
+  say(`"${p.name}" 불러옴 — 미리보기 확인 후 [적용]을 누르면 송출됩니다`)
 }
+/** 저장된 설정 표시: 송출 중과 같으면 '송출 중', 적용 전 수정본과 같으면 '미리보기' */
+const presetTag = (p: StylePreset) =>
+  sameStyle(p.style, applied.value) ? '송출 중' : draft.dirty.value && sameStyle(p.style, st.value) ? '미리보기' : null
 function remove(p: StylePreset) {
   if (!confirm(`저장된 설정 "${p.name}" 을(를) 지울까요?`)) return
   deletePreset(p.id)
@@ -98,29 +112,31 @@ async function importFile(e: Event) {
 
 <template>
   <section class="style">
-    <h2>출력 설정</h2>
+    <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag">적용 안 된 변경</span></h2>
 
     <!-- 저장된 설정: 이 PC 에만(서버로 안 보냄) -->
     <div class="presets full">
       <div class="p-head"><span>저장된 설정</span><small>이 PC 에만 저장</small></div>
-      <ul v-if="presets.length" class="p-list">
+      <!-- 목록 자리는 비어 있어도 상자로 항상 보인다 — 저장하면 여기에 쌓인다는 게 보이게 -->
+      <ul v-if="presets.length" class="p-list p-box">
         <li v-for="p in presets" :key="p.id" :class="{ on: p.id === activeId }">
-          <button class="p-apply" :title="`'${p.name}' 불러오기 — 송출 화면에 바로 적용됩니다`" @click="apply(p)">
+          <button class="p-apply" :title="`'${p.name}' 불러오기 — 미리보기로 확인 후 [적용]을 눌러 송출`" @click="apply(p)">
             <span class="p-swatch" :style="{ background: backdropCss(p.style.backdrop), color: p.style.color }">가</span>
             <span class="p-name">{{ p.name }}</span>
-            <span v-if="p.id === activeId" class="p-cur">적용 중</span>
+            <span v-if="presetTag(p)" class="p-cur" :class="{ pv: presetTag(p) === '미리보기' }">{{ presetTag(p) }}</span>
           </button>
           <button class="p-del" title="지우기" @click="remove(p)">✕</button>
         </li>
       </ul>
-      <p v-else class="muted">아직 없음 — 지금 설정에 이름을 붙여 저장해 두면 한 번에 불러올 수 있습니다.</p>
+      <p v-else class="p-box p-empty">아직 없음 — 아래에 이름을 쓰고 <b>현재 설정 저장</b>을 누르면 여기에 쌓입니다. 누르면 한 번에 불러옵니다.</p>
       <form class="p-save" @submit.prevent="save">
         <input v-model="presetName" :maxlength="NAME_MAX" placeholder="이름 (예: 본당 프로젝터)" />
         <button class="primary" :disabled="!presetName.trim()">현재 설정 저장</button>
       </form>
-      <div class="p-file">
-        <button type="button" :disabled="!presets.length" title="다른 PC 로 옮기거나 백업할 때" @click="exportFile">파일로 내보내기</button>
-        <label class="p-import">파일에서 가져오기<input type="file" accept="application/json,.json" @change="importFile" /></label>
+      <button type="button" class="p-more" :aria-expanded="showBackup" @click="showBackup = !showBackup">{{ showBackup ? '▾' : '▸' }} 백업·다른 PC 로 옮기기 <small>(JSON 파일)</small></button>
+      <div v-if="showBackup" class="p-file">
+        <button type="button" :disabled="!presets.length" title="저장된 설정 전체를 파일로 — 다른 PC 로 옮기거나 백업할 때" @click="exportFile">파일로 내보내기</button>
+        <label class="p-import" title="내보낸 파일을 이 PC 의 목록에 추가(같은 이름은 바꿈)">파일에서 가져오기<input type="file" accept="application/json,.json" @change="importFile" /></label>
       </div>
       <p v-if="presetMsg" class="p-msg" :class="{ err: presetMsg.err }">{{ presetMsg.text }}</p>
     </div>
@@ -201,7 +217,10 @@ async function importFile(e: Event) {
       <input type="range" min="100" max="1000" step="50" :value="st.fadeMs" :style="fill(st.fadeMs, 100, 1000)" @input="set('fadeMs', num($event))" />
     </label>
 
-    <button class="reset full danger-line" @click="live.setStyle({ ...DEFAULT_STYLE })">기본값으로</button>
+    <button class="reset full danger-line" title="수정본을 기본값으로(적용을 눌러야 송출)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
+
+    <!-- PC: 적용 전 미리보기 + 적용/되돌리기 — 패널 아래쪽에 붙어 스크롤해도 보인다(모바일은 시트 위쪽에 따로 있음) -->
+    <StylePreview v-if="draft.dirty.value || draft.canUndo.value" class="desk-apply full" compact />
   </section>
 </template>
 
@@ -247,13 +266,25 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
 .presets { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .p-head { display: flex; align-items: baseline; justify-content: space-between; color: var(--muted); }
 .p-head small { font-size: 11px; }
-.p-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 180px; overflow-y: auto; }
+.p-box { margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0, 0, 0, .18); }
+.p-empty { padding: 10px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.p-empty b { color: var(--text); font-weight: 600; }
+.p-list { list-style: none; display: grid; gap: 4px; max-height: 180px; overflow-y: auto; }
+/* 접기 토글 = 평평한 글자 버튼 */
+.p-more { justify-self: start; padding: 2px 0; margin: 0; border: none; background: none; box-shadow: none; color: var(--muted); font-size: 12px; }
+.p-more:hover { color: var(--text); background: none; }
+.p-more small { font-size: 11px; opacity: .7; }
 .p-list li { display: flex; gap: 4px; }
 .p-apply { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 8px; text-align: left; font-size: 12px; }
 .p-list li.on .p-apply { border-color: var(--accent); }
 .p-swatch { flex: none; width: 22px; height: 16px; border-radius: 3px; border: 1px solid var(--line); font-size: 10px; font-weight: 700; display: grid; place-items: center; }
 .p-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.p-cur { flex: none; font-size: 10px; color: var(--accent); }
+.p-cur { flex: none; font-size: 10px; color: var(--live); font-weight: 600; }
+.p-cur.pv { color: var(--preview); }
+.dirty-tag { margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #dbe7ff; background: rgba(79, 140, 255, .25); vertical-align: middle; }
+/* PC: 적용 바 — 패널(.right) 아래쪽에 붙음. 모바일은 시트 위쪽 고정 미리보기가 같은 일을 하므로 숨김 */
+.desk-apply { position: sticky; bottom: -10px; z-index: 3; margin: 4px -10px -10px; padding: 8px 10px 10px; background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -8px 16px rgba(0, 0, 0, .35); }
+@media (max-width: 768px) { .desk-apply { display: none; } }
 .p-del { flex: none; padding: 0 8px; color: var(--muted); }
 .p-save { display: flex; gap: 4px; }
 .p-save input { flex: 1; min-width: 0; }

@@ -79,12 +79,46 @@ try {
   await back(m)
   check('팝업 없을 때 뒤로가기 → 이전 페이지(홈)', await until(async () => (await path(m)) === '/'))
 
+  // ── 폰: 출력 설정 시트의 고정 미리보기(설정을 바꾸며 결과를 바로 봄) ──
+  await m.goto(BASE + '/local', { waitUntil: 'networkidle0' })
+  await m.$$eval('.dock button', (bs) => bs[2].click()) // 출력 설정
+  check('출력 설정 시트에 미리보기', !!(await m.waitForSelector('.style-sheet.open .sheet-pv .pv-screen', { timeout: 5000 }).catch(() => null)))
+  const pvTop = () => m.$eval('.sheet-pv', (e) => e.getBoundingClientRect().top)
+  await sleep(500) // 시트가 올라오는 애니메이션(0.2초)이 끝난 뒤 위치를 잰다
+  const top0 = await pvTop()
+  await m.$eval('.style-sheet', (e) => { e.scrollTop = 600 })
+  await sleep(200)
+  check('설정을 아래로 스크롤해도 미리보기 위치 고정', Math.abs((await pvTop()) - top0) < 1)
+  const fs0 = await m.$eval('.sheet-pv .txt', (e) => parseFloat(getComputedStyle(e).fontSize))
+  await m.$eval('.style-sheet input[type=range]', (e) => { e.value = '12'; e.dispatchEvent(new Event('input', { bubbles: true })) })
+  check('크기 바꾸면 미리보기에 바로 반영', await until(async () => (await m.$eval('.sheet-pv .txt', (e) => parseFloat(getComputedStyle(e).fontSize))) > fs0 * 1.3))
+  // 수정본: 송출(저장된 송출 상태)은 그대로, 적용을 눌러야 나간다
+  const airFont = () => m.evaluate(() => JSON.parse(localStorage.getItem('biew.live.v1:LOCAL') ?? '{}').style?.fontSize)
+  const before = await airFont()
+  check('적용 전: 송출 설정은 그대로', before !== 12, String(before))
+  await back(m)
+  check('뒤로가기 → 출력 설정 시트 닫힘', await until(async () => !(await m.$('.style-sheet.open'))))
+  check('닫아도 수정본 유지 → 하단 "출력 설정"에 표시(•)', !!(await m.$('.dock button.dirty .dock-dot')))
+  await m.$$eval('.dock button', (bs) => bs[2].click())
+  await m.waitForSelector('.style-sheet.open .sheet-pv .apply', { timeout: 3000 })
+  await sleep(400)
+  await m.click('.style-sheet.open .sheet-pv .apply')
+  check('시트의 [적용] → 송출 설정 바뀜, 표시 사라짐', await until(async () => (await airFont()) === 12) && !(await m.$('.dock button.dirty')))
+  await back(m)
+  await until(async () => !(await m.$('.style-sheet.open')))
+
   // ── PC: 단축키 도움말 ──
   const d = await open(1400, 900)
   await d.click('button.desk-only.quiet')
   check('PC: 단축키 도움말 열림', await until(() => d.$('.help')))
   await back(d)
   check('PC: 뒤로가기 → 도움말만 닫힘', await until(async () => !(await d.$('.help'))) && (await path(d)) === '/local')
+  // PC: 오른쪽 패널을 스크롤해도 송출 모니터는 위에 고정
+  const monTop = () => d.$eval('aside.right .monitors', (e) => e.getBoundingClientRect().top)
+  const mt0 = await monTop()
+  await d.$eval('aside.right', (e) => { e.scrollTop = 600 })
+  await sleep(200)
+  check('PC: 출력 설정을 스크롤해도 송출 모니터 고정', Math.abs((await monTop()) - mt0) < 12 && (await d.$eval('aside.right', (e) => e.scrollTop)) > 100)
 } catch (e) { fail++; console.error('✖ 중단:', e.message) } finally {
   await browser.close()
   console.log(`\n${fail ? '✖' : '✔'} ${pass} 통과 / ${fail} 실패`)

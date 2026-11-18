@@ -74,7 +74,8 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.
 - **뒤로가기 = 팝업 닫기**(`src/lib/backClose.ts` `useBackClose(isOpen, request)`): 팝업이 열리면 같은 주소로 히스토리 칸을 쌓고, 뒤로가기는 맨 위 팝업에 닫기를 요청(거절하면 칸을 다시 쌓음). 새 팝업·시트를 만들면 반드시 연결할 것(안 하면 모바일 뒤로가기가 페이지를 나감). 처리 중엔 request 에서 무시. E2E `e2e:back`.
 - 세그먼트(고르기) 버튼의 선택 상태는 제자리 + 안쪽 그림자 — 내리면(translate) 받침이 안 보이는 어두운 패널에서 옆 버튼보다 처져 보인다.
-- **저장된 출력 설정(프리셋)** = `src/live/stylePresets.ts`, localStorage `biew.stylePresets.v1` 하나(채널 무관). **서버에 절대 올리지 않는다**(사용자 결정). 옮기기·백업은 JSON 파일 내보내기/가져오기. 불러오기는 `setStyle` 한 번(송출에 즉시 반영). OutputStyle 필드를 바꾸면 `shared/outputStyle.ts` 의 `normalizeStyle` 도 같이.
+- **저장된 출력 설정(프리셋)** = `src/live/stylePresets.ts`, localStorage `biew.stylePresets.v1` 하나(채널 무관). **서버에 절대 올리지 않는다**(사용자 결정). 옮기기·백업은 JSON 파일 내보내기/가져오기. 불러오기는 수정본으로(적용을 눌러야 송출). 목록 상자 항상 표시, 파일 내보내기/가져오기는 "백업·다른 PC 로 옮기기" 안에 접힘. OutputStyle 필드를 바꾸면 `shared/outputStyle.ts` 의 `normalizeStyle` 도 같이.
+- **출력 설정 = 수정본 → 적용**(2026-11-18 사용자 결정, `src/live/styleDraft.ts`): 설정을 바꾸면 수정본만 바뀌고 **[적용]을 눌러야 송출**. 기준 = 지금 송출 중 설정(되돌리기 = 수정본 버림 — PC 패널은 늘 열려 있어 "연 시점" 기준은 애매하므로). 시트를 닫아도 수정본 유지(하단 "⚙ 출력 설정 •"), 새로고침·채널 이동 시 사라짐(메모리만). 적용 직후 "방금 적용 취소" 한 단계. **적용 ≠ 저장**(저장 = 이름 붙여 보관, 지금 보이는 설정). 미리보기: 모바일 시트 위쪽 고정, PC 는 패널 아래쪽 sticky(수정본 있을 때만) + 위 송출 모니터 고정. FREEZE 는 글만 고정 — 설정은 적용하면 바로 나간다. 설정 패널에서 `live.setStyle` 을 직접 부르지 말 것.
 - **PWA**: 앱 파일 전체 precache, 새 버전은 **알림 후 적용**(자동 교체 금지 — 예배 중 화면이 바뀌면 안 됨). 알림은 /output 에 절대 띄우지 않는다. Supabase 요청은 캐시하지 않는다.
 - **로컬 송출 `/local`** = 채널 없는 PC 전용 송출(`LOCAL_CODE`). 예배의 기본. 서버 기능을 여기에 섞지 말 것. 콘티는 그날 하루 임시 — 송출 방식 간 콘티 가져오기·보관 기능은 만들지 않기로 함.
 - **곡 저장 규칙**: 온라인+로그인이면 서버에 바로, 아니면 PC(pending). 이미 pending 이 있는 곡은 온라인이어도 PC 에 이어서 저장(충돌 검사를 거쳐야 하므로). 서버에 올리기 전에 반드시 동기화 후 중복(새 곡)·충돌(수정, base.updated_at 비교) 검사. 삭제는 온라인만.

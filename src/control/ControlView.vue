@@ -15,6 +15,8 @@ import SetlistPanel from './panels/SetlistPanel.vue'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import StylePanel from './panels/StylePanel.vue'
+import StylePreview from './panels/StylePreview.vue'
+import { useStyleDraft } from '@/live/styleDraft'
 import ChannelPopover from './panels/ChannelPopover.vue'
 import SwitchToInternet from './SwitchToInternet.vue'
 
@@ -87,6 +89,8 @@ function leaveRemote() {
 
 // 모바일 바텀시트 (PC 에선 CSS 가 무시하므로 상태만 있고 영향 없음)
 const sheet = ref<'find' | 'style' | null>(null)
+/** 출력 설정에 적용 안 된 수정본이 있으면 하단 버튼에 표시(시트를 닫아도 수정본은 남음) */
+const styleDraft = useStyleDraft()
 // 뒤로가기 = 열린 바텀시트·단축키 도움말 닫기(페이지를 나가지 않게)
 useBackClose(() => !!sheet.value, () => { sheet.value = null })
 useBackClose(() => showHelp.value, () => { showHelp.value = false })
@@ -205,9 +209,13 @@ onBeforeUnmount(() => {
     <aside class="right">
       <MonitorPanel />
       <div v-if="isHost" class="style-sheet" :class="{ open: sheet === 'style' }">
-        <div class="sheet-head">
-          <span class="spacer" />
-          <button aria-label="닫기" @click="sheet = null">✕</button>
+        <!-- 모바일: 머리 + 미리보기를 시트 위에 고정, 설정은 그 아래에서 스크롤(PC 에선 숨김 — 위 모니터가 고정됨) -->
+        <div class="sheet-top">
+          <div class="sheet-head">
+            <span class="spacer" />
+            <button aria-label="닫기" @click="sheet = null">✕</button>
+          </div>
+          <StylePreview class="sheet-pv" />
         </div>
         <StylePanel />
       </div>
@@ -216,7 +224,7 @@ onBeforeUnmount(() => {
     <nav v-if="isHost" class="dock">
       <button @click="openSheet('find', 'lib')">🔍 곡 검색</button>
       <button @click="openSheet('find', 'set')">☰ 콘티 {{ live.state.setlist.length }}</button>
-      <button @click="openSheet('style')">⚙ 출력 설정</button>
+      <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
     </nav>
   </div>
 </template>
@@ -265,6 +273,9 @@ onBeforeUnmount(() => {
 .center { grid-area: center; display: flex; flex-direction: column; min-height: 0; }
 .center > * { flex: 1; }
 .right { grid-area: right; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 10px; border-left: 1px solid var(--line); overflow-y: auto; background: var(--panel); }
+/* PC: 송출 모니터를 위에 고정 — 출력 설정을 아래로 스크롤해도 결과가 보이게(사용자 요청) */
+.right > .monitors { position: sticky; top: -10px; z-index: 3; margin: -10px -10px 0; padding: 10px 10px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.sheet-pv { display: none; }
 
 /* 리모컨(폰, 계정 없음): 모니터 + 슬라이드 목록 + 이동 버튼만. 화면 폭과 무관하게 1열 */
 .control.remote {
@@ -275,6 +286,7 @@ onBeforeUnmount(() => {
 .control.remote .top { flex-wrap: wrap; gap: 8px; }
 .control.remote .group { flex: 1; }
 .control.remote .group button { flex: 1; padding: 10px 12px; }
+.control.remote .right > .monitors { position: static; margin: 0; padding: 0; border-bottom: 0; }
 .control.remote .right { border-left: 0; border-bottom: 1px solid var(--line); overflow: visible; padding: 8px 12px; gap: 0; }
 .control.remote .right :deep(.monitors) { max-width: 520px; width: 100%; margin: 0 auto; }
 .control.remote .right :deep(.screen) { max-height: 32dvh; margin: 0 auto; }
@@ -323,7 +335,12 @@ onBeforeUnmount(() => {
   }
   .left.open, .style-sheet.open { transform: none; visibility: visible; transition: transform .2s; }
   .left { grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
-  .style-sheet { overflow-y: auto; }
+  .style-sheet { overflow-y: auto; padding-top: 0; }
+  /* 시트 머리 + 미리보기 고정, 설정만 스크롤 */
+  .style-sheet .sheet-top { position: sticky; top: 0; z-index: 2; margin: 0 -12px 10px; padding: 10px 12px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .style-sheet .sheet-top .sheet-head { margin-bottom: 6px; }
+  .sheet-pv { display: grid; }
+  .right > .monitors { position: static; margin: 0; padding: 0; border-bottom: 0; }
   .left[data-tab='lib'] .set, .left[data-tab='set'] .lib { display: none; }
 
   .sheet-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
@@ -333,6 +350,8 @@ onBeforeUnmount(() => {
   .sheet-head button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   .dock { grid-area: dock; display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
+  .dock button.dirty { color: #dbe7ff; border-color: var(--preview); }
+  .dock-dot { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; background: var(--preview); vertical-align: middle; }
   .dock button { flex: 1; padding: 12px 6px; font-size: 13px; white-space: nowrap; }
 }
 </style>

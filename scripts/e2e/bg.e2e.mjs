@@ -1,4 +1,4 @@
-// 배경 E2E(로컬 송출): 예전 'green' 이어받기 · 단색 · 그라데이션(방향·색 바꾸기) · 키잉 경고. Lorem 더미.
+// 배경 E2E(로컬 송출): 예전 'green' 이어받기 · 단색 · 그라데이션(방향·색 바꾸기) · 키잉 경고 · 적용 전엔 송출 그대로(수정본). Lorem 더미.
 import puppeteer from 'puppeteer-core'
 import { CHROME, OUT, ensureServer } from './_lib.mjs'
 const server = await ensureServer('dev', 5179) // 개발 서버가 없으면 띄우고 끝나면 끈다
@@ -28,8 +28,15 @@ try {
   await c.bringToFront()
   const warn = () => c.$('.bg .warn')
   check('키잉 색(초록)일 땐 경고 없음', !(await warn()))
-  const btn = (t) => c.$$eval('.bg button', (bs, t) => bs.find((x) => x.textContent?.trim() === t)?.click(), t)
-  await btn('그라데이션')
+  // 설정은 수정본만 바꾸고 [적용]을 눌러야 송출(src/live/styleDraft.ts) → 버튼마다 적용까지
+  const pick = (t) => c.$$eval('.bg button', (bs, t) => bs.find((x) => x.textContent?.trim() === t)?.click(), t)
+  const applyNow = async () => { await c.waitForSelector('.desk-apply .apply', { timeout: 3000 }); await c.click('.desk-apply .apply') }
+  const btn = async (t) => { await pick(t); await applyNow() }
+  await pick('그라데이션')
+  await sleep(500)
+  check('적용 전: 송출은 그대로(초록), "적용 안 된 변경" 표시', (await outBg()).includes('rgb(0, 177, 64)') && !!(await c.$('.dirty-tag')))
+  await applyNow()
+  check('적용 → 표시 사라짐', await until(async () => !(await c.$('.dirty-tag'))))
   check('그라데이션 → 출력에 linear-gradient(위→아래)', await until(async () => (await outBg()).startsWith('linear-gradient(rgb(30, 58, 95), rgb(0, 0, 0))')), await outBg())
   check('키잉 불가 경고 표시', !!(await warn()))
   await btn('↘')
@@ -42,6 +49,17 @@ try {
   check('단색 검정은 루마키로 인식(경고 없음)', await until(async () => !(await warn())))
   await btn('초록 (크로마키)')
   check('초록(크로마키) 버튼', await until(async () => (await outBg()).includes('rgb(0, 177, 64)')))
+  // 방금 적용 취소 → 그 전(검정)으로 바로 송출
+  await c.click('.desk-apply .undo')
+  check('방금 적용 취소 → 이전 설정(검정)으로', await until(async () => (await outBg()).startsWith('none|rgb(0, 0, 0)')), await outBg())
+  // 되돌리기 → 수정본 버림(송출 그대로)
+  await pick('초록 (크로마키)')
+  await c.waitForSelector('.desk-apply')
+  await c.$$eval('.desk-apply button', (bs) => bs.find((b) => b.textContent?.trim() === '되돌리기')?.click())
+  await sleep(300)
+  check('되돌리기 → 수정본 버림, 송출 그대로(검정)', !(await c.$('.dirty-tag')) && (await outBg()).startsWith('none|rgb(0, 0, 0)'))
+  await btn('초록 (크로마키)')
+  await until(async () => (await outBg()).includes('rgb(0, 177, 64)'))
   const saved = await c.evaluate(() => JSON.parse(localStorage.getItem('biew.live.v1:LOCAL')).style)
   check('저장 형식: backdrop(예전 background 필드 없음)', saved.backdrop?.kind === 'solid' && !('background' in saved), JSON.stringify(saved.backdrop))
 } catch (e) { fail++; console.error('✖ 중단:', e.message) } finally {
