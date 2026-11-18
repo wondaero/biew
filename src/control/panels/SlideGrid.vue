@@ -3,6 +3,9 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
 import { vFitLines } from '@/components/fitLines'
+import { useLibrary, loadCache, saveSong } from '@/library/library'
+import SlideEditDialog from '../SlideEditDialog.vue'
+import { patchSongSlides } from '../slideEdit'
 
 const live = useLive()
 const root = ref<HTMLElement>()
@@ -63,6 +66,36 @@ watch(
   },
 )
 
+// ── 슬라이드 한 장 고치기(✎) — 콘티는 즉시, 곡 원본은 그 글만(src/control/slideEdit.ts) ──
+const lib = useLibrary()
+const editing = ref<{ key: string; j: number } | null>(null)
+const notice = ref<{ text: string; warn: boolean } | null>(null)
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+function say(text: string, warn = false) {
+  notice.value = { text, warn }
+  clearTimeout(noticeTimer)
+  noticeTimer = setTimeout(() => (notice.value = null), warn ? 8000 : 4000)
+}
+async function saveEdit(p: { text: string; indexes: number[]; toSong: boolean; all: boolean }) {
+  const e = editing.value
+  const it = e && live.state.setlist.find((x) => x.key === e.key)
+  if (!e || !it) return
+  const oldText = it.slides[e.j]!
+  live.setlist.editSlides(e.key, p.indexes, p.text)
+  editing.value = null
+  if (!p.toSong) return say('콘티만 고쳤습니다(곡 원본은 그대로)')
+  await loadCache()
+  const song = lib.byId.value.get(it.songId)
+  const slides = song && patchSongSlides(song.slides, e.j, oldText, p.text, p.all)
+  if (!song || !slides) return say(song ? '콘티는 고쳤지만 곡 원본은 그 사이 바뀌어 저장하지 않았습니다 — 곡 검색의 ✎ 로 확인하세요' : '콘티는 고쳤지만 곡 원본을 찾을 수 없습니다', true)
+  try {
+    const r = await saveSong({ id: song.id, title: song.title, slides })
+    say(r.local ? '고쳤습니다 — 곡 원본은 이 PC 에 저장(나중에 서버에 올리기)' : '고쳤습니다 — 곡 원본도 저장')
+  } catch (err) {
+    say(`콘티는 고쳤지만 곡 원본 저장 실패: ${err instanceof Error ? err.message : err}`, true)
+  }
+}
+
 defineExpose({ scrollToItem })
 </script>
 
@@ -89,9 +122,8 @@ defineExpose({ scrollToItem })
       </h3>
       <p v-if="!isClosed(it.key) && !it.slides.length" class="noslide">슬라이드 없음</p>
       <div v-if="!isClosed(it.key)" class="cards">
+        <div v-for="(s, j) in it.slides" :key="j" class="cell">
         <button
-          v-for="(s, j) in it.slides"
-          :key="j"
           class="card"
           :class="{ live: isLive(i, j), frozen: isLive(i, j) && air.frozen, pvw: isPreview(i, j), ctl: isCtl(i, j), blanked: isLive(i, j) && air.blank }"
           @click="onClick(i, j)"
@@ -100,8 +132,12 @@ defineExpose({ scrollToItem })
           <span class="idx">{{ j + 1 }}</span>
           <span v-fit-lines="s" class="txt">{{ s }}</span>
         </button>
+        <button v-if="live.role.value === 'host'" class="edit" title="이 슬라이드 글 고치기" aria-label="이 슬라이드 글 고치기" @click="editing = { key: it.key, j }">✎</button>
+        </div>
       </div>
     </div>
+    <SlideEditDialog v-if="editing" :item-key="editing.key" :slide-index="editing.j" @close="editing = null" @save="saveEdit" />
+    <p v-if="notice" class="se-notice" :class="{ warn: notice.warn }" role="status">{{ notice.text }}</p>
   </section>
 </template>
 
@@ -142,6 +178,20 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .card.live.frozen .idx { color: var(--freeze); }
 .card.live .txt { color: #fff; }
 .card.blanked .txt { opacity: .35; }
+.cell { position: relative; min-width: 0; display: grid; }
+/* ✎ = 카드 오른쪽 위 구석(카드 클릭 = 송출이므로 카드 밖 형제 버튼, 누를 자리 충분히). PC 는 마우스를 올렸을 때만 */
+.edit {
+  position: absolute; top: 3px; right: 3px; width: 30px; height: 26px; padding: 0; margin: 0; z-index: 1;
+  font-size: 14px; line-height: 1; border-radius: 6px; background: rgba(20, 20, 26, .9); box-shadow: none; color: #cfd3dc;
+}
+.edit:active { transform: none; }
+.edit:hover { border-color: var(--accent); color: #fff; }
+@media (hover: hover) { .edit { opacity: 0; } .cell:hover .edit, .edit:focus-visible { opacity: 1; } }
+.se-notice {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 47; margin: 0; max-width: calc(100vw - 32px);
+  padding: 8px 14px; border-radius: 8px; background: #1d2a22; border: 1px solid var(--live); color: #c9f5d9; font-size: 13px;
+}
+.se-notice.warn { background: #2e2614; border-color: var(--warn); color: #ffe7a8; }
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }
 .card.live .idx { color: var(--live); font-weight: 700; }
 @media (max-width: 768px) {
@@ -152,6 +202,11 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   .idx { position: static; min-width: 16px; text-align: center; font-size: 12px; }
   /* .card .txt: 아래 기본 .txt 규칙보다 뒤에 있어도 이기도록(예전엔 순서 때문에 14px 가 안 먹고 12.5px 였음) */
   .card .txt { font-size: 14px; }
+  /* 폰: ✎ 항상 보임(마우스 올리기 없음) — 글이 ✎ 아래로 가지 않게 오른쪽 자리 비움 */
+  .card { padding-right: 38px; gap: 8px; padding-left: 8px; }
+  .edit { top: 50%; right: 4px; transform: translateY(-50%); width: 32px; height: 34px; }
+  .edit:active { transform: translateY(-50%); }
+  .se-notice { bottom: 80px; }
   h3 { margin: 0 -10px 8px; padding: 10px 18px; }
 }
 /*

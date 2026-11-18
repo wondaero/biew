@@ -72,6 +72,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 기호 ◀ ▶ 는 Windows 가 이모지로 그릴 수 있음 → 뒤에 `&#xFE0E;`(글자로 그리기). 디자인 비교 스크린샷은 `node scripts/e2e/shot-control.mjs <이름>`.
 - **FREEZE**(단축키 F 는 **걸기만**, 해제는 버튼 클릭으로만 — 가사 수정 중 실수로 풀리는 것 방지): `LiveState.frozen` = 걸 때의 송출 위치 + **텍스트 스냅샷**. 컨트롤러 이동/BLANK 는 그대로 동작하지만 출력·뷰어·PGM 모니터는 `nav.onAir(state)`(freeze 중이면 스냅샷)를 그린다. 해제하면 컨트롤러의 현재 위치가 바로 송출. 목적: 예배 중 오타 발견 시 송출은 유지한 채 가사 수정. 송출을 그리는 곳은 `currentText(state)` 대신 반드시 `onAir()` 를 쓸 것. 컨트롤러가 freeze 중 가리키는 위치는 SlideGrid 에서 파란 점선(`.ctl`).
 - 즉시 모드: 카드 클릭 = 송출, 그리드엔 송출 중만 표시. PVW 모드: 클릭 = 미리보기, Enter/TAKE = 송출.
+- **슬라이드 한 장 고치기 = 카드의 ✎**(2026-11-18 사용자 결정, `SlideEditDialog.vue` + 규칙 `src/control/slideEdit.ts`): 예배 중 오타용. 저장 = 콘티 즉시(`live.setlist.editSlides` — 장 수·위치 그대로, 송출 중 장이면 바로 나감, FREEZE 중이면 풀 때) + **곡 원본에도**(기본 켜짐, 끄면 오늘만). 원본은 통째로 덮지 않고 **그 글만** 바꿔 `saveSong` 규칙대로(서버/PC) — 어느 장인지 모르면(그 사이 바뀜) 원본은 건드리지 않고 경고. 같은 글이 여러 장(후렴)이면 "모두" 기본 켜짐. 빈 줄 금지(나누기는 곡 편집기). ✎ 는 카드 밖 형제 버튼(카드 클릭 = 송출), PC 는 마우스 올릴 때만, 폰은 항상. 호스트만. E2E `e2e:slideedit`.
 - 모달(편집기) 열린 동안 `hotkeysPaused` 로 송출 단축키 중지.
 - **뒤로가기 = 팝업 닫기**(`src/lib/backClose.ts` `useBackClose(isOpen, request)`): 팝업이 열리면 같은 주소로 히스토리 칸을 쌓고, 뒤로가기는 맨 위 팝업에 닫기를 요청(거절하면 칸을 다시 쌓음). 새 팝업·시트를 만들면 반드시 연결할 것(안 하면 모바일 뒤로가기가 페이지를 나감). 처리 중엔 request 에서 무시. E2E `e2e:back`.
 - 세그먼트(고르기) 버튼의 선택 상태는 제자리 + 안쪽 그림자 — 내리면(translate) 받침이 안 보이는 어두운 패널에서 옆 버튼보다 처져 보인다.

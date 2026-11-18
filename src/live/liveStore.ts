@@ -208,6 +208,20 @@ const setlist = {
   clear() {
     setSetlist([])
   },
+  /**
+   * 슬라이드 글만 고치기(카드의 ✎). 장 수·순서·송출 위치는 그대로 → 송출 중인 장이면 저장 즉시 새 글이 나간다.
+   * FREEZE 중이면 고정 화면은 텍스트 스냅샷이라 그대로(풀면 반영).
+   */
+  editSlides(key: string, indexes: number[], text: string) {
+    const i = state.setlist.findIndex((x) => x.key === key)
+    if (i < 0) return
+    commit((s) => {
+      const it = s.setlist[i]!
+      const slides = [...it.slides]
+      for (const j of indexes) if (j >= 0 && j < slides.length) slides[j] = text
+      s.setlist[i] = { ...it, slides }
+    })
+  },
 }
 
 function setStyle(patch: Partial<OutputStyle>) {
