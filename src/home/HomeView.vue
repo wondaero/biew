@@ -319,7 +319,7 @@ const build = __APP_BUILD__
 </template>
 
 <style scoped>
-.home { max-width: 520px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 16px; }
+.home { max-width: 520px; margin: 0 auto; padding: 24px 16px 64px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; } /* minmax(0,…): 긴 내용이 열을 넓혀 좁은 폰(280px)에서 가로로 넘치지 않게 */
 header { display: flex; align-items: center; }
 h1 { margin: 0; font-size: 22px; letter-spacing: .5px; flex: 1; }
 h2 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px; }
@@ -329,14 +329,14 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 /* 폰·태블릿: 머리 → 번호로 입장 → 나머지(DOM 순서) */
 .home.mobile > header { order: -2; }
 .home.mobile > .join { order: -1; }
-.card { display: grid; gap: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .form { display: grid; gap: 8px; }
 .muted { margin: 0; color: var(--muted); font-size: 12px; }
 .warn { margin: 0; color: var(--warn); font-size: 13px; }
 .err { margin: 0; color: var(--pgm); font-size: 13px; }
-.code { text-align: center; font: 700 26px/1 ui-monospace, monospace; letter-spacing: 6px; padding: 12px 8px; text-transform: uppercase; }
-.row { display: flex; gap: 8px; }
-.row button { flex: 1; padding: 10px; }
+.code { text-align: center; font: 700 26px/1 ui-monospace, monospace; letter-spacing: 6px; padding: 12px 8px; text-transform: uppercase; width: 100%; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; } /* 좁은 폰(280px)에선 버튼이 두 줄로 쌓인다 — 글자가 버튼 안에서 꺾이지 않게 */
+.row button { flex: 1 1 120px; min-width: 0; padding: 10px; white-space: nowrap; }
 .card > button, .form > button { padding: 10px; }
 .ghost { margin-left: auto; padding: 2px 8px; font-size: 12px; font-weight: normal; }
 .who { font-size: 12px; color: var(--live); }

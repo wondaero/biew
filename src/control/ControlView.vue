@@ -136,7 +136,7 @@ onBeforeUnmount(() => {
         <button class="nav" title="이전 (←)" @click="live.actions.prev()">◀&#xFE0E;</button>
         <button class="nav" title="다음 (→ / Space)" @click="live.actions.next()">▶&#xFE0E;</button>
         <button class="blank" :class="{ on: live.state.blank }" title="자막 내리기 (B)" @click="live.actions.toggleBlank()">
-          {{ live.state.blank ? 'BLANK 해제' : 'BLANK' }}
+          BLANK<span v-if="live.state.blank" class="off-word"> 해제</span>
         </button>
         <button
           v-if="isHost"
@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
           title="송출 화면 고정 — 조작은 계속되지만 송출은 그대로 (F 로 걸기, 해제는 이 버튼)"
           @click="live.state.frozen ? live.actions.unfreeze() : live.actions.freeze()"
         >
-          {{ live.state.frozen ? 'FREEZE 해제' : 'FREEZE' }}
+          FREEZE<span v-if="live.state.frozen" class="off-word"> 해제</span>
         </button>
       </div>
 
@@ -318,6 +318,14 @@ onBeforeUnmount(() => {
   .spacer { display: none; }
   .group { flex: 1; }
   .group button { flex: 1; padding: 9px 12px; }
+  /* 아주 좁은 폰(≤360px, 접는 폰 280px 포함): ◀ ▶ BLANK FREEZE 가 한 줄에 들어가게 — 폭 고정 풀고 글자·여백 줄임.
+     켜졌을 때의 " 해제" 는 생략(채운 색으로 켜짐이 보이고, 글자가 길어지면 버튼이 밀림) */
+  @media (max-width: 360px) {
+    .group { gap: 4px; }
+    .group button { min-width: 0; padding: 9px 4px; font-size: 13px; }
+    .nav { flex: 0.7; }
+    .off-word { display: none; }
+  }
   .mode { font-size: 12px; }
 
   .right { padding: 6px 10px; border-left: 0; border-bottom: 1px solid var(--line); overflow: visible; gap: 0; }
@@ -328,7 +336,7 @@ onBeforeUnmount(() => {
 
   .left, .style-sheet {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    height: min(78dvh, 640px); padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    height: 92dvh; /* 내용을 더 보이게(사용자 요청) — 위에 한 줄 남겨 시트임을 알고, 그 틈을 눌러 닫을 수 있게 */ padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     background: var(--panel); border: 1px solid var(--line); border-bottom: 0; border-radius: 14px 14px 0 0;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
     transform: translateY(105%); visibility: hidden; transition: transform .2s, visibility 0s .2s;
@@ -338,7 +346,9 @@ onBeforeUnmount(() => {
   .style-sheet { overflow-y: auto; padding-top: 0; }
   /* 시트 머리 + 미리보기 고정, 설정만 스크롤 */
   .style-sheet .sheet-top { position: sticky; top: 0; z-index: 2; margin: 0 -12px 10px; padding: 10px 12px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  .style-sheet .sheet-top .sheet-head { margin-bottom: 6px; }
+  .style-sheet .sheet-top .sheet-head { margin-bottom: 4px; }
+  /* 출력 설정 시트의 ✕ 는 작게 — 버튼 하나에 한 줄을 다 쓰지 않게 */
+  .style-sheet .sheet-top .sheet-head button { padding: 3px 12px; font-size: 13px; }
   .sheet-pv { display: grid; }
   .right > .monitors { position: static; margin: 0; padding: 0; border-bottom: 0; }
   .left[data-tab='lib'] .set, .left[data-tab='set'] .lib { display: none; }

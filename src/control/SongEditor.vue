@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
             <input ref="titleInput" v-model="title" placeholder="예: 001 곡 제목" />
           </label>
           <label class="grow">
-            <span>가사 <small>빈 줄로 슬라이드를 나눕니다 · 오른쪽 미리보기를 누르면 해당 위치로 이동</small></span>
+            <span>가사 <small>빈 줄로 슬라이드를 나눕니다 · <span class="desk-word">오른쪽</span><span class="mob-word">아래</span> 미리보기를 누르면 해당 위치로 이동</small></span>
             <textarea
               ref="ta"
               v-model="text"
@@ -170,7 +170,7 @@ onBeforeUnmount(() => {
         <span class="spacer" />
         <button :disabled="busy" @click="close">취소</button>
         <button class="primary" :disabled="busy || !title.trim() || !slides.length" @click="save">
-          {{ busy ? '저장 중…' : '저장 (⌘/Ctrl+S)' }}
+          {{ busy ? '저장 중…' : '저장' }}<span v-if="!busy" class="desk-word"> (⌘/Ctrl+S)</span>
         </button>
       </footer>
     </div>
@@ -214,4 +214,20 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .empty { color: var(--muted); font-size: 13px; }
 .del { color: var(--pgm); border-color: #5a2a2a; }
 .err { margin: 0; color: var(--pgm); font-size: 13px; }
+.mob-word { display: none; }
+
+/* 폰(≤768px, 접는 폰 280px 포함): 전체 화면 · 위 가사 입력(가득) · 아래 미리보기 가로 한 줄.
+   예전엔 좌우 2단이라 280px 에서 가사 칸이 한 줄에 서너 글자였음 */
+@media (max-width: 768px) {
+  .dialog { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
+  header, footer { padding: 10px 12px; flex-wrap: wrap; }
+  .body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .edit { border-right: 0; padding: 10px 12px; }
+  .preview { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
+  .preview h3 { margin-bottom: 6px; }
+  .thumbs { flex: none; display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; }
+  .thumb { flex: none; width: 150px; }
+  .desk-word { display: none; }
+  .mob-word { display: inline; }
+}
 </style>

@@ -93,6 +93,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 ## 모바일 컨트롤러 (≤768px, CSS 미디어쿼리)
 - 위: 상단 바 → 송출 모니터 → 슬라이드 목록(곡별 아코디언, 접힌 곡 헤더에도 "● 송출 중 n/m" 표시, 1열 행 목록). 아래 도크 버튼 3개(곡 검색/콘티/출력 설정)가 바텀시트를 연다. 컴포넌트를 복제하지 않고 같은 DOM 을 CSS 로 재배치한다(`ControlView.vue` 하단 스타일).
 - 모바일에선 출력 시작·출력 연결 표시·📱 폰·`?` 를 숨긴다(`desk-only`).
+- **가장 좁은 기준 = 280px**(접는 폰, 사용자가 실제로 씀). 화면을 바꾸면 `npm run e2e:narrow`(화면별 가로 넘침 자동 점검 + out/e2e/w280-*.png). grid 는 `minmax(0, 1fr)` 로(기본값은 긴 내용이 열을 넓혀 넘침), 고정 폭(min-width)은 좁은 화면에서 풀 것. 바텀시트 높이 92dvh. 곡 편집기는 ≤768px 에서 전체 화면 · 위 가사 · 아래 미리보기 가로 한 줄.
 - **기기 종류(폰·태블릿 vs PC) 판단은 화면 폭이 아니라 `isMobileOS()`(src/lib/device.ts, OS 기준)**. pointer:coarse 는 터치 노트북을 모바일로 잘못 잡으므로 쓰지 않는다. 판정은 경고·배치용이고 기능을 막지 않는다.
 - 넓은 화면 `/view` 는 송출 화면(`onStage`) — 새 UI 를 띄울 때 `/output` 과 마찬가지로 여기에도 뜨지 않게 할 것.
 
