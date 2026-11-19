@@ -16,7 +16,7 @@ import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
 
 const props = defineProps<{ song: Song | null }>() // null = 새 곡
-const emit = defineEmits<{ close: []; saved: [song: Song, local: boolean] }>()
+const emit = defineEmits<{ close: []; saved: [song: Song, local: boolean, conflict: boolean] }>()
 
 const live = useLive()
 const lib = useLibrary()
@@ -75,8 +75,11 @@ async function save() {
   try {
     const dup = isNew ? duplicateWarning() : null
     if (dup && !confirm(`이미 있는 곡과 겹칩니다.\n${dup}\n\n그래도 새 곡으로 저장할까요?`)) return
-    const r = await saveSong({ id: props.song?.id, title: title.value, slides: slides.value })
-    emit('saved', r.song, r.local)
+    // base = 편집기를 열 때 본 서버 버전(그 사이 다른 기기가 고쳤으면 덮어쓰지 않게). PC 에만 있는 변경이면 saveSong 이 그쪽 base 를 씀
+    const s = props.song
+    const base = s && !localKind.value ? { updated_at: s.updated_at, title: s.title, slides: [...s.slides] } : undefined
+    const r = await saveSong({ id: s?.id, title: title.value, slides: slides.value, base })
+    emit('saved', r.song, r.local, !!r.conflict)
     emit('close')
   } catch (e) {
     err.value = (e as Error).message

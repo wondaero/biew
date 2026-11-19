@@ -134,29 +134,52 @@ async function dropPending(id: string) {
 
 export const isLocalNewId = (id: string) => id.startsWith('local-')
 
-export interface SaveResult { song: Song; local: boolean }
+/** conflict: 서버에 바로 저장하려 했는데 그 사이 서버 곡이 바뀌었거나 지워져서 PC 에 저장함('서버에 올리기'에서 비교) */
+export interface SaveResult { song: Song; local: boolean; conflict?: boolean }
+/** 고치기 시작할 때 본 서버 버전 */
+export type SongBase = { updated_at: string; title: string; slides: string[] }
 
 /**
  * 새 곡(id 없음) 또는 수정.
  * 온라인 + 로그인이면 바로 서버에 저장. 아니면 PC 에 저장(pending) → 나중에 '서버에 올리기'.
  * 이미 PC 에만 있는 변경(아직 안 올린 새 곡/수정)이 있는 곡은 온라인이어도 PC 에 이어서 저장한다
  * — 그 변경은 '서버에 올리기'에서 충돌 검사를 거쳐야 하므로.
+ *
+ * 수정을 서버에 바로 저장할 때도 충돌 검사(2026-11-19): base(고치기 시작할 때 본 서버 버전 — 없으면 캐시)의 updated_at 과
+ * 지금 서버가 같을 때만 저장(조건부 update). 그 사이 다른 기기가 고쳤거나 지웠으면 덮어쓰지 않고 PC 에 저장 → '서버에 올리기'에서
+ * 양쪽 가사를 비교해 고른다(예전엔 소리 없이 덮어써서 다른 PC 의 수정이 사라질 수 있었음).
  */
-export async function saveSong(input: { id?: string; title: string; slides: string[] }): Promise<SaveResult> {
+export async function saveSong(input: { id?: string; title: string; slides: string[]; base?: SongBase }): Promise<SaveResult> {
   const title = input.title.trim()
   if (!title) throw new Error('제목을 입력하세요')
   if (!input.slides.length) throw new Error('가사를 입력하세요')
   const prev = input.id ? pending.value.find((p) => p.id === input.id) : undefined
   const localNew = !!input.id && isLocalNewId(input.id)
 
+  const cached = input.id ? serverSongs.value.find((s) => s.id === input.id) : undefined
+  const seen: SongBase | null = input.base ?? (cached ? { updated_at: cached.updated_at, title: cached.title, slides: [...cached.slides] } : null)
+  let conflict = false
   if (canUseServer() && !prev && !localNew) {
     const row = { title, slides: input.slides }
-    const q = input.id ? supabase!.from('songs').update(row).eq('id', input.id) : supabase!.from('songs').insert(row)
-    const { data, error } = await q.select(COLS).single()
+    if (!input.id) {
+      const { data, error } = await supabase!.from('songs').insert(row).select(COLS).single()
+      if (error) throw new Error(error.message)
+      await putServerSong(data as Song)
+      rebuild()
+      return { song: data as Song, local: false }
+    }
+    let q = supabase!.from('songs').update(row).eq('id', input.id).is('deleted_at', null)
+    if (seen) q = q.eq('updated_at', seen.updated_at) // 내가 본 버전 그대로일 때만
+    const { data, error } = await q.select(COLS)
     if (error) throw new Error(error.message)
-    await putServerSong(data as Song)
-    rebuild()
-    return { song: data as Song, local: false }
+    if (data?.length) {
+      await putServerSong(data[0] as Song)
+      rebuild()
+      return { song: data[0] as Song, local: false }
+    }
+    // 0건 = 그 사이 서버 곡이 바뀌었거나 지워짐 → 덮어쓰지 않고 PC 에 저장(아래). 최신 서버 버전은 받아 둔다(올리기 비교용)
+    conflict = true
+    void syncNow()
   }
 
   // PC 에 저장
@@ -165,8 +188,9 @@ export async function saveSong(input: { id?: string; title: string; slides: stri
   if (!input.id || localNew) {
     p = { id: input.id ?? `local-${uid()}`, kind: 'new', title, slides: [...input.slides], base: null, savedAt: now }
   } else {
-    const server = serverSongs.value.find((s) => s.id === input.id)
-    const base = prev?.base ?? (server ? { updated_at: server.updated_at, title: server.title, slides: [...server.slides] } : null)
+    const server = cached
+    // 기준 = 고치기 시작할 때 본 버전(충돌이면 반드시 그것 — 캐시는 동기화로 이미 새 버전일 수 있음)
+    const base = prev?.base ?? seen
     // 서버 버전과 똑같이 되돌렸으면 올릴 것이 없다
     if (base && base.title === title && JSON.stringify(base.slides) === JSON.stringify(input.slides)) {
       await dropPending(input.id)
@@ -177,7 +201,7 @@ export async function saveSong(input: { id?: string; title: string; slides: stri
   }
   await db.putPending(p)
   setPending([...pending.value.filter((x) => x.id !== p.id), p])
-  return { song: songs.value.find((s) => s.id === p.id)!, local: true }
+  return { song: songs.value.find((s) => s.id === p.id)!, local: true, conflict }
 }
 
 /** 소프트 삭제(deleted_at) — 온라인에서만. 아직 안 올린 PC 새 곡은 PC 에서만 지운다 */

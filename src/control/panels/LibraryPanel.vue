@@ -59,9 +59,11 @@ const statusText = computed(() => {
 // 편집기: undefined = 닫힘, null = 새 곡, Song = 수정. 오프라인·로그인 없이도 열 수 있다(PC 에 저장)
 const editing = ref<Song | null | undefined>(undefined)
 const notice = ref<string | null>(null)
-function onSaved(song: Song, local: boolean) {
+function onSaved(song: Song, local: boolean, conflict = false) {
   q.value = song.title // 저장한 곡이 바로 보이도록
-  notice.value = local ? 'PC 에 저장했습니다. 인터넷이 될 때 "↑ 서버에 올리기"로 올리세요.' : null
+  notice.value = conflict
+    ? '다른 기기에서 그 사이 이 곡을 고쳐서(또는 지워서) 덮어쓰지 않고 PC 에 저장했습니다. "↑ 서버에 올리기"에서 양쪽 가사를 비교해 고르세요.'
+    : local ? 'PC 에 저장했습니다. 인터넷이 될 때 "↑ 서버에 올리기"로 올리세요.' : null
 }
 const showUpload = ref(false)
 const online = ref(navigator.onLine)
