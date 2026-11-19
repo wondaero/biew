@@ -64,7 +64,7 @@ const ARMS = [0, 60, 120, 180, 240, 300]
 .freeze { --edge: #0b3a50; color: var(--freeze); border-color: rgba(56, 189, 248, .5); }
 .freeze:hover { background-color: #1f3340; border-color: var(--freeze); }
 .blank.on, .blank.on:hover { --edge: #93600c; background-color: var(--warn); border-color: #ffc25a; color: #222; font-weight: 700; }
-.freeze.on, .freeze.on:hover { --edge: #13729b; background-color: var(--freeze); border-color: #7dd6fb; color: #04212e; font-weight: 700; }
+.freeze.on, .freeze.on:hover { --edge: #13729b; background-color: var(--freeze); border-color: #7dd6fb; color: #fff; font-weight: 700; } /* 켜짐 = 흰 아이콘·글자(사용자 요청) */
 @media (max-width: 1150px) { .blank, .freeze { min-width: 0; } }
 
 /* 리모컨 PC 화면: 버튼이 줄을 채움 */
