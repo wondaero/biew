@@ -17,6 +17,7 @@ import { loadLive, saveLive, isLiveState, normalizeLive } from './persistence'
 import * as nav from './nav'
 import { uid } from '@/lib/uid'
 import type { Cursor } from './nav'
+import { remapIndex, replaceSlides } from '@/control/slideEdit'
 
 export type Role = 'host' | 'remote'
 
@@ -212,15 +213,23 @@ const setlist = {
    * 슬라이드 글만 고치기(카드의 ✎). 장 수·순서·송출 위치는 그대로 → 송출 중인 장이면 저장 즉시 새 글이 나간다.
    * FREEZE 중이면 고정 화면은 텍스트 스냅샷이라 그대로(풀면 반영).
    */
-  editSlides(key: string, indexes: number[], text: string) {
+  editSlides(key: string, indexes: number[], pieces: string[]) {
     const i = state.setlist.findIndex((x) => x.key === key)
-    if (i < 0) return
+    if (i < 0 || !pieces.length) return
+    const it0 = state.setlist[i]!
+    const targets = [...new Set(indexes)].filter((j) => j >= 0 && j < it0.slides.length).sort((a, b) => a - b)
+    if (!targets.length) return
+    // 나누기(2026-11-19): 장 수가 바뀌면 송출·FREEZE·미리보기 위치를 '같은 글'로 옮긴다.
+    // 송출 중인 장이나 그 뒤를 나누면 번호 그대로, 앞을 나누면 늘어난 만큼 뒤로(번호를 그대로 두면 화면이 다른 장으로 튐)
+    const n = pieces.length
+    const remap = (j: number) => remapIndex(j, targets, n)
     commit((s) => {
       const it = s.setlist[i]!
-      const slides = [...it.slides]
-      for (const j of indexes) if (j >= 0 && j < slides.length) slides[j] = text
-      s.setlist[i] = { ...it, slides }
+      s.setlist[i] = { ...it, slides: replaceSlides(it.slides, targets, pieces) }
+      if (s.itemIndex === i) s.slideIndex = remap(s.slideIndex)
+      if (s.frozen && s.frozen.itemIndex === i) s.frozen = { ...s.frozen, slideIndex: remap(s.frozen.slideIndex) }
     })
+    if (preview.value?.itemIndex === i) preview.value = { itemIndex: i, slideIndex: remap(preview.value.slideIndex) }
   },
 }
 

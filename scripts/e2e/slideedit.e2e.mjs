@@ -1,5 +1,5 @@
 // 슬라이드 한 장 고치기(카드 ✎) E2E — 로컬 송출, Lorem 콘티 + PC 새 곡(IndexedDB pending) 하나. 서버·계정 안 씀.
-// 콘티 즉시 반영·송출 중 장 반영·같은 글 모두·곡 원본(그 글만)·오늘만·빈 줄 거부·Esc/뒤로가기·단축키 막힘·폰(280px) 넘침.
+// 콘티 즉시 반영·송출 중 장 반영·같은 글 모두·곡 원본(그 글만)·오늘만·빈 줄 = 장 나누기(송출 위치 따라감)·Esc/뒤로가기·단축키 막힘·폰(280px) 넘침.
 import puppeteer from 'puppeteer-core'
 import path from 'node:path'
 import { CHROME, OUT, ensureServer } from './_lib.mjs'
@@ -58,7 +58,9 @@ try {
   check('송출 중 안내', !!(await p.$('.se .air')))
   check('열린 동안 송출 단축키 막힘', await (async () => { await p.keyboard.press('ArrowRight'); return (await state(p)).slideIndex === 1 })())
   await setText(p, 'Sed do\n\ntempor')
-  check('빈 줄 → 저장 막힘', await p.$eval('.se footer .primary', (b) => b.disabled) && !!(await p.$('.se .err')))
+  check('빈 줄 → "2장으로 나뉩니다" + 미리보기 2개', (await p.$eval('.se .split', (e) => e.textContent).catch(() => '')).includes('2장') && (await p.$$('.se .pvs .pv')).length === 2)
+  await setText(p, '')
+  check('빈 글 → 저장 막힘', await p.$eval('.se footer .primary', (b) => b.disabled) && !!(await p.$('.se .err')))
   await setText(p, 'Sed do eiusmod  \ntempor FIXED')
   await p.keyboard.down('Control'); await p.keyboard.press('Enter'); await p.keyboard.up('Control')
   await sleep(500)
@@ -107,6 +109,23 @@ try {
   check('뒤로가기 = 창만 닫힘', !(await p.$('.se')) && p.url().endsWith('/local'))
   await p.keyboard.press('ArrowRight'); await sleep(200)
   check('닫은 뒤 송출 단축키 다시 동작', (await state(p)).slideIndex === 2)
+
+  // 장 나누기(2026-11-19): 송출 위치는 '같은 글'을 따라감 — 앞을 나누면 밀리고, 송출 중·뒤를 나누면 그대로
+  const saveSplit = async (j, txt) => { await cellEdit(p, 0, j); await p.waitForSelector('.se'); await setText(p, txt); await p.click('.se footer .primary'); await sleep(400) }
+  const onAirText = async () => { const x = await state(p); return x.setlist[x.itemIndex].slides[x.slideIndex] }
+  const airBefore = await onAirText()
+  await saveSplit(0, 'Lorem A1\n\nLorem A2') // 송출 중(3장)보다 앞 → 4장으로
+  s = await state(p)
+  check('앞 장 나누기: 장 수 +1, 송출 번호 +1, 송출 글 그대로', s.setlist[0].slides.length === 5 && s.slideIndex === 3 && (await onAirText()) === airBefore, JSON.stringify({ n: s.setlist[0].slides.length, i: s.slideIndex }))
+  await saveSplit(3, 'Ut X1\n\nUt X2') // 송출 중인 장 자체 → 번호 그대로, 첫 장이 송출
+  s = await state(p)
+  check('송출 중인 장 나누기: 번호 그대로, 나눈 첫 장이 송출', s.setlist[0].slides.length === 6 && s.slideIndex === 3 && (await onAirText()) === 'Ut X1')
+  // 뒤 장(같은 글 2곳 — 송출 중보다 앞 1곳, 뒤 1곳) 모두 나누기
+  await saveSplit(5, 'S1\n\nS2')
+  s = await state(p)
+  check('같은 글 모두 나누기: 앞쪽 1곳만큼 번호 밀림, 송출 글 그대로', s.setlist[0].slides.length === 8 && s.slideIndex === 4 && (await onAirText()) === 'Ut X1', JSON.stringify({ n: s.setlist[0].slides.length, i: s.slideIndex, sl: s.setlist[0].slides }))
+  check('카드도 8장으로', (await p.$$('[data-item="0"] .cell')).length === 8)
+  check('나누기 알림', (await p.$eval('.se-notice', (e) => e.textContent).catch(() => '')).includes('2장으로 나눴습니다'))
 
   // ── 폰 280px ──
   const m = await (await browser.createBrowserContext()).newPage()

@@ -76,23 +76,24 @@ function say(text: string, warn = false) {
   clearTimeout(noticeTimer)
   noticeTimer = setTimeout(() => (notice.value = null), warn ? 8000 : 4000)
 }
-async function saveEdit(p: { text: string; indexes: number[]; toSong: boolean; all: boolean }) {
+async function saveEdit(p: { pieces: string[]; indexes: number[]; toSong: boolean; all: boolean }) {
   const e = editing.value
   const it = e && live.state.setlist.find((x) => x.key === e.key)
   if (!e || !it) return
   const oldText = it.slides[e.j]!
-  live.setlist.editSlides(e.key, p.indexes, p.text)
+  live.setlist.editSlides(e.key, p.indexes, p.pieces)
   editing.value = null
-  if (!p.toSong) return say('콘티만 고쳤습니다(곡 원본은 그대로)')
+  const split = p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다 — ` : ''
+  if (!p.toSong) return say(`${split}콘티만 고쳤습니다(곡 원본은 그대로)`)
   await loadCache()
   const song = lib.byId.value.get(it.songId)
-  const slides = song && patchSongSlides(song.slides, e.j, oldText, p.text, p.all)
-  if (!song || !slides) return say(song ? '콘티는 고쳤지만 곡 원본은 그 사이 바뀌어 저장하지 않았습니다 — 곡 검색의 ✎ 로 확인하세요' : '콘티는 고쳤지만 곡 원본을 찾을 수 없습니다', true)
+  const slides = song && patchSongSlides(song.slides, e.j, oldText, p.pieces, p.all)
+  if (!song || !slides) return say(song ? '콘티는 고쳤지만 곡 원본은 그 사이 바뀌어 저장하지 않았습니다 — 곡 목록에서 그 곡을 눌러 확인하세요' : '콘티는 고쳤지만 곡 원본을 찾을 수 없습니다', true)
   try {
     // base = 고친 기준(이 기기가 받아 둔 버전) — 업로드 때 그 사이 DB 가 바뀌었는지 판정
     const r = await saveSong({ id: song.id, title: song.title, slides, base: { updated_at: song.updated_at, title: song.title, slides: [...song.slides] } })
     void r
-    say('고쳤습니다 — 곡 원본은 이 기기에 저장(DB 에는 곡 목록의 ⬆ 업로드로)')
+    say(`${split || '고쳤습니다 — '}곡 원본은 이 기기에 저장(DB 에는 곡 목록의 ⬆ 업로드로)`)
   } catch (err) {
     say(`콘티는 고쳤지만 곡 원본 저장 실패: ${err instanceof Error ? err.message : err}`, true)
   }
