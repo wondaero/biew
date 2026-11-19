@@ -4,7 +4,7 @@
  *  - PC: 위 줄 안(bar). 리모컨 PC 화면은 stretch(버튼이 줄을 채움).
  *  - 폰(≤768px): 화면 맨 아래 두 줄(bottom, 사용자 결정 2026-11-19 — 엄지가 닿는 자리).
  *      [ BLANK ][ FREEZE ]   ← 낮게
- *      [   ◀   ][   ▶   ]    ← 가장 크게. 한 줄 네 개면 280px 에서 ▶ 옆 FREEZE 를 잘못 누르기 쉬워 두 줄
+ *      [   ◀   ][   ▶   ]    ← BLANK·FREEZE 와 같은 높이. 한 줄 네 개면 280px 에서 ▶ 옆 FREEZE 를 잘못 누르기 쉬워 두 줄
  * FREEZE 는 호스트만(리모컨은 BLANK 가 한 줄을 다 씀).
  */
 import { useLive } from '@/live/liveStore'
@@ -52,17 +52,17 @@ const live = useLive()
 .stretch { flex: 1; }
 .stretch button { flex: 1; padding: 10px 12px; }
 
-/* 폰: 맨 아래 두 줄 — 위 BLANK·FREEZE(낮게), 아래 ◀ ▶(크게). 제스처 막대와 겹치지 않게 아래 여백 */
+/* 폰: 맨 아래 두 줄 — 위 BLANK·FREEZE(낮게), 아래 ◀ ▶(같은 높이). 제스처 막대와 겹치지 않게 아래 여백 */
 .bottom {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 8px;
   grid-template-areas: 'blank freeze' 'prev next';
   padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line);
 }
 .bottom.solo { grid-template-areas: 'blank blank' 'prev next'; }
-.bottom button { min-width: 0; margin-bottom: var(--lift); }
+.bottom button { min-width: 0; margin-bottom: 0; } /* 받침(4px) 자리는 줄 간격·아래 여백(8px)이 이미 충분 */
 .bottom .blank { grid-area: blank; min-height: 42px; }
 .bottom .freeze { grid-area: freeze; min-height: 42px; }
 .bottom .prev { grid-area: prev; }
 .bottom .next { grid-area: next; }
-.bottom .nav { min-height: 56px; font-size: 22px; }
+.bottom .nav { min-height: 42px; font-size: 18px; } /* BLANK·FREEZE 와 같은 높이(사용자 요청 — 56px 은 너무 큼) */
 </style>

@@ -204,7 +204,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }
 .card.live .idx { color: var(--live); font-weight: 700; }
 @media (max-width: 768px) {
-  .grid-wrap { padding: 0 10px 80px; }
+  .grid-wrap { padding: 0 10px 16px; } /* 아래 송출 버튼 줄은 겹쳐 뜨지 않고 자기 자리를 차지하므로 큰 여백 불필요 */
+  .empty { margin-top: 24px; } /* 30vh 면 좁은 폰에서 안내 글이 아래로 밀려 잘림 */
   /* 1열 행 목록: 16:9 고정을 풀고 글자 길이에 맞춰 높이가 정해지게 */
   .cards { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .card { aspect-ratio: auto; min-height: 52px; justify-content: flex-start; gap: 12px; padding: 10px 12px; text-align: left; }
