@@ -15,6 +15,7 @@ import SetlistPanel from './panels/SetlistPanel.vue'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import OnAirStrip from './OnAirStrip.vue'
+import TransportBar from './TransportBar.vue'
 import StylePanel from './panels/StylePanel.vue'
 import StylePreview from './panels/StylePreview.vue'
 import StyleDialog from './StyleDialog.vue'
@@ -154,22 +155,8 @@ onBeforeUnmount(() => {
       <button class="brand" title="채널 목록" @click="goHome">Biew</button>
       <span class="ch"><b>{{ title }}</b> <code v-if="!isLocalMode">{{ code }}</code><small v-else>이 PC 전용 · 인터넷 불필요</small></span>
 
-      <div class="group">
-        <button class="nav" title="이전 (←)" @click="live.actions.prev()">◀&#xFE0E;</button>
-        <button class="nav" title="다음 (→ / Space)" @click="live.actions.next()">▶&#xFE0E;</button>
-        <button class="blank" :class="{ on: live.state.blank }" title="자막 내리기 (B)" @click="live.actions.toggleBlank()">
-          BLANK<span v-if="live.state.blank" class="off-word"> 해제</span>
-        </button>
-        <button
-          v-if="isHost"
-          class="freeze"
-          :class="{ on: !!live.state.frozen }"
-          title="송출 화면 고정 — 조작은 계속되지만 송출은 그대로 (F 로 걸기, 해제는 이 버튼)"
-          @click="live.state.frozen ? live.actions.unfreeze() : live.actions.freeze()"
-        >
-          FREEZE<span v-if="live.state.frozen" class="off-word"> 해제</span>
-        </button>
-      </div>
+      <!-- 송출 버튼: PC = 이 줄 안, 폰 = 화면 맨 아래 두 줄(아래 transport) — 둘 중 하나만 -->
+      <TransportBar v-if="!narrow" :host="isHost" :stretch="!isHost" />
 
       <label v-if="isHost" class="mode" title="켜면 슬라이드를 누를 때 바로 나가지 않고 미리보기로 골라 둔 뒤, Enter 나 [송출] 버튼으로 내보냅니다">
         <input v-model="live.pvwMode.value" type="checkbox" /> 미리보기 후 송출
@@ -180,7 +167,7 @@ onBeforeUnmount(() => {
       <span v-if="netWarn" class="netwarn" role="status">{{ netWarn }}</span>
       <template v-if="isLocalMode">
         <button class="endlocal danger-line" title="콘티를 비우고 다음 예배 준비(출력 창은 검은 화면으로 유지)" @click="endLocal">송출 종료</button>
-        <button title="지금 송출을 그대로 인터넷 송출로 옮겨 폰 리모컨·보기를 씀" @click="showSwitch = true">🌐 인터넷 송출<span class="wide-word">로 전환</span></button>
+        <button class="tonet" title="지금 송출을 그대로 인터넷 송출로 옮겨 폰 리모컨·보기를 씀" @click="showSwitch = true">🌐<span class="net-word"> 인터넷 송출</span><span class="wide-word">로 전환</span></button>
       </template>
       <template v-if="isHost">
         <span class="conn desk-only" :class="{ on: outputOn }" :title="outputOn ? '출력 창 연결됨' : '출력 창 없음'"><span class="conn-word">{{ outputOn ? '출력 연결됨' : '출력 없음' }}</span></span>
@@ -263,11 +250,13 @@ onBeforeUnmount(() => {
       <StylePanel touch-guard />
     </div>
 
+    <!-- 폰: 준비용 버튼(곡 목록·콘티·출력 설정)은 위, 송출 버튼은 맨 아래(사용자 결정 2026-11-19) -->
     <nav v-if="isHost" class="dock">
       <button @click="openSearch()">🔍 곡 목록<b v-if="lib.pendingCount.value" class="badge">{{ lib.pendingCount.value }}</b></button>
       <button @click="openSheet('set')">☰ 콘티 {{ live.state.setlist.length }}</button>
       <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
     </nav>
+    <TransportBar v-if="narrow" class="transport" bottom :host="isHost" />
   </div>
 </template>
 
@@ -290,27 +279,13 @@ onBeforeUnmount(() => {
 .netwarn { font-size: 12px; color: var(--warn); padding: 3px 8px; border: 1px solid #5a4a1e; border-radius: 6px; background: #3a3014; }
 .share.live { border-color: var(--pvw); color: var(--pvw); }
 .share.error { border-color: var(--pgm); }
-/* 송출 조작 묶음: 예배 중 가장 자주 누르는 버튼 — 조금 크게, 상태 버튼은 평소에도 자기 색 테두리 */
-.group { display: flex; gap: 6px; }
-.group button { min-height: 34px; font-weight: 600; }
-/* 3D: 색은 background-color 만(면 그라데이션 유지), 받침 색 --edge 는 더 어두운 같은 계열 */
-.nav { min-width: 52px; font-size: 16px; background-color: #33333f; border-color: #4e4e5b; }
-.nav:hover { background-color: #3d3d4a; border-color: #5e5e6c; }
-/* 최소 폭: 켜면 글자가 'BLANK 해제'로 길어져 옆 버튼이 밀리면 예배 중 잘못 누르기 쉽다 → 폭 고정 */
-.blank, .freeze { min-width: 7.6em; }
-.blank { --edge: #4d3407; color: var(--warn); border-color: rgba(245, 165, 36, .5); }
-.blank:hover { background-color: #3a3222; border-color: var(--warn); }
-.freeze { --edge: #0b3a50; color: var(--freeze); border-color: rgba(56, 189, 248, .5); }
-.freeze:hover { background-color: #1f3340; border-color: var(--freeze); }
-.blank.on, .blank.on:hover { --edge: #93600c; background-color: var(--warn); border-color: #ffc25a; color: #222; font-weight: 700; }
-.freeze.on, .freeze.on:hover { --edge: #13729b; background-color: var(--freeze); border-color: #7dd6fb; color: #04212e; font-weight: 700; }
+/* 송출 조작 버튼(◀ ▶ BLANK FREEZE) 모양은 TransportBar.vue */
 /* 위 버튼 줄: 글자는 꺾지 않고, PC 화면이 좁을수록 덜 중요한 글자부터 줄인다(1280px 에서 버튼 글자가 두 줄로 꺾였음) */
 .top button, .mode, .conn { white-space: nowrap; }
 @media (max-width: 1440px) {
   .ch small, .wide-word { display: none; }
 }
 @media (max-width: 1150px) {
-  .blank, .freeze { min-width: 0; }
   .conn-word { display: none; }
 }
 /* 769~1023px(세로 태블릿 등): 한 줄에 안 들어가면 두 줄로(잘리지 않게). 이 구간은 3단 배치 자체가 좁다 — 별도 과제 */
@@ -347,8 +322,6 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   grid-template-areas: 'top' 'side' 'center';
 }
 .control.remote .top { flex-wrap: wrap; gap: 8px; }
-.control.remote .group { flex: 1; }
-.control.remote .group button { flex: 1; padding: 10px 12px; }
 .control.remote .side { border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; padding: 8px 12px; gap: 0; }
 .control.remote .side :deep(.monitors) { max-width: 520px; width: 100%; margin: 0 auto; }
 .control.remote .side :deep(.screen) { max-height: 32dvh; margin: 0 auto; }
@@ -371,24 +344,24 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   .control {
     height: 100dvh;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    grid-template-areas: 'top' 'side' 'center' 'dock';
+    /* 위 = 관리(상단 바) → 준비(곡 목록·콘티·출력 설정) → 송출 화면 → 가사 목록, 맨 아래 = 송출 버튼 */
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'top' 'dock' 'side' 'center' 'transport';
   }
+  .control.remote {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: 'top' 'side' 'center' 'transport';
+  }
+  .transport { grid-area: transport; }
   .desk-only { display: none !important; }
 
-  .top { flex-wrap: wrap; gap: 8px; padding: 6px 10px; }
+  /* 상단 바: 1줄 = Biew · 채널 이름, 2줄 = [미리보기 후 송출][송출 종료][🌐 인터넷 송출 | 📡 채널] */
+  .top { flex-wrap: wrap; gap: 6px 8px; padding: 6px 10px; }
+  .ch { flex: 1 1 60%; }
   .spacer { display: none; }
-  .group { flex: 1; }
-  .group button { flex: 1; padding: 9px 12px; }
-  /* 아주 좁은 폰(≤360px, 접는 폰 280px 포함): ◀ ▶ BLANK FREEZE 가 한 줄에 들어가게 — 폭 고정 풀고 글자·여백 줄임.
-     켜졌을 때의 " 해제" 는 생략(채운 색으로 켜짐이 보이고, 글자가 길어지면 버튼이 밀림) */
-  @media (max-width: 360px) {
-    .group { gap: 4px; }
-    .group button { min-width: 0; padding: 9px 4px; font-size: 13px; }
-    .nav { flex: 0.7; }
-    .off-word { display: none; }
-  }
-  .mode { font-size: 12px; }
+  .mode { font-size: 12px; margin-right: auto; }
+  /* 좁은 폰: 🌐 만(글자 빼고) — 세 개가 한 줄에 들어가게 */
+  @media (max-width: 360px) { .net-word { display: none; } }
 
   /* 사이드바 = 위쪽 송출 화면 줄(콘티는 바텀시트로 빠짐) */
   .side { padding: 6px 10px; border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; gap: 0; }
@@ -428,7 +401,8 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   .set-wrap .set :deep(header h2) { display: none; }
   .set-wrap .set :deep(header) { justify-content: flex-end; }
 
-  .dock { grid-area: dock; display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); }
-  .dock button { flex: 1; padding: 12px 6px; font-size: 13px; white-space: nowrap; }
+  /* 준비용 버튼 줄(위). 예배 전에 한 번 맞추면 거의 안 쓰므로 송출 버튼보다 낮게 */
+  .dock { grid-area: dock; display: flex; gap: 6px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .dock button { flex: 1; min-width: 0; padding: 8px 4px; font-size: 13px; white-space: nowrap; margin-bottom: var(--lift); }
 }
 </style>
