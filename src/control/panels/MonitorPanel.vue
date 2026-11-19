@@ -40,7 +40,7 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
 <style scoped>
 .monitors { display: grid; gap: 10px; }
 /* 머리줄 높이 고정 — 송출 중/미리보기 두 화면이 나란히 있을 때(폰) 화면 위치가 맞게. 글자는 꺾지 않음 */
-.bar { display: flex; align-items: center; gap: 8px; height: 34px; font-size: 12px; padding: 0 2px; min-width: 0; }
+.bar { display: flex; align-items: center; gap: 8px; height: 34px; margin-bottom: 6px; font-size: 12px; padding: 0 2px; min-width: 0; } /* 아래 6px = 송출 버튼 받침과 화면 사이 여백(양쪽 같게 — 두 화면 위치 맞춤) */
 .bar b { flex: none; padding: 1px 6px; border-radius: 4px; color: #fff; font-size: 11px; white-space: nowrap; }
 .bar.pgm b { background: var(--live); color: var(--live-ink); }
 .bar.pvw b { background: var(--preview); }
