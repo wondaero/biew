@@ -4,7 +4,7 @@
  *  - Chrome 경로: CHROME_PATH 환경변수 > OS 별 기본 설치 위치
  *  - ensureServer: 개발 서버(또는 미리보기 서버)가 그 포트에 떠 있으면 그대로 쓰고, 없으면 띄웠다가 stop() 으로 끈다
  *  - 결과물(스크린샷)은 out/e2e/ (git 제외)
- * 데이터 원칙: Lorem 더미만, 임시 스태프 계정·채널·곡은 끝나면 삭제(곡은 완전 삭제). 가사·키는 출력하지 않는다.
+ * 데이터 원칙: Lorem 더미만, 임시 스태프 계정·채널은 끝나면 삭제, 곡은 deleted_at 표시(완전 삭제하면 그 사이 받은 기기에 유령 곡). 가사·키는 출력하지 않는다.
  */
 import { fileURLToPath } from 'node:url'
 import { existsSync, mkdirSync } from 'node:fs'

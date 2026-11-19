@@ -97,7 +97,8 @@ try {
   check('✎ 충돌: 서버 원본은 다른 기기 수정 그대로', JSON.stringify(await serverSlides(idB)) === JSON.stringify(['Sed beta one', 'Sed beta two SERVER']))
   check('✎ 충돌: 경고 알림', (await p.$eval('.se-notice.warn', (e) => e.textContent).catch(() => '')).includes('다른 기기'))
 } catch (e) { fail++; console.error('✖ 중단:', e.message) } finally {
-  await admin.from('songs').delete().like('title', `${tag}%`)
+  // 완전 삭제 금지 — 테스트 중 곡을 받은 기기가 삭제를 모르고 유령 곡으로 남는다(겪음). deleted_at 으로 표시하면 델타 동기화로 지워짐
+  await admin.from('songs').update({ deleted_at: new Date().toISOString() }).like('title', `${tag}%`).is('deleted_at', null)
   if (userId) await admin.auth.admin.deleteUser(userId)
   await browser?.close()
   console.log(`\n${fail ? '✖' : '✔'} ${pass} 통과 / ${fail} 실패 (테스트 곡·임시 계정 정리)`)

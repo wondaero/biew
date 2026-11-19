@@ -174,7 +174,8 @@ try {
   console.error('✖ 중단:', e.message)
 } finally {
   // 테스트 곡은 1~2분만 존재 — 끝나면 완전 삭제(DB 에 쌓이지 않게)
-  await admin.from('songs').delete().like('title', `${tag}%`)
+  // 완전 삭제 금지 — 테스트 중 곡을 받은 기기가 삭제를 모르고 유령 곡으로 남는다(겪음). deleted_at 으로 표시하면 델타 동기화로 지워짐
+  await admin.from('songs').update({ deleted_at: new Date().toISOString() }).like('title', `${tag}%`).is('deleted_at', null)
   if (userId) await admin.auth.admin.deleteUser(userId)
   await browser?.close()
   await stopServer()
