@@ -4,8 +4,8 @@
  * 아이콘은 직접 그린 SVG(2026-11-19 사용자 결정) — 문자(❄ ◀)는 기기마다 컬러 이모지로 그려질 수 있어서.
  *   BLANK = 눈에 빗금(자막 숨김), FREEZE = 눈꽃, 이전/다음 = 삼각형. 켜짐은 지금처럼 채운 색(노랑/하늘색).
  *  - PC: 위 줄 안(bar) — 아이콘 + 글자("❄ FREEZE"). 리모컨 PC 화면은 stretch(버튼이 줄을 채움).
- *  - 폰(≤768px): 화면 맨 아래 한 줄(bottom) — 아이콘만. [BLANK][FREEZE][◀][▶ 가장 넓게]
- *      ▶(가장 많이 누름)를 엄지 자리 오른쪽 끝에 넓게, 바로 옆은 ◀ — 잘못 눌러도 한 장 뒤로 갈 뿐.
+ *  - 폰(≤768px): 화면 맨 아래 한 줄(bottom) — 아이콘만, 모두 같은 폭. [BLANK][FREEZE][◀][▶]
+ *      ▶(가장 많이 누름)를 엄지 자리 오른쪽 끝에, 바로 옆은 ◀ — 잘못 눌러도 한 장 뒤로 갈 뿐. (▶ 만 넓게 했다가 오류처럼 보여 같은 폭으로)
  *      BLANK·FREEZE 는 왼쪽으로 떨어뜨림(실수로 자막이 꺼지는 게 가장 큰 사고).
  * FREEZE 는 호스트만(리모컨은 BLANK 하나).
  */
@@ -71,12 +71,12 @@ const ARMS = [0, 60, 120, 180, 240, 300]
 .stretch { flex: 1; }
 .stretch button { flex: 1; padding: 10px 12px; }
 
-/* 폰: 맨 아래 한 줄, 아이콘만. ▶ 가 가장 넓게. 제스처 막대와 겹치지 않게 아래 여백 */
+/* 폰: 맨 아래 한 줄, 아이콘만, 같은 폭. 제스처 막대와 겹치지 않게 아래 여백 */
 .bottom {
-  display: grid; gap: 8px; grid-template-columns: 1fr 1fr 1fr 1.6fr; grid-template-areas: 'blank freeze prev next';
+  display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-areas: 'blank freeze prev next'; /* 같은 폭(사용자 결정 — ▶ 만 넓으면 오류처럼 보임) */
   padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line);
 }
-.bottom.solo { grid-template-columns: 1fr 1fr 1.6fr; grid-template-areas: 'blank prev next'; }
+.bottom.solo { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: 'blank prev next'; }
 .bottom button { min-width: 0; min-height: 48px; margin-bottom: 0; padding: 0; } /* 받침(4px) 자리는 위아래 여백(8px)이 이미 충분 */
 .bottom .lbl { display: none; } /* 아이콘만(켜짐은 채운 색으로) — 작은 글자는 보류(사용자 결정) */
 .bottom .ic { width: 24px; height: 24px; }
