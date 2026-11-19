@@ -30,7 +30,7 @@ async function page(ua, w, h, touch = 0) {
   return p
 }
 /** 홈 카드 제목 순서(h2 첫 글자들) */
-const cardOrder = (p) => p.$$eval('main.home > section.card', (els) => els.filter((e) => getComputedStyle(e).display !== 'none')
+const cardOrder = (p) => p.$$eval('main.home section.card', (els) => els.filter((e) => getComputedStyle(e).display !== 'none')
   .map((e) => ({ t: e.querySelector('h2')?.textContent?.trim() ?? e.querySelector('button')?.textContent?.trim() ?? '', y: e.getBoundingClientRect().top }))
   .sort((a, b) => a.y - b.y).map((x) => x.t))
 

@@ -188,6 +188,8 @@ const build = __APP_BUILD__
     </header>
 
 
+    <!-- 넓은 PC(≥1000px): 두 칸 — 왼쪽 = 이 PC(로컬 송출·곡), 오른쪽 = 인터넷 송출. 폰·좁은 창에선 .col 이 사라져(display: contents) 예전 한 줄 그대로 -->
+    <div class="col col-l">
     <!-- ── 로컬 송출 ── -->
     <section v-if="!mobile" class="card local">
       <h2>로컬 송출 <small>예배용 기본</small></h2>
@@ -208,7 +210,9 @@ const build = __APP_BUILD__
     </section>
     <UploadDialog v-if="sync.open.value === 'up'" @close="sync.close()" />
     <DownloadDialog v-if="sync.open.value === 'down'" @close="sync.close()" />
+    </div>
 
+    <div class="col col-r">
     <!-- ── 인터넷 송출 ── -->
     <h2 class="group">인터넷 송출 <small>폰 리모컨·보기 기기 · 서버를 거침 · 가끔 쓸 때</small></h2>
 
@@ -305,6 +309,7 @@ const build = __APP_BUILD__
         <button :disabled="!joinOk" @click="go('control')">컨트롤 (리모컨)</button>
       </div>
     </section>
+    </div>
 
     <p v-if="!supabase" class="warn">Supabase 설정(.env)이 없어 서버 기능(채널 만들기·리모컨·보기)을 쓸 수 없습니다.</p>
 
@@ -323,9 +328,18 @@ h2 { margin: 0; font-size: 15px; display: flex; align-items: baseline; gap: 8px;
 h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .group { margin: 8px 0 -6px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .card.local { border-color: var(--live); }
-/* 폰·태블릿: 머리 → 번호로 입장 → 나머지(DOM 순서) */
+/* 폰·태블릿: 머리 → 번호로 입장 → 나머지(DOM 순서). .col 은 contents 라 .join 도 .home 의 칸으로 정렬된다 */
 .home.mobile > header { order: -2; }
-.home.mobile > .join { order: -1; }
+.home.mobile .join { order: -1; }
+/* 두 칸 묶음: 평소(폰·좁은 창)엔 없는 것처럼 */
+.col { display: contents; }
+/* 넓은 PC: 두 칸(사용자 요청 2026-11-19 — PC 인데 폰 화면처럼 좁았음). 왼쪽 = 이 PC, 오른쪽 = 인터넷 송출 */
+@media (min-width: 1000px) {
+  .home:not(.mobile) { max-width: 1120px; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 24px; align-items: start; padding-top: 32px; }
+  .home:not(.mobile) > header, .home:not(.mobile) > .ver, .home:not(.mobile) > .warn { grid-column: 1 / -1; }
+  .home:not(.mobile) .col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+  .home:not(.mobile) .col-r > .group { margin-top: 0; }
+}
 .card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .form { display: grid; gap: 8px; }
 .muted { margin: 0; color: var(--muted); font-size: 12px; }
