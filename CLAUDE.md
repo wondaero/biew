@@ -42,7 +42,7 @@ src/sync/          SyncTransport 인터페이스, BroadcastChannelTransport, Sup
 src/live/          liveStore(채널 하나를 연 동안의 상태 소유, commit 단일 경로. host/remote 역할), nav(이동·onAir — 서버 `_apply_command` 와 같은 규칙), persistence(채널별 localStorage·호스트/방문 기록·옛 키 정리)
 src/channel/       api(채널 RPC·기기 토큰 저장), sync(호스트/리모컨 Realtime 연결)
 src/home/          채널 만들기·목록·번호 입력(`/`)
-src/library/       IndexedDB 캐시(songs·pending), updated_at 델타 동기화, 검색, saveSong(오프라인이면 PC 에 저장)/deleteSong(온라인만), 서버에 올리기(pending.ts 분류)
+src/library/       IndexedDB(이 기기: 받아 둔 DB 곡 songs + 이 기기 변경 pending), DB 와 통째로 비교(diffIndex)·골라 받기/전체 받기·업로드(pending.ts 분류), 검색
 src/components/    SlideRender/FitText — 출력·미리보기 공용 렌더러(cqh 단위, 자동 축소)
 src/control/       ControlGate(호스트/리모컨 분기·비밀번호 입력), LocalView(/local 오프라인 모드), ControlView, panels/*, SongEditor, UploadDialog, 단축키, 출력창 열기
 src/pwa.ts         서비스 워커 등록·새 버전 알림(UpdateBanner)·영구 저장 요청
@@ -65,7 +65,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - **채널 관리는 호스트 PC 를 끊지 않는다**: "모든 기기 접속 끊기" 없음. 리모컨 쫓아내기 = 컨트롤 비밀번호 변경(새 비밀번호 필수), 보기 비밀번호 설정·변경·없애기. PC 분실 = 채널 삭제. **삭제는 로그인만으로**(기기 무관, 홈 "내 계정의 채널"의 삭제 버튼). 쓰던 채널이 지워진 호스트 PC 는 `hostDeleted` 로 재시도 없이 "삭제됨" 표시(송출은 계속).
 - 송출은 항상 호스트 PC 를 거친다. 호스트↔출력 창은 BroadcastChannel `biew-live:<code>` 라 인터넷이 끊겨도 동작.
 - **songs.updated_at 트리거**는 내용이 바뀐 경우에만 갱신(재import 시 전 기기 재다운로드 방지). 삭제는 `deleted_at` 소프트 삭제(델타 동기화가 삭제를 알 수 있게).
-- 델타 동기화는 `updated_at >= lastSync`(gte, 멱등). 단건 저장은 lastSync 를 건드리지 않는다.
+- 다운로드 목록은 델타가 아니라 **DB 전체 목록(id·updated_at·deleted_at)과 이 기기를 통째로 비교**(`diffIndex`) — 건너뛴 항목이 다음에 다시 나오고, DB 에서 완전히 사라진 유령 곡도 잡힌다. 가사는 다른 곡만 받는다.
 - 연속 중복 슬라이드는 의도된 것 — 지우지 않는다.
 - 색: `--live`(초록) = 송출 중, `--preview`(파랑 점선) = PVW 선택, 노랑 = BLANK 전용, `--freeze`(하늘색) = FREEZE 전용, 빨강 = 오류/삭제만. (src/style.css)
 - **버튼 = 3D, 뱃지·입력칸과 구분**(2026-11-18, src/style.css): 버튼은 위가 밝은 면 + 받침(box-shadow, 색 `--edge`, 높이 `--lift` = 글자 크기 비례). 받침을 두꺼운 아래 테두리로 하면 아래 모서리 둥글기가 어긋나므로 쓰지 말 것. 색은 `background-color` 만 바꿀 것(면 그라데이션 유지). 평평한 글자형 버튼(✕·✎)은 `box-shadow: none; margin: 0` 필요. 단계: 기본 · `.primary` · `.danger` · `.danger-line`(확인창 거치는 위험 동작) · `.quiet`. 송출(TAKE)은 초록. 입력칸은 반대로 파인 모양(`--field`). 뱃지는 평평.
@@ -83,7 +83,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - **출력 설정 = 수정본 → 적용**(2026-11-18 사용자 결정, `src/live/styleDraft.ts`): 설정을 바꾸면 수정본만 바뀌고 **[적용]을 눌러야 송출**. 기준 = 지금 송출 중 설정(되돌리기 = 수정본 버림 — PC 패널은 늘 열려 있어 "연 시점" 기준은 애매하므로). 시트를 닫아도 수정본 유지(하단 "⚙ 출력 설정 •"), 새로고침·채널 이동 시 사라짐(메모리만). 적용 직후 "방금 적용 취소" 한 단계. **적용 ≠ 저장**(저장 = 이름 붙여 보관, 지금 보이는 설정). **PC 는 출력 설정 = 팝업**(`StyleDialog.vue`, 사이드바 설정 한 줄의 "⚙ 설정" — 왼쪽 = 보는 곳(큰 적용 전 미리보기 + 지금 송출 중 비교), 오른쪽 = 만지는 곳(설정 + 아래 고정 줄 [기본값으로] … [되돌리기][적용])). 열린 동안 송출 단축키 막고 팝업 단축키만: Esc 닫기(수정본 유지)·Ctrl/⌘+Enter 적용(그냥 Enter 는 이름 입력 중 실수 방지로 안 씀). 모바일은 전체 화면(위쪽 고정 미리보기 — 고친 내용이 있으면 [적용 전 | 송출 중] 전환으로 같은 자리·같은 크기 비교. 시트가 뒤의 송출 화면을 가리고, 나란히 두면 폰에서 글자를 못 읽어서). ≤768px 이면 시트, 아니면 팝업 — 둘 중 하나만 그린다(둘 다 그리면 설정 패널이 두 벌). FREEZE 는 글만 고정 — 설정은 적용하면 바로 나간다. 설정 패널에서 `live.setStyle` 을 직접 부르지 말 것.
 - **PWA**: 앱 파일 전체 precache, 새 버전은 **알림 후 적용**(자동 교체 금지 — 예배 중 화면이 바뀌면 안 됨). 알림은 /output 에 절대 띄우지 않는다. Supabase 요청은 캐시하지 않는다.
 - **로컬 송출 `/local`** = 채널 없는 PC 전용 송출(`LOCAL_CODE`). 예배의 기본. 서버 기능을 여기에 섞지 말 것. 콘티는 그날 하루 임시 — 송출 방식 간 콘티 가져오기·보관 기능은 만들지 않기로 함.
-- **곡 저장 규칙**: 온라인+로그인이면 서버에 바로, 아니면 PC(pending). **서버에 바로 저장하는 수정도 충돌 검사**(2026-11-19): `saveSong({…, base})` — base = 고치기 시작할 때 본 서버 버전(편집기를 연 시점 / ✎ 는 이 PC 가 받아 둔 버전). 조건부 update(`updated_at = base`)가 0건이면(그 사이 다른 기기가 고침·지움) 덮어쓰지 않고 PC 에 저장(base 유지) → "서버에 올리기"에서 충돌로 비교. 캐시는 동기화로 새 버전이 될 수 있으므로 base 를 캐시에서 다시 읽지 말 것. E2E `e2e:conflict`. 이미 pending 이 있는 곡은 온라인이어도 PC 에 이어서 저장(충돌 검사를 거쳐야 하므로). 서버에 올리기 전에 반드시 동기화 후 중복(새 곡)·충돌(수정, base.updated_at 비교) 검사. 삭제는 온라인만.
+- **곡 저장 = 이 기기, DB 는 버튼으로만**(2026-11-19 사용자 결정, `src/library/library.ts`): 저장·삭제는 언제나 이 기기(pending: new/edit/delete, 인터넷·로그인 불필요, 콘티·검색에 바로). 곡 목록(과 홈 곡 카드)의 **[⬇ 다운로드]·[⬆ 업로드]**(항상 보임, 숫자 = 받을 것/올릴 것)를 누를 때 **비밀번호 재확인**(`requireReauth` — 아이디 채워 둠, 같은 탭에서 5분 안이면 생략, 세션 변경 watch 로 통과시키지 말 것 — 토큰 갱신에도 바뀜) → 목록 화면에선 다시 안 물음. 다운로드(`DownloadDialog`): DB 와 다른 곡(새 곡·수정·삭제) + 어디가 다른지(`shared/songDiff.ts`, 장·줄·글자) → 골라 받기 / **전체 받기**(이 기기의 곡·변경을 모두 지우고 DB 로 교체, 확인창). 이 기기에서도 바꾼 곡(충돌)은 기본 선택 안 함. 업로드(`UploadDialog`): 이 기기 변경마다 중복·충돌(DB 기준) 검사, 전체 선택, 충돌은 직접 고름. 충돌 없는 수정·삭제는 `updated_at = base` 조건부. **전체 업로드(DB 를 이 기기로 교체)는 보류**(이 기기에 없는 다른 기기 곡까지 지움). 컨트롤러·홈을 열면 비교만(숫자), 받은 곡이 없는 기기는 로그인돼 있으면 전체를 바로 받음. 로그아웃은 홈에만. E2E `e2e:sync`.
 
 ## 출력 여백 · 정렬 (사용자가 나중에 수치 조절을 요청하면 바로 여기를 수정)
 - **여백은 위·왼쪽만 쓴다.** 오른쪽·아래는 화면 끝까지(넘치면 글자 축소). 글은 왼쪽 정렬, (왼쪽 여백, 위 여백)에서 시작하고 줄이 늘면 아래로 자란다. 가운데 정렬/하단 기준으로 되돌리지 말 것.

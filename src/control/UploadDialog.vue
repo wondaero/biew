@@ -1,23 +1,22 @@
 <script setup lang="ts">
 /**
- * 서버에 올리기: PC 에서 고치거나 새로 등록한 곡을 서버로.
- * 열면 서버 최신 곡을 먼저 받고(동기화), 항목마다 중복(새 곡)·충돌(수정)을 검사한다.
- *  - 문제 없는 항목: 체크박스(기본 선택)로 올릴지 고름
- *  - 중복/충돌 항목: 처리 방법을 직접 고름(기본 '보류' — 고르지 않으면 올리지 않음)
- * 로그인돼 있지 않으면 여기서 로그인한다.
+ * ⬆ 업로드(이 기기 → DB, 2026-11-19 사용자 결정 — DB 는 이 화면으로만 바뀐다). 들어오기 전에 비밀번호 재확인(여기선 다시 안 물음).
+ * 열면 DB 와 비교한 뒤 이 기기 변경(새 곡·수정·삭제)마다 중복·충돌을 검사한다. 비교 기준은 지금 DB.
+ *  - 문제 없는 항목: 체크박스(기본 선택) + 전체 선택
+ *  - 중복/충돌 항목: 처리 방법을 직접 고름(기본 '보류' — 고르지 않으면 올리지 않음). 어디가 다른지 보기(SongDiffView)
+ *  - 전체 업로드(DB 를 이 기기로 통째로 교체)는 보류 — 이 기기에 없는 다른 기기의 곡까지 지울 수 있어 위험
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { session } from '@/lib/auth'
 import { prepareUpload, uploadOne, isLocalNewId, type UploadItem, type UploadAction } from '@/library/library'
 import { isClean } from '@/library/pending'
-import { useLive } from '@/live/liveStore'
-import { requireLogin } from '@/lib/loginPrompt'
+import { diffSongs, diffSummary } from '@shared/songDiff'
 import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
 import OnAirStrip from './OnAirStrip.vue'
+import SongDiffView from './SongDiffView.vue'
 
 const emit = defineEmits<{ close: [] }>()
-const live = useLive()
 
 /** 'skip' = 보류(이번엔 안 올림, PC 에 그대로) */
 type Choice = 'skip' | Exclude<UploadAction, 'overwrite'> | `overwrite:${string}`
@@ -41,20 +40,18 @@ async function load() {
   rows.value = r.items.map((item) => ({
     item,
     checked: isClean(item),
-    choice: isClean(item) ? (item.p.kind === 'new' ? 'add' : 'mine') : 'skip',
+    choice: isClean(item) ? defaultAction(item) : item.p.kind === 'delete' && item.conflict === 'deleted' ? 'delete' : 'skip',
     open: false,
   }))
 }
-watch(session, (s) => { if (s) void load() })
-const UPLOAD_REASON = 'PC 에서 고친 곡을 서버에 올리려면 로그인하세요.'
+const defaultAction = (i: UploadItem): Choice => (i.p.kind === 'new' ? 'add' : i.p.kind === 'delete' ? 'delete' : 'mine')
 usePauseHotkeys()
-onMounted(() => {
-  // 로그인 안 돼 있으면 공용 로그인 팝업을 이 창 위에 바로 띄운다(로그인되면 watch(session) 이 이어서 load)
-  if (!session.value) void requireLogin(UPLOAD_REASON)
-  void load()
-})
+onMounted(() => { void load() })
 
 const clean = (r: Row) => isClean(r.item)
+const cleanRows = computed(() => rows.value.filter((r) => clean(r) && !r.result?.ok))
+const allChecked = computed(() => cleanRows.value.length > 0 && cleanRows.value.every((r) => r.checked))
+function toggleAll() { const v = !allChecked.value; for (const r of cleanRows.value) r.checked = v }
 /** 이번에 실제로 처리할 항목 */
 const todo = computed(() => rows.value.filter((r) => !r.result?.ok && (clean(r) ? r.checked : r.choice !== 'skip')))
 
@@ -68,7 +65,7 @@ async function run() {
     const [action, target] = c.startsWith('overwrite:') ? (['overwrite', c.slice('overwrite:'.length)] as const) : ([c as UploadAction, undefined] as const)
     try {
       await uploadOne(r.item, action, target)
-      r.result = { ok: true, msg: action === 'discard' ? 'PC 변경 버림' : '올림' }
+      r.result = { ok: true, msg: action === 'discard' ? '이 기기 변경 버림' : action === 'delete' ? 'DB 에서 삭제' : '올림' }
     } catch (e) {
       r.result = { ok: false, msg: (e as Error).message }
     }
@@ -77,28 +74,36 @@ async function run() {
   ran.value = true
 }
 
-const kindLabel = (r: Row) => (r.item.p.kind === 'new' ? '새 곡' : '수정')
+const kindLabel = (r: Row) => (r.item.p.kind === 'new' ? '새 곡' : r.item.p.kind === 'delete' ? '삭제' : '수정')
 const titles = (list: { title: string }[]) => list.map((s) => `"${s.title}"`).join(', ')
-const joinSlides = (slides: string[]) => slides.join('\n\n')
-/** 비교 대상: 수정이면 서버 버전, 새 곡이면 첫 번째 중복 후보 */
+/** 비교 대상(DB 쪽): 수정·삭제면 지금 DB 버전, 새 곡이면 첫 번째 중복 후보 */
 const compareWith = (r: Row) => r.item.server ?? r.item.dup.sameLyrics[0] ?? r.item.dup.sameTitle[0] ?? null
+/** 수정 요약: 지금 DB(없으면 고치기 시작할 때 버전)와 내 것의 다른 곳 */
+const editSummary = (r: Row) => {
+  const a = r.item.server ?? r.item.p.base
+  return a ? `다른 곳: ${diffSummary(diffSongs(a, r.item.p))}` : ''
+}
 </script>
 
 <template>
   <div class="backdrop" @mousedown.self="emit('close')">
     <div class="dialog m-full" role="dialog" aria-modal="true">
       <header>
-        <h2>서버에 올리기</h2>
+        <h2>⬆ 업로드</h2>
         <span class="spacer" />
         <button class="x" title="닫기" @click="emit('close')">✕</button>
       </header>
       <OnAirStrip />
+      <div v-if="cleanRows.length" class="tools">
+        <label class="chk"><input type="checkbox" :checked="allChecked" :disabled="busy" @change="toggleAll" /> 전체 선택</label>
+        <small class="muted">이 기기 → DB · 문제 있는 곡은 아래에서 하나씩 고르세요</small>
+      </div>
 
       <div class="body">
-        <p v-if="!session" class="muted">서버에 올리려면 로그인해야 합니다. <button class="primary" @click="requireLogin(UPLOAD_REASON)">로그인</button></p>
-        <p v-else-if="loading" class="muted">서버의 최신 곡을 받고 비교하는 중…</p>
+        <p v-if="!session" class="muted">로그인이 필요합니다.</p>
+        <p v-else-if="loading" class="muted">DB 와 비교하는 중…</p>
         <p v-else-if="err" class="err">{{ err }}</p>
-        <p v-else-if="!rows.length" class="muted">올릴 변경이 없습니다.</p>
+        <p v-else-if="!rows.length" class="muted">올릴 변경이 없습니다. 이 기기에서 곡을 고치거나 새로 만들면 여기에 쌓입니다.</p>
 
         <ul v-else class="rows">
           <li v-for="r in rows" :key="r.item.p.id" :class="{ problem: !clean(r), done: r.result?.ok }">
@@ -110,41 +115,42 @@ const compareWith = (r: Row) => r.item.server ?? r.item.dup.sameLyrics[0] ?? r.i
               <span v-if="r.result" class="res" :class="{ ok: r.result.ok }">{{ r.result.ok ? '✔' : '✖' }} {{ r.result.msg }}</span>
             </div>
 
-            <!-- 수정 요약 -->
-            <p v-if="r.item.p.kind === 'edit' && r.item.p.base" class="sub">
-              <template v-if="r.item.p.base.title !== r.item.p.title">제목 "{{ r.item.p.base.title }}" → "{{ r.item.p.title }}" · </template>
-              슬라이드 {{ r.item.p.base.slides.length }}장 → {{ r.item.p.slides.length }}장
-            </p>
+            <!-- 수정 요약(어디가 다른지) -->
+            <p v-if="r.item.p.kind === 'edit'" class="sub">{{ editSummary(r) }}</p>
+            <p v-else-if="r.item.p.kind === 'delete'" class="sub">이 기기에서 지운 곡 — 올리면 DB 에서도 삭제(다른 기기는 다운로드 때 지워짐)</p>
 
             <!-- 문제 설명 + 처리 방법 -->
             <template v-if="!clean(r)">
               <p v-if="r.item.dup.sameLyrics.length" class="warn">가사가 같은 곡이 있습니다: {{ titles(r.item.dup.sameLyrics) }}</p>
               <p v-if="r.item.dup.sameTitle.length" class="warn">제목이 같은 곡이 있습니다(가사는 다름): {{ titles(r.item.dup.sameTitle) }}</p>
-              <p v-if="r.item.conflict === 'changed'" class="warn">내가 고치는 동안 서버에서도 이 곡이 바뀌었습니다. 서버 버전: "{{ r.item.server?.title }}" {{ r.item.server?.slides.length }}장</p>
-              <p v-if="r.item.conflict === 'deleted'" class="warn">서버에서 삭제된 곡입니다.</p>
+              <p v-if="r.item.conflict === 'changed'" class="warn">내가 {{ r.item.p.kind === 'delete' ? '지운' : '고친' }} 뒤 DB 에서도 이 곡이 바뀌었습니다(다른 기기). 아래 "어디가 다른지"를 보고 고르세요.</p>
+              <p v-if="r.item.conflict === 'deleted'" class="warn">DB 에서 이미 삭제된 곡입니다.</p>
 
               <select v-model="r.choice" :disabled="busy || r.result?.ok">
-                <option value="skip">보류 — 이번엔 올리지 않음(PC 에 그대로)</option>
+                <option value="skip">보류 — 이번엔 올리지 않음(이 기기에 그대로)</option>
                 <template v-if="r.item.p.kind === 'new'">
                   <option value="add">새 곡으로 추가</option>
                   <option v-for="s in overwriteTargets(r)" :key="s.id" :value="`overwrite:${s.id}`">기존 "{{ s.title }}" 에 덮어쓰기</option>
-                  <option value="discard">PC 에서 버리기</option>
+                  <option value="discard">이 기기에서 버리기</option>
+                </template>
+                <template v-else-if="r.item.p.kind === 'delete'">
+                  <option value="delete">{{ r.item.conflict === 'deleted' ? '정리(이미 DB 에서도 삭제됨)' : 'DB 에서도 삭제' }}</option>
+                  <option value="discard">삭제 취소(DB 것 유지)</option>
                 </template>
                 <template v-else-if="r.item.conflict === 'changed'">
-                  <option value="mine">내 것으로 덮어쓰기</option>
-                  <option value="discard">서버 것 유지(내 수정 버리기)</option>
+                  <option value="mine">내 것으로 DB 덮어쓰기</option>
+                  <option value="discard">DB 것 유지(내 수정 버리기)</option>
                 </template>
                 <template v-else>
                   <option value="add">새 곡으로 다시 추가</option>
-                  <option value="discard">PC 에서 버리기</option>
+                  <option value="discard">이 기기에서 버리기</option>
                 </template>
               </select>
 
-              <button v-if="compareWith(r)" class="ghost" @click="r.open = !r.open">{{ r.open ? '▾' : '▸' }} 가사 비교</button>
-              <div v-if="r.open && compareWith(r)" class="cmp">
-                <div><h4>PC (내 것)</h4><pre>{{ joinSlides(r.item.p.slides) }}</pre></div>
-                <div><h4>서버 "{{ compareWith(r)!.title }}"</h4><pre>{{ joinSlides(compareWith(r)!.slides) }}</pre></div>
-              </div>
+            </template>
+            <template v-if="compareWith(r) || r.item.p.kind === 'edit'">
+              <button class="ghost" @click="r.open = !r.open">{{ r.open ? '▾ 접기' : '▸ 어디가 다른지 보기' }}</button>
+              <SongDiffView v-if="r.open" :a="compareWith(r) ?? r.item.p.base" :b="r.item.p.kind === 'delete' ? null : r.item.p" a-label="DB" b-label="이 기기" />
             </template>
           </li>
         </ul>
@@ -186,8 +192,8 @@ h2 { margin: 0; font-size: 16px; }
 .sub { margin: 0; font-size: 12px; color: var(--muted); }
 .warn { margin: 0; font-size: 12px; color: var(--warn); }
 select { width: 100%; }
-.ghost { justify-self: start; background: none; border: none; padding: 0; color: var(--muted); font-size: 12px; box-shadow: none; margin: 0; }
-.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.cmp h4 { margin: 0 0 4px; font-size: 12px; color: var(--muted); font-weight: normal; }
-.cmp pre { margin: 0; max-height: 240px; overflow: auto; white-space: pre-wrap; font: 12px/1.5 system-ui, 'Malgun Gothic', sans-serif; background: var(--bg); padding: 8px; border-radius: 6px; }
+.ghost { justify-self: start; background: none; border: none; padding: 0; color: var(--accent); font-size: 13px; box-shadow: none; margin: 0; }
+.tools { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.tag.delete { background: #5a2a2a; }
 </style>

@@ -4,8 +4,10 @@
  * PC = 화면 가운데 작은 창, 모바일(≤768px) = 아래에서 올라오는 시트. 다른 팝업(📡 관리·서버 올리기 등) 위에 겹쳐 뜬다.
  * Esc·뒤로가기·바깥 누르기 = 취소(요청한 쪽에 false). 로그인되면 요청한 쪽이 하려던 동작을 이어서 한다.
  */
-import { onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { loginRequest, cancelLogin } from '@/lib/loginPrompt'
+import { computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { loginRequest, cancelLogin, loginSucceeded } from '@/lib/loginPrompt'
+import { session } from '@/lib/auth'
+import { LOGIN_DOMAIN } from '@shared/loginId'
 import { useBackClose } from '@/lib/backClose'
 import LoginForm from './LoginForm.vue'
 import { useLive } from '@/live/liveStore'
@@ -15,11 +17,17 @@ const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault
 // 캡처 단계에서 받아 아래 팝업(출력 설정 등)의 Esc 처리보다 먼저 — 로그인 팝업만 닫히게
 // 열린 동안 송출 단축키 막기. 닫을 때는 '열기 전 상태'로 — 출력 설정 팝업 위에 떴다 닫혀도 단축키가 다시 켜지지 않게
 const live = useLive()
+/** 비밀번호 재확인: 지금 계정 아이디를 채워 둔다(우리 도메인이면 아이디만) */
+const reauth = computed(() => !!loginRequest.value?.reauth && !!session.value)
+const presetId = computed(() => {
+  const e = session.value?.user.email ?? ''
+  return e.endsWith('@' + LOGIN_DOMAIN) ? e.slice(0, -(LOGIN_DOMAIN.length + 1)) : e
+})
 const pausedBefore = live.hotkeysPaused.value
 onMounted(() => {
   live.hotkeysPaused.value = true
   window.addEventListener('keydown', onKey, true)
-  void nextTick(() => document.querySelector<HTMLInputElement>('.login-dlg input')?.focus()) // 아이디 칸에 바로 입력
+  if (!reauth.value) void nextTick(() => document.querySelector<HTMLInputElement>('.login-dlg input')?.focus()) // 아이디 칸에 바로 입력(재확인은 LoginForm 이 비밀번호 칸에)
 })
 onBeforeUnmount(() => {
   live.hotkeysPaused.value = pausedBefore
@@ -29,14 +37,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="login-backdrop" @mousedown.self="cancelLogin">
-    <div class="login-dlg" role="dialog" aria-modal="true" aria-label="로그인">
+    <div class="login-dlg" role="dialog" aria-modal="true" :aria-label="reauth ? '비밀번호 확인' : '로그인'">
       <header>
-        <h2>로그인</h2>
+        <h2>{{ reauth ? '비밀번호 확인' : '로그인' }}</h2>
         <button class="x" title="닫기 (Esc)" @click="cancelLogin">✕</button>
       </header>
       <p class="reason">{{ loginRequest?.reason }}</p>
-      <LoginForm />
-      <p class="note">로그인은 이 기기에 저장됩니다(로그아웃할 때까지).</p>
+      <LoginForm :preset-id="reauth ? presetId : undefined" @done="loginSucceeded" />
+      <p class="note">{{ reauth ? 'DB 와 주고받는 작업이라 한 번 더 확인합니다. 5분 동안은 다시 묻지 않습니다.' : '로그인은 이 기기에 저장됩니다(로그아웃할 때까지).' }}</p>
     </div>
   </div>
 </template>

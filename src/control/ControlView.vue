@@ -5,7 +5,7 @@ import { useLive } from '@/live/liveStore'
 import { hostLink, hostNeedsLogin, hostDeleted, remoteLink } from '@/channel/sync'
 import { forgetToken } from '@/channel/api'
 import { LOCAL_CODE, forgetVisit } from '@/live/persistence'
-import { loadCache, syncNow, useLibrary } from '@/library/library'
+import { loadCache, checkRemote, useLibrary } from '@/library/library'
 import { openOutputWindow } from './outputWindow'
 import { isMobileOS } from '@/lib/device'
 import { useHotkeys } from './useHotkeys'
@@ -138,7 +138,8 @@ function goHome() {
 onMounted(() => {
   document.title = `${isHost.value ? '컨트롤러' : '리모컨'} — Biew`
   if (isHost.value) {
-    loadCache().then(() => syncNow())
+    // DB 와 비교만(숫자 배지). 받는 건 곡 목록의 [⬇ 다운로드]로. 처음 쓰는 기기(빈 상태)는 로그인돼 있으면 전체를 바로 받음
+    loadCache().then(() => checkRemote())
     tick = window.setInterval(() => { now.value = Date.now() }, 1000)
     window.addEventListener('beforeunload', onBeforeUnload)
   }
@@ -213,7 +214,7 @@ onBeforeUnmount(() => {
         <StyleSummary v-if="!narrow" @open="showStyle = true" />
         <div class="side-actions desk-only">
           <button class="find" title="곡 목록 — 찾아서 [+ 콘티] 또는 Enter 로 추가 ( / )" @click="openSearch()">
-            🔍 곡 목록 <kbd>/</kbd><b v-if="lib.pendingCount.value" class="badge" title="PC 에서 고친 곡 — 서버에 올리기 대기">{{ lib.pendingCount.value }}</b>
+            🔍 곡 목록 <kbd>/</kbd><b v-if="lib.remoteCount.value" class="badge down" title="DB 에서 바뀐 곡 — 다운로드로 받기">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge" title="이 기기에서 바꾼 곡 — 업로드 대기">⬆{{ lib.pendingCount.value }}</b>
           </button>
           <button title="새 곡 등록(오프라인이면 PC 에 저장)" @click="openSearch(true)">+ 새 곡</button>
         </div>
@@ -252,7 +253,7 @@ onBeforeUnmount(() => {
 
     <!-- 폰: 준비용 버튼(곡 목록·콘티·출력 설정)은 위, 송출 버튼은 맨 아래(사용자 결정 2026-11-19) -->
     <nav v-if="isHost" class="dock">
-      <button @click="openSearch()">🔍 곡 목록<b v-if="lib.pendingCount.value" class="badge">{{ lib.pendingCount.value }}</b></button>
+      <button @click="openSearch()">🔍 곡 목록<b v-if="lib.remoteCount.value" class="badge down">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge">⬆{{ lib.pendingCount.value }}</b></button>
       <button @click="openSheet('set')">☰ 콘티 {{ live.state.setlist.length }}</button>
       <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
     </nav>
@@ -303,6 +304,7 @@ onBeforeUnmount(() => {
 .side-actions .find { flex: 1; }
 kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; }
 /* 서버에 올릴 곡 수(곡 검색 팝업 안에 올리기 버튼이 있음) */
+.badge.down { background: rgba(79, 140, 255, .25); color: #dbe7ff; }
 .badge { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; background: #5a4a1e; color: #f5d27a; }
 .side-hint { margin: 0; font-size: 12px; color: var(--warn); }
 .side-hint b { color: var(--text); }

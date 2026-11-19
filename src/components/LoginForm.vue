@@ -3,14 +3,17 @@
  * 로그인 폼(공용). 로그인은 이 기기에 저장된다(로그아웃할 때까지 — lib/supabase.ts).
  * ID/PW 는 브라우저 비밀번호 저장 기능이 채워 주도록 name/autocomplete 를 표준대로 둔다(앱이 비밀번호를 저장하지 않음).
  */
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { signIn } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
-defineProps<{ hint?: string }>()
+/** presetId: 비밀번호 재확인 — 아이디를 채워 두고 비밀번호 칸에 커서 */
+const props = defineProps<{ hint?: string; presetId?: string }>()
 const emit = defineEmits<{ done: [] }>()
 
-const email = ref('')
+const email = ref(props.presetId ?? '')
+const pwEl = ref<HTMLInputElement>()
+onMounted(() => { if (props.presetId) pwEl.value?.focus() })
 const pw = ref('')
 const err = ref<string | null>(null)
 const busy = ref(false)
@@ -29,7 +32,7 @@ async function submit() {
     <p v-if="!supabase" class="err">Supabase 설정(.env)이 없습니다.</p>
     <!-- type=text: 아이디만(예: jv) 입력해도 되도록. 도메인은 signIn 이 붙인다(shared/loginId) -->
     <input v-model="email" name="username" type="text" placeholder="아이디" autocomplete="username" autocapitalize="off" spellcheck="false" required />
-    <input v-model="pw" name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required />
+    <input ref="pwEl" v-model="pw" name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required />
     <button class="primary" :disabled="busy || !supabase">{{ busy ? '로그인 중…' : '로그인' }}</button>
     <p v-if="err" class="err">{{ err }}</p>
   </form>

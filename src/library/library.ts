@@ -1,11 +1,14 @@
 /**
- * 곡 라이브러리: IndexedDB 캐시 → 메모리 인덱스.
- * 온라인 + 로그인 상태면 updated_at 델타만 받아온다(deleted_at 으로 삭제 반영).
+ * 곡 라이브러리: IndexedDB(이 기기) → 메모리 인덱스.
  *
- * 화면에 보이는 곡 = 서버에서 받은 곡(캐시) + PC 에서 고치거나 새로 등록한 곡(pending, 아직 서버에 안 올라감).
- *  - 오프라인이거나 로그인 안 한 상태에서 저장하면 pending 에 들어가고, 콘티·검색·'↻ 최신'에 바로 쓰인다.
- *  - '서버에 올리기'(prepareUpload → uploadOne)에서 중복·충돌을 검사한 뒤 올리고 pending 에서 지운다.
- *  - 삭제는 온라인에서만(아직 안 올린 PC 새 곡은 오프라인에서도 지울 수 있음).
+ * 2026-11-19 사용자 결정 — "평소 저장은 이 기기, DB 는 버튼으로만":
+ *  - 저장·삭제는 언제나 이 기기에만(pending). 콘티·검색에는 바로 쓰인다. 인터넷·로그인 불필요.
+ *  - [⬇ 다운로드]: DB 와 이 기기를 통째로 비교한 목록(새 곡·수정·삭제, 어디가 다른지) → 골라 받기 / 전체 받기(이 기기를 DB 로 교체).
+ *  - [⬆ 업로드]: 이 기기에서 바꾼 것 목록(중복·충돌 검사) → 골라 올리기. 전체 업로드(DB 를 이 기기로 교체)는 보류(위험).
+ *  - 두 버튼은 들어갈 때 비밀번호 재확인(requireReauth, 5분 안이면 생략). 목록 화면 안에선 다시 묻지 않는다.
+ *  - 비교 기준은 DB. 같은 곡을 이 기기와 DB 양쪽에서 바꿨으면 충돌 — 직접 고른다.
+ * 화면에 보이는 곡 = 받아 둔 DB 곡(cache) + 이 기기의 새 곡·수정 − 이 기기에서 지운 곡.
+ * 받아 둔 곡이 하나도 없는 기기(처음)는 로그인돼 있으면 확인할 때 전체를 바로 받는다(잃을 게 없으므로).
  */
 import { shallowRef, ref, computed, watch } from 'vue'
 import type { Song } from '@shared/types'
@@ -15,34 +18,43 @@ import { uid } from '@/lib/uid'
 import * as db from './db'
 import type { PendingSong } from './db'
 import { buildIndex, search, type IndexedSong } from './search'
-import { classifyPending, pendingAsSong, type UploadItem } from './pending'
+import { classifyPending, pendingAsSong, diffIndex, type UploadItem, type RemoteRow, type RemoteKind } from './pending'
 
 const PAGE = 1000 // PostgREST 기본 max-rows
 const COLS = 'id,title,slides,source_file,updated_at,deleted_at'
 
-/** 서버에서 받은 곡(캐시) */
+/** 받아 둔 DB 곡(이 기기의 DB 사본) */
 const serverSongs = shallowRef<Song[]>([])
-/** PC 변경 — 아직 서버에 안 올라감 */
+/** 이 기기에서 바꾼 것 — 아직 DB 에 안 올라감 */
 export const pending = shallowRef<PendingSong[]>([])
-/** 화면용: 서버 곡 + PC 변경 */
+/** 화면용 */
 const songs = shallowRef<Song[]>([])
 const index = shallowRef<IndexedSong[]>([])
-export const syncStatus = ref<'idle' | 'loading' | 'syncing' | 'error' | 'offline'>('idle')
+export const syncStatus = ref<'idle' | 'loading' | 'checking' | 'downloading' | 'error' | 'offline'>('idle')
 export const syncError = ref<string | null>(null)
+/** 마지막으로 DB 에서 받은 시각 */
 export const lastSync = ref<string | null>(null)
+/** 마지막으로 DB 와 비교한 시각 */
+export const lastCheck = ref<string | null>(null)
+
+/** 다운로드 목록 한 줄: DB 에서 바뀐 곡. mine = 이 기기에서도 바꿨으면(충돌) */
+export interface RemoteItem { id: string; kind: RemoteKind; db: Song | null; local: Song | null; mine: PendingSong | null }
+/** 마지막 비교 결과(DB 와 다른 곡) */
+export const remoteItems = shallowRef<RemoteItem[]>([])
 
 function rebuild() {
   const map = new Map(serverSongs.value.map((s) => [s.id, s]))
-  for (const p of pending.value) map.set(p.id, pendingAsSong(p, map.get(p.id)?.source_file ?? null))
+  for (const p of pending.value) {
+    if (p.kind === 'delete') map.delete(p.id)
+    else map.set(p.id, pendingAsSong(p, map.get(p.id)?.source_file ?? null))
+  }
   songs.value = [...map.values()]
   index.value = buildIndex(songs.value)
 }
-
 function setSongs(list: Song[]) {
   serverSongs.value = list.filter((s) => !s.deleted_at)
   rebuild()
 }
-
 function setPending(list: PendingSong[]) {
   pending.value = list
   rebuild()
@@ -60,41 +72,66 @@ export function loadCache() {
   return loaded
 }
 
-let running: Promise<void> | null = null
-export function syncNow(): Promise<void> {
-  running ??= doSync().finally(() => { running = null })
-  return running
+const canUseServer = () => !!supabase && !!session.value && navigator.onLine
+function requireOnline() {
+  if (!supabase || !session.value) throw new Error('로그인이 필요합니다')
+  if (!navigator.onLine) throw new Error('인터넷 연결이 필요합니다')
+  return supabase
 }
 
-async function doSync() {
+async function fetchIndex(): Promise<RemoteRow[]> {
+  const out: RemoteRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase!.from('songs').select('id,updated_at,deleted_at').order('id').range(from, from + PAGE - 1)
+    if (error) throw error
+    out.push(...(data as RemoteRow[]))
+    if (!data || data.length < PAGE) break
+  }
+  return out
+}
+async function fetchSongs(ids: string[]): Promise<Song[]> {
+  const out: Song[] = []
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data, error } = await supabase!.from('songs').select(COLS).in('id', ids.slice(i, i + 150))
+    if (error) throw error
+    out.push(...(data as Song[]))
+  }
+  return out
+}
+async function fetchAll(): Promise<Song[]> {
+  const out: Song[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase!.from('songs').select(COLS).is('deleted_at', null).order('id').range(from, from + PAGE - 1)
+    if (error) throw error
+    out.push(...(data as Song[]))
+    if (!data || data.length < PAGE) break
+  }
+  return out
+}
+
+let checking: Promise<void> | null = null
+/**
+ * DB 와 비교(가사 없는 목록만 받아 비교하고, 다른 곡만 가사까지 받음). 이 기기는 바꾸지 않는다 — 목록(remoteItems)만.
+ * 처음 쓰는 기기(받은 곡·바꾼 것 모두 없음)면 바로 전체를 받는다.
+ */
+export function checkRemote(): Promise<void> {
+  checking ??= doCheck().finally(() => { checking = null })
+  return checking
+}
+async function doCheck() {
   await loadCache()
   if (!supabase || !session.value) return
   if (!navigator.onLine) { syncStatus.value = 'offline'; return }
-  syncStatus.value = 'syncing'
   syncError.value = null
   try {
-    const since = lastSync.value
-    const changed: Song[] = []
-    for (let from = 0; ; from += PAGE) {
-      let q = supabase.from('songs').select(COLS).order('updated_at').order('id').range(from, from + PAGE - 1)
-      // gte(이상): 같은 timestamp 의 행을 놓치지 않도록. 재적용은 멱등.
-      if (since) q = q.gte('updated_at', since)
-      const { data, error } = await q
-      if (error) throw error
-      changed.push(...(data as Song[]))
-      if (!data || data.length < PAGE) break
-    }
-    if (changed.length) {
-      const maxTs = changed.reduce((m, s) => (s.updated_at > m ? s.updated_at : m), since ?? '')
-      const deletes = changed.filter((s) => s.deleted_at).map((s) => s.id)
-      const ups = changed.filter((s) => !s.deleted_at)
-      await db.applyChanges(ups, deletes, maxTs)
-      lastSync.value = maxTs
-      const map = new Map(serverSongs.value.map((s) => [s.id, s]))
-      for (const s of ups) map.set(s.id, s)
-      for (const id of deletes) map.delete(id)
-      setSongs([...map.values()])
-    }
+    if (!serverSongs.value.length && !pending.value.length) { await downloadAll(); return }
+    syncStatus.value = 'checking'
+    const diff = diffIndex(serverSongs.value, await fetchIndex())
+    const full = new Map((await fetchSongs(diff.filter((d) => d.kind !== 'deleted').map((d) => d.id))).map((s) => [s.id, s]))
+    const local = new Map(serverSongs.value.map((s) => [s.id, s]))
+    const mine = new Map(pending.value.map((p) => [p.id, p]))
+    remoteItems.value = diff.map((d) => ({ id: d.id, kind: d.kind, db: full.get(d.id) ?? null, local: local.get(d.id) ?? null, mine: mine.get(d.id) ?? null }))
+    lastCheck.value = new Date().toISOString()
     syncStatus.value = 'idle'
   } catch (e) {
     syncStatus.value = 'error'
@@ -102,31 +139,61 @@ async function doSync() {
   }
 }
 
-/** 로그인되면 자동 동기화, 다시 온라인 되면 재시도 */
-watch(session, (s) => { if (s) syncNow() })
-window.addEventListener('online', () => syncNow())
+/** 로그인되면·다시 온라인 되면 비교(받지는 않음 — 숫자만 갱신) */
+watch(session, (s) => { if (s) void checkRemote() })
+window.addEventListener('online', () => void checkRemote())
 
-/** 곡 캐시를 지우고 전체 다시 받기. 올리지 않은 PC 변경은 그대로 둔다 */
-export async function resetCache() {
-  await db.clearAll()
-  lastSync.value = null
-  setSongs([])
-  await syncNow()
+/**
+ * 골라 받기: 이 기기에 DB 버전을 반영. 이 기기에서도 바꾼 곡(충돌)을 받으면 이 기기 변경은 버린다.
+ * 받지 않은 항목은 그대로 남아 다음 비교 때 다시 나온다.
+ */
+export async function applyDownload(ids: string[]) {
+  const pick = new Set(ids)
+  const items = remoteItems.value.filter((r) => pick.has(r.id))
+  const map = new Map(serverSongs.value.map((s) => [s.id, s]))
+  for (const r of items) {
+    if (r.kind === 'deleted' || !r.db) { await db.removeSong(r.id); map.delete(r.id) }
+    else { await db.putSong(r.db); map.set(r.id, r.db) }
+    if (r.mine) await db.removePending(r.id)
+  }
+  const now = new Date().toISOString()
+  await db.setLastSync(now)
+  lastSync.value = now
+  pending.value = pending.value.filter((p) => !items.some((r) => r.mine && r.id === p.id))
+  setSongs([...map.values()])
+  remoteItems.value = remoteItems.value.filter((r) => !pick.has(r.id))
 }
 
-const canUseServer = () => !!supabase && !!session.value && navigator.onLine
-
-function requireOnline() {
-  if (!supabase || !session.value) throw new Error('로그인이 필요합니다')
-  if (!navigator.onLine) throw new Error('인터넷 연결이 필요합니다')
-  return supabase
+/** 전체 받기: 이 기기의 곡·바꾼 내용(업로드 안 한 것 포함)을 모두 지우고 DB 곡으로 교체 */
+export async function downloadAll() {
+  requireOnline()
+  syncStatus.value = 'downloading'
+  syncError.value = null
+  try {
+    const all = await fetchAll()
+    const now = new Date().toISOString()
+    await db.replaceAll(all, now)
+    lastSync.value = now
+    lastCheck.value = now
+    pending.value = []
+    setSongs(all)
+    remoteItems.value = []
+    syncStatus.value = 'idle'
+  } catch (e) {
+    syncStatus.value = 'error'
+    syncError.value = (e as Error).message
+    throw e
+  }
 }
 
 async function putServerSong(saved: Song) {
   await db.putSong(saved)
   serverSongs.value = [...serverSongs.value.filter((s) => s.id !== saved.id), saved]
 }
-
+async function dropServerSong(id: string) {
+  await db.removeSong(id)
+  serverSongs.value = serverSongs.value.filter((s) => s.id !== id)
+}
 async function dropPending(id: string) {
   await db.removePending(id)
   pending.value = pending.value.filter((p) => p.id !== id)
@@ -134,126 +201,107 @@ async function dropPending(id: string) {
 
 export const isLocalNewId = (id: string) => id.startsWith('local-')
 
-/** conflict: 서버에 바로 저장하려 했는데 그 사이 서버 곡이 바뀌었거나 지워져서 PC 에 저장함('서버에 올리기'에서 비교) */
-export interface SaveResult { song: Song; local: boolean; conflict?: boolean }
-/** 고치기 시작할 때 본 서버 버전 */
+export interface SaveResult { song: Song }
+/** 고치기 시작할 때 본 DB 버전 */
 export type SongBase = { updated_at: string; title: string; slides: string[] }
 
+const baseOf = (s: Song | undefined): SongBase | null => (s ? { updated_at: s.updated_at, title: s.title, slides: [...s.slides] } : null)
+
 /**
- * 새 곡(id 없음) 또는 수정.
- * 온라인 + 로그인이면 바로 서버에 저장. 아니면 PC 에 저장(pending) → 나중에 '서버에 올리기'.
- * 이미 PC 에만 있는 변경(아직 안 올린 새 곡/수정)이 있는 곡은 온라인이어도 PC 에 이어서 저장한다
- * — 그 변경은 '서버에 올리기'에서 충돌 검사를 거쳐야 하므로.
- *
- * 수정을 서버에 바로 저장할 때도 충돌 검사(2026-11-19): base(고치기 시작할 때 본 서버 버전 — 없으면 캐시)의 updated_at 과
- * 지금 서버가 같을 때만 저장(조건부 update). 그 사이 다른 기기가 고쳤거나 지웠으면 덮어쓰지 않고 PC 에 저장 → '서버에 올리기'에서
- * 양쪽 가사를 비교해 고른다(예전엔 소리 없이 덮어써서 다른 PC 의 수정이 사라질 수 있었음).
+ * 새 곡(id 없음) 또는 수정 — 언제나 이 기기에(DB 는 업로드로만).
+ * base = 고치기 시작할 때 본 DB 버전(편집기를 연 시점). 업로드 때 그 사이 DB 가 바뀌었는지 이걸로 판정한다.
+ * 받아 둔 버전과 똑같이 되돌렸으면 바꾼 것이 없으므로 지운다.
  */
 export async function saveSong(input: { id?: string; title: string; slides: string[]; base?: SongBase }): Promise<SaveResult> {
   const title = input.title.trim()
   if (!title) throw new Error('제목을 입력하세요')
   if (!input.slides.length) throw new Error('가사를 입력하세요')
   const prev = input.id ? pending.value.find((p) => p.id === input.id) : undefined
-  const localNew = !!input.id && isLocalNewId(input.id)
-
-  const cached = input.id ? serverSongs.value.find((s) => s.id === input.id) : undefined
-  const seen: SongBase | null = input.base ?? (cached ? { updated_at: cached.updated_at, title: cached.title, slides: [...cached.slides] } : null)
-  let conflict = false
-  if (canUseServer() && !prev && !localNew) {
-    const row = { title, slides: input.slides }
-    if (!input.id) {
-      const { data, error } = await supabase!.from('songs').insert(row).select(COLS).single()
-      if (error) throw new Error(error.message)
-      await putServerSong(data as Song)
-      rebuild()
-      return { song: data as Song, local: false }
-    }
-    let q = supabase!.from('songs').update(row).eq('id', input.id).is('deleted_at', null)
-    if (seen) q = q.eq('updated_at', seen.updated_at) // 내가 본 버전 그대로일 때만
-    const { data, error } = await q.select(COLS)
-    if (error) throw new Error(error.message)
-    if (data?.length) {
-      await putServerSong(data[0] as Song)
-      rebuild()
-      return { song: data[0] as Song, local: false }
-    }
-    // 0건 = 그 사이 서버 곡이 바뀌었거나 지워짐 → 덮어쓰지 않고 PC 에 저장(아래). 최신 서버 버전은 받아 둔다(올리기 비교용)
-    conflict = true
-    void syncNow()
-  }
-
-  // PC 에 저장
   const now = new Date().toISOString()
   let p: PendingSong
-  if (!input.id || localNew) {
+  if (!input.id || isLocalNewId(input.id)) {
     p = { id: input.id ?? `local-${uid()}`, kind: 'new', title, slides: [...input.slides], base: null, savedAt: now }
   } else {
-    const server = cached
-    // 기준 = 고치기 시작할 때 본 버전(충돌이면 반드시 그것 — 캐시는 동기화로 이미 새 버전일 수 있음)
-    const base = prev?.base ?? seen
-    // 서버 버전과 똑같이 되돌렸으면 올릴 것이 없다
-    if (base && base.title === title && JSON.stringify(base.slides) === JSON.stringify(input.slides)) {
+    const cached = serverSongs.value.find((s) => s.id === input.id)
+    const base = prev?.base ?? input.base ?? baseOf(cached)
+    if (base && cached && base.updated_at === cached.updated_at && base.title === title && JSON.stringify(base.slides) === JSON.stringify(input.slides)) {
       await dropPending(input.id)
       rebuild()
-      return { song: server ?? pendingAsSong({ id: input.id, kind: 'edit', title, slides: input.slides, base, savedAt: now }), local: false }
+      return { song: cached }
     }
     p = { id: input.id, kind: 'edit', title, slides: [...input.slides], base, savedAt: now }
   }
   await db.putPending(p)
   setPending([...pending.value.filter((x) => x.id !== p.id), p])
-  return { song: songs.value.find((s) => s.id === p.id)!, local: true, conflict }
+  return { song: songs.value.find((s) => s.id === p.id)! }
 }
 
-/** 소프트 삭제(deleted_at) — 온라인에서만. 아직 안 올린 PC 새 곡은 PC 에서만 지운다 */
+/** 삭제 — 이 기기에서만(목록에서 숨김). DB 에서 지우는 건 업로드로. 이 기기 새 곡은 그냥 지운다 */
 export async function deleteSong(id: string) {
-  if (isLocalNewId(id)) {
-    await dropPending(id)
-    rebuild()
-    return
-  }
-  const sb = requireOnline()
-  const { error } = await sb.from('songs').update({ deleted_at: new Date().toISOString() }).eq('id', id)
-  if (error) throw new Error(error.message)
-  await db.removeSong(id)
-  await dropPending(id) // 올리지 않은 수정이 있었다면 함께 버림
-  serverSongs.value = serverSongs.value.filter((s) => s.id !== id)
-  rebuild()
+  if (isLocalNewId(id)) { await dropPending(id); rebuild(); return }
+  const prev = pending.value.find((p) => p.id === id)
+  const cached = serverSongs.value.find((s) => s.id === id)
+  const shown = songs.value.find((s) => s.id === id)
+  const p: PendingSong = { id, kind: 'delete', title: shown?.title ?? cached?.title ?? '', slides: [...(shown?.slides ?? cached?.slides ?? [])], base: prev?.base ?? baseOf(cached), savedAt: new Date().toISOString() }
+  await db.putPending(p)
+  setPending([...pending.value.filter((x) => x.id !== id), p])
 }
 
-// ── 서버에 올리기 ──────────────────────────────────────
+// ── 업로드 ──────────────────────────────────────
 export type { UploadItem }
-export type UploadAction = 'add' | 'overwrite' | 'mine' | 'discard'
+/** add/overwrite/mine = 올림, delete = DB 에서 삭제, discard = 이 기기 변경 버림(받아 둔 버전으로) */
+export type UploadAction = 'add' | 'overwrite' | 'mine' | 'delete' | 'discard'
 
-/** 서버 최신 곡을 먼저 받은 뒤 PC 변경을 하나씩 분류(중복·충돌) */
+/** DB 와 비교한 뒤(이 기기는 바꾸지 않음) 이 기기 변경을 하나씩 분류(중복·충돌) — 비교 기준은 지금 DB */
 export async function prepareUpload(): Promise<{ items: UploadItem[]; error?: string }> {
   if (!supabase || !session.value) return { items: [], error: '로그인이 필요합니다' }
   if (!navigator.onLine) return { items: [], error: '인터넷 연결이 필요합니다' }
-  await syncNow()
-  if (syncStatus.value === 'error') return { items: [], error: `서버 곡을 받지 못했습니다: ${syncError.value}` }
-  return { items: pending.value.map((p) => classifyPending(p, serverSongs.value, pending.value)) }
+  await checkRemote()
+  if (syncStatus.value === 'error') return { items: [], error: `DB 와 비교하지 못했습니다: ${syncError.value}` }
+  // 지금 DB 모습 = 받아 둔 곡 + 아직 안 받은 DB 변경
+  const view = new Map(serverSongs.value.map((s) => [s.id, s]))
+  for (const r of remoteItems.value) { if (r.kind === 'deleted' || !r.db) view.delete(r.id); else view.set(r.id, r.db) }
+  return { items: pending.value.map((p) => classifyPending(p, [...view.values()], pending.value)) }
 }
 
-/**
- * 한 건 처리.
- *  add      : 새 곡으로 추가(서버에서 지워진 곡을 다시 올릴 때도)
- *  overwrite: targetId 서버 곡에 덮어쓰기(새 곡이 기존 곡과 중복일 때)
- *  mine     : 내 수정으로 서버 곡 덮어쓰기
- *  discard  : 올리지 않고 PC 변경을 버림(서버 것 유지)
- */
+/** 한 건 처리. 충돌 없는 수정·삭제는 '내가 본 DB 버전 그대로일 때만'(그 사이 바뀌면 오류 → 다시 비교) */
 export async function uploadOne(item: UploadItem, action: UploadAction, targetId?: string): Promise<void> {
   const sb = requireOnline()
-  const row = { title: item.p.title, slides: item.p.slides }
-  let saved: Song | null = null
-  if (action === 'add' || action === 'overwrite' || action === 'mine') {
-    const id = action === 'overwrite' ? targetId : action === 'mine' ? item.p.id : undefined
+  const p = item.p
+  const guard = !item.conflict && p.base ? p.base.updated_at : null
+  if (action === 'discard') {
+    await dropPending(p.id)
+  } else if (action === 'delete') {
+    if (item.server) {
+      let q = sb.from('songs').update({ deleted_at: new Date().toISOString() }).eq('id', p.id).is('deleted_at', null)
+      if (guard) q = q.eq('updated_at', guard)
+      const { data, error } = await q.select('id')
+      if (error) throw new Error(error.message)
+      if (!data?.length) throw new Error('그 사이 DB 에서 바뀌었습니다 — 다시 열어 비교하세요')
+    }
+    await dropServerSong(p.id)
+    await dropPending(p.id)
+  } else {
+    const row = { title: p.title, slides: p.slides }
+    const id = action === 'overwrite' ? targetId : action === 'mine' ? p.id : undefined
     if (action === 'overwrite' && !id) throw new Error('덮어쓸 곡이 없습니다')
-    const q = id ? sb.from('songs').update(row).eq('id', id) : sb.from('songs').insert(row)
-    const { data, error } = await q.select(COLS).single()
-    if (error) throw new Error(error.message)
-    saved = data as Song
+    let saved: Song
+    if (id) {
+      let q = sb.from('songs').update({ ...row, deleted_at: null }).eq('id', id)
+      if (action === 'mine' && guard) q = q.eq('updated_at', guard)
+      const { data, error } = await q.select(COLS)
+      if (error) throw new Error(error.message)
+      if (!data?.length) throw new Error('그 사이 DB 에서 바뀌었습니다 — 다시 열어 비교하세요')
+      saved = data[0] as Song
+    } else {
+      const { data, error } = await sb.from('songs').insert(row).select(COLS).single()
+      if (error) throw new Error(error.message)
+      saved = data as Song
+    }
+    await dropPending(p.id)
+    await putServerSong(saved)
   }
-  await dropPending(item.p.id)
-  if (saved) await putServerSong(saved)
+  remoteItems.value = remoteItems.value.filter((r) => r.id !== p.id && r.id !== targetId)
   rebuild()
 }
 
@@ -262,9 +310,15 @@ export function useLibrary() {
     songs,
     count: computed(() => songs.value.length),
     byId: computed(() => new Map(songs.value.map((x) => [x.id, x]))),
-    /** PC 변경 상태: 'new' = PC 에서 새로 등록, 'edit' = PC 에서 고침(둘 다 아직 서버에 안 올라감) */
+    /** 이 기기 변경 상태: 'new' = 이 기기 새 곡, 'edit' = 이 기기에서 고침(둘 다 아직 DB 에 안 올라감) */
     localKind: computed(() => new Map(pending.value.map((p) => [p.id, p.kind]))),
+    /** 올릴 것(이 기기 변경) 개수 */
     pendingCount: computed(() => pending.value.length),
+    /** 받을 것(DB 와 다른 곡) 개수 — 마지막 비교 기준 */
+    remoteCount: computed(() => remoteItems.value.length),
     search: (q: string, limit?: number) => search(index.value, q, limit),
   }
 }
+
+/** 화면이 DB 와 주고받을 수 있는 상태인지(로그인·온라인) */
+export const canSync = canUseServer

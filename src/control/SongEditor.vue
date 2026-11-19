@@ -2,7 +2,7 @@
 /**
  * 곡 추가/수정/삭제. 빈 줄 = 슬라이드 구분.
  * 오른쪽에 현재 출력 스타일 그대로 슬라이드 미리보기.
- * 오프라인/로그인 없이 저장하면 PC 에 저장되고(나중에 '서버에 올리기'), 삭제는 온라인에서만.
+ * 저장·삭제는 언제나 이 기기에만(인터넷·로그인 불필요) — DB 에는 곡 목록의 [⬆ 업로드]로 올린다(2026-11-19 사용자 결정).
  */
 import OnAirStrip from './OnAirStrip.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
@@ -16,7 +16,7 @@ import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
 
 const props = defineProps<{ song: Song | null }>() // null = 새 곡
-const emit = defineEmits<{ close: []; saved: [song: Song, local: boolean, conflict: boolean] }>()
+const emit = defineEmits<{ close: []; saved: [song: Song] }>()
 
 const live = useLive()
 const lib = useLibrary()
@@ -79,7 +79,7 @@ async function save() {
     const s = props.song
     const base = s && !localKind.value ? { updated_at: s.updated_at, title: s.title, slides: [...s.slides] } : undefined
     const r = await saveSong({ id: s?.id, title: title.value, slides: slides.value, base })
-    emit('saved', r.song, r.local, !!r.conflict)
+    emit('saved', r.song)
     emit('close')
   } catch (e) {
     err.value = (e as Error).message
@@ -91,8 +91,8 @@ async function save() {
 async function remove() {
   if (!props.song) return
   if (isLocalNewId(props.song.id)) {
-    if (!confirm(`PC 에만 있는 새 곡 "${props.song.title}"을(를) 지울까요?`)) return
-  } else if (!confirm(`"${props.song.title}"을(를) 삭제할까요?\n이미 콘티에 들어간 곡은 이번 예배 동안 그대로 남습니다.`)) return
+    if (!confirm(`이 기기에만 있는 새 곡 "${props.song.title}"을(를) 지울까요?`)) return
+  } else if (!confirm(`"${props.song.title}"을(를) 이 기기에서 삭제할까요?\nDB 에서도 지우려면 [⬆ 업로드]에서 올리세요. 이미 콘티에 들어간 곡은 이번 예배 동안 그대로 남습니다.`)) return
   busy.value = true
   try {
     await deleteSong(props.song.id)

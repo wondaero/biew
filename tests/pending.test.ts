@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyPending, isClean } from '../src/library/pending'
+import { classifyPending, isClean, diffIndex } from '../src/library/pending'
 import type { PendingSong } from '../src/library/db'
 import type { Song } from '../shared/types'
 
@@ -38,5 +38,24 @@ describe('서버에 올리기 — PC 변경 분류', () => {
   })
   it('수정: 서버에서 삭제됐으면 deleted', () => {
     expect(classifyPending(pedit('gone', '2026-11-01T00:00:00Z'), server, []).conflict).toBe('deleted')
+  })
+})
+
+describe('DB 와 이 기기 비교(다운로드 목록)', () => {
+  const c = [{ id: 'a', updated_at: '1' }, { id: 'b', updated_at: '1' }, { id: 'ghost', updated_at: '1' }, { id: 'd', updated_at: '1' }]
+  const r = [
+    { id: 'a', updated_at: '1', deleted_at: null }, // 같음
+    { id: 'b', updated_at: '2', deleted_at: null }, // DB 에서 수정
+    { id: 'd', updated_at: '2', deleted_at: '2' }, // DB 에서 삭제
+    { id: 'n', updated_at: '1', deleted_at: null }, // DB 에 새 곡
+    { id: 'x', updated_at: '1', deleted_at: '1' }, // 이미 지워졌고 이 기기에도 없음 → 무시
+  ]
+  it('새 곡·수정·삭제·유령 곡(DB 에 아예 없음)', () => {
+    const d = diffIndex(c, r)
+    expect(Object.fromEntries(d.map((x) => [x.id, x.kind]))).toEqual({ b: 'changed', n: 'new', ghost: 'deleted', d: 'deleted' })
+  })
+  it('지우려는 곡은 새 곡 중복 후보에서 빠진다', () => {
+    const del: PendingSong = { id: 's1', kind: 'delete', title: 'Lorem Alpha', slides: ['Lorem ipsum'], base: null, savedAt: 'x' }
+    expect(classifyPending(pnew('local-1', 'X', ['Lorem ipsum']), server, [del]).dup.sameLyrics).toEqual([])
   })
 })

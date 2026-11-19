@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useLibrary, syncStatus, syncError, lastSync, syncNow, resetCache } from '@/library/library'
-import { session, signOut, authReady } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
-import { requireLogin } from '@/lib/loginPrompt'
+import { useLibrary, syncStatus, syncError, lastSync, lastCheck } from '@/library/library'
+import { session } from '@/lib/auth'
+import { useSyncDialogs } from '../useSyncDialogs'
 import { useLive } from '@/live/liveStore'
 import type { Song } from '@shared/types'
 import SongEditor from '../SongEditor.vue'
 import UploadDialog from '../UploadDialog.vue'
+import DownloadDialog from '../DownloadDialog.vue'
 import { dbNotice } from '@/library/db'
 
 const lib = useLibrary()
@@ -43,29 +43,30 @@ function onKey(e: KeyboardEvent) {
   else if (e.key === 'Escape' && q.value) { q.value = ''; e.preventDefault() }
 }
 
-// 로그인: 곡 받기(동기화)·곡 편집에만 필요. 공용 로그인 팝업(requireLogin) — 예전엔 여기에 로그인 칸이 펼쳐져 패널 위쪽을 차지했음
-const login = () => requireLogin('로그인하면 새 곡을 받고 곡을 추가·수정할 수 있습니다. 받아 둔 곡은 로그인 없이 계속 쓸 수 있습니다.')
-
+// DB 와 주고받기 = [⬇ 다운로드]·[⬆ 업로드] 두 버튼(항상 보임). 누르면 비밀번호 재확인 → 목록 화면(useSyncDialogs)
+const sync = useSyncDialogs()
+const time = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 const statusText = computed(() => {
   switch (syncStatus.value) {
-    case 'loading': return '캐시 불러오는 중…'
-    case 'syncing': return '동기화 중…'
-    case 'offline': return '오프라인 — 캐시 사용 중'
-    case 'error': return `동기화 실패: ${syncError.value}`
-    default: return lastSync.value ? `최신 (${new Date(lastSync.value).toLocaleString('ko-KR')})` : '동기화 전'
+    case 'loading': return '이 기기 곡 불러오는 중…'
+    case 'checking': return 'DB 와 비교하는 중…'
+    case 'downloading': return 'DB 에서 받는 중…'
+    case 'offline': return '오프라인 — 이 기기 곡 사용 중'
+    case 'error': return `DB 비교 실패: ${syncError.value}`
+    default:
+      if (!session.value) return '로그인하면 DB 와 비교합니다'
+      if (lastCheck.value) return `DB 확인 ${time(lastCheck.value)}${lib.remoteCount.value ? ` · 받을 것 ${lib.remoteCount.value}곡` : ' · DB 와 같음'}`
+      return lastSync.value ? `마지막 다운로드 ${time(lastSync.value)}` : '아직 받지 않음'
   }
 })
 
 // 편집기: undefined = 닫힘, null = 새 곡, Song = 수정. 오프라인·로그인 없이도 열 수 있다(PC 에 저장)
 const editing = ref<Song | null | undefined>(undefined)
 const notice = ref<string | null>(null)
-function onSaved(song: Song, local: boolean, conflict = false) {
+function onSaved(song: Song) {
   q.value = song.title // 저장한 곡이 바로 보이도록
-  notice.value = conflict
-    ? '다른 기기에서 그 사이 이 곡을 고쳐서(또는 지워서) 덮어쓰지 않고 PC 에 저장했습니다. "↑ 서버에 올리기"에서 양쪽 가사를 비교해 고르세요.'
-    : local ? 'PC 에 저장했습니다. 인터넷이 될 때 "↑ 서버에 올리기"로 올리세요.' : null
+  notice.value = '이 기기에 저장했습니다. DB 에 올리려면 [⬆ 업로드].'
 }
-const showUpload = ref(false)
 const online = ref(navigator.onLine)
 window.addEventListener('online', () => (online.value = true))
 window.addEventListener('offline', () => (online.value = false))
@@ -75,7 +76,7 @@ defineExpose({
   /** 새 곡 편집기 바로 열기(사이드바 "+ 새 곡") */
   newSong: () => { editing.value = null },
   /** 안에 편집기·서버 올리기 창이 떠 있는지(그땐 바깥 검색 팝업이 Esc 로 닫히면 안 됨) */
-  hasModal: () => editing.value !== undefined || showUpload.value,
+  hasModal: () => editing.value !== undefined || !!sync.open.value,
 })
 </script>
 
@@ -86,26 +87,22 @@ defineExpose({
         <h2>곡 라이브러리 <small>{{ lib.count.value }}곡</small></h2>
         <button class="new" title="새 곡 추가(오프라인이면 PC 에 저장)" @click="editing = null">+ 새 곡</button>
       </div>
-      <button v-if="lib.pendingCount.value" class="upload" :class="{ ready: online }" title="PC 에서 고치거나 등록한 곡을 서버로" @click="showUpload = true">
-        ↑ 서버에 올리기 {{ lib.pendingCount.value }}건{{ online ? '' : ' (인터넷 연결 후)' }}
-      </button>
+      <!-- DB 와 주고받기(사용자 결정 2026-11-19): 항상 보임. 숫자 = 받을 것 / 올릴 것 -->
+      <div class="sync">
+        <button class="download" :class="{ has: lib.remoteCount.value }" title="DB → 이 기기: DB 와 다른 곡 목록에서 골라 받기(비밀번호 확인)" @click="sync.openDownload()">
+          ⬇ 다운로드<b v-if="lib.remoteCount.value" class="cnt">{{ lib.remoteCount.value }}</b>
+        </button>
+        <button class="upload" :class="{ has: lib.pendingCount.value }" title="이 기기 → DB: 이 기기에서 바꾼 곡 골라 올리기(비밀번호 확인)" @click="sync.openUpload()">
+          ⬆ 업로드<b v-if="lib.pendingCount.value" class="cnt">{{ lib.pendingCount.value }}</b>
+        </button>
+      </div>
       <p v-if="notice" class="notice" @click="notice = null">{{ notice }}</p>
       <p v-if="dbNotice" class="dbnotice">{{ dbNotice }}</p>
-      <div class="status" :class="syncStatus">
-        <span>{{ statusText }}</span>
-        <template v-if="session">
-          <button title="새로 바뀐 곡 받기" :disabled="syncStatus === 'syncing'" @click="syncNow()">↻</button>
-          <button title="캐시를 지우고 전체 다시 받기" @click="resetCache()">전체</button>
-          <button title="로그아웃" @click="signOut()">⎋</button>
-        </template>
-      </div>
+      <p class="status" :class="syncStatus">{{ statusText }}</p>
     </header>
 
-    <template v-if="authReady && !session && supabase">
-      <!-- 곡이 하나도 없으면 눈에 띄게(처음엔 받아야 함), 있으면 작은 글자 버튼 -->
-      <button v-if="!lib.count.value" class="primary login-first" @click="login">로그인해서 곡 받기 <small>(처음엔 곡을 받아야 합니다)</small></button>
-      <button v-else class="login-toggle" @click="login">로그인 — 새 곡 받기 · 곡 추가/수정</button>
-    </template>
+    <!-- 곡이 하나도 없으면 눈에 띄게(처음엔 받아야 함) -->
+    <button v-if="!lib.count.value && syncStatus !== 'loading'" class="primary login-first" @click="sync.openDownload()">⬇ 곡 받기 <small>(처음엔 DB 에서 곡을 받아야 합니다)</small></button>
 
     <input
       ref="input"
@@ -134,7 +131,8 @@ defineExpose({
       <li v-if="q && !hits.length" class="empty">결과 없음</li>
     </ol>
     <SongEditor v-if="editing !== undefined" :song="editing" @close="editing = undefined" @saved="onSaved" />
-    <UploadDialog v-if="showUpload" @close="showUpload = false" />
+    <UploadDialog v-if="sync.open.value === 'up'" @close="sync.close()" />
+    <DownloadDialog v-if="sync.open.value === 'down'" @close="sync.close()" />
   </section>
 </template>
 
@@ -146,12 +144,16 @@ header h2 { margin: 0; font-size: 14px; flex: 1; }
 /* 곡 누르기 = 보기·수정(편집기), 콘티 추가는 오른쪽 버튼으로만(사용자 결정 2026-11-19 — 잘못 눌러 콘티에 들어가지 않게). Enter 는 그대로 추가(키보드 빠른 길) */
 .add { font-size: 14px; white-space: nowrap; }
 header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
-.status { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); margin-top: 4px; }
-.status span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status.error span { color: var(--pgm); }
-.status.offline span { color: var(--warn); }
-.status button { font-size: 14px; white-space: nowrap; }
-.login-toggle { text-align: left; background: none; border: none; padding: 2px 0; color: var(--muted); font-size: 12px; box-shadow: none; margin: 0; }
+.sync { display: flex; gap: 6px; margin-top: 6px; }
+.sync button { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; }
+.sync .cnt { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 12px; }
+.download.has { border-color: var(--accent); }
+.download .cnt { background: rgba(79, 140, 255, .25); color: #dbe7ff; }
+.upload.has { border-color: #8a6d24; color: var(--warn); }
+.upload .cnt { background: #5a4a1e; color: #f5d27a; }
+.status { margin: 4px 0 0; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status.error { color: var(--pgm); }
+.status.offline { color: var(--warn); }
 .login-first { width: 100%; padding: 8px; }
 .login-first small { font-weight: normal; opacity: .8; }
 .search { width: 100%; }
@@ -161,8 +163,6 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #3a3a46; color: #bbb; }
 .badge.pc { background: #5a4a1e; color: #f5d27a; }
-.upload { margin-top: 6px; width: 100%; font-size: 14px;  color: var(--warn); --edge: #2e260f; border-color: #5a4a1e; background-color: rgba(245, 165, 36, .06); }
-.upload.ready { background-color: #3a3014; }
 .notice { margin: 6px 0 0; font-size: 12px; color: var(--warn); cursor: pointer; }
 .dbnotice { margin: 6px 0 0; font-size: 12px; color: var(--warn); }
 .n { font-size: 11px; color: var(--muted); }

@@ -129,7 +129,7 @@ try {
   await page.$eval('.dialog textarea', (e) => { e.value = 'Lorem ipsum alpha one\n\nLorem ipsum alpha two'; e.dispatchEvent(new Event('input')) })
   await page.click('.dialog footer button.primary')
   await page.waitForSelector('.dialog', { hidden: true, timeout: 5000 })
-  check('오프라인 저장 → "서버에 올리기 3건"', await until(async () => (await text('button.upload')).includes('3건')))
+  check('오프라인 저장 → 업로드 배지 3', await until(async () => (await text('.srch .sync .upload .cnt')) === '3'))
   check('콘티의 곡에 "↻ 최신" 표시(오프라인 수정 반영)', !!(await page.$('.setlist button.upd')))
 
   // ── 6. 온라인 복귀 + 그 사이 서버에서 Beta 가 바뀜(충돌) ──
@@ -137,13 +137,13 @@ try {
   check('앱 서버 다시 시작', await startServer())
   await page.setOfflineMode(false)
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
-  await page.click('button.upload')
+  await page.click('.srch .sync .upload')
   // 로그인은 이 기기에 저장 → 오프라인을 거쳐 돌아와도 다시 로그인하지 않고 바로 분류
   await sleep(1500)
   check('올리기: 저장된 로그인으로 바로(로그인 칸 없음)', !(await page.$('.login-dlg')))
   check('3건 분류됨', await until(async () => (await page.$$('.rows li')).length === 3, 30000))
   const rowInfo = await page.$$eval('.rows li', (lis) => lis.map((li) => ({
-    t: li.querySelector('.t')?.textContent, problem: li.classList.contains('problem'), warn: li.textContent?.includes('서버에서도') ? 'changed' : li.textContent?.includes('가사가 같은') ? 'dup' : '',
+    t: li.querySelector('.t')?.textContent, problem: li.classList.contains('problem'), warn: li.textContent?.includes('DB 에서도') ? 'changed' : li.textContent?.includes('가사가 같은') ? 'dup' : '',
   })))
   const find = (s) => rowInfo.find((r) => r.t?.endsWith(s))
   check('Alpha 수정: 문제 없음(체크)', find('Alpha')?.problem === false)
@@ -167,7 +167,7 @@ try {
   const gamma = (await admin.from('songs').select('id').eq('title', `${tag} Gamma`)).data ?? []
   check('중복 새 곡(Gamma)은 서버에 안 올라감', gamma.length === 0)
   await page.click('.dialog footer button:not(.primary)')
-  check('올릴 변경 0건(버튼 사라짐)', await until(async () => !(await page.$('button.upload'))))
+  check('올릴 변경 0건(업로드 배지 사라짐)', await until(async () => !(await page.$('.srch .sync .upload .cnt'))))
   check('새 버전 알림 없음(같은 버전)', !(await page.$('div.upd')))
 } catch (e) {
   fail++

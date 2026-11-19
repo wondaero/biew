@@ -12,14 +12,15 @@ import type { Song } from '@shared/types'
 export const dbNotice = ref<string | null>(null)
 
 /**
- * PC 에서 고친 곡 / 새로 등록한 곡 — 서버에 아직 안 올라간 변경(오프라인·로그인 없이 저장한 것).
- * '서버에 올리기'에서 중복·충돌을 검사한 뒤 올리고 지운다.
- *  - kind 'new'  : id 는 'local-…'(서버에 없음)
- *  - kind 'edit' : id 는 서버 곡 id. base = 고치기 시작할 때의 서버 버전(updated_at 으로 충돌 판정)
+ * 이 기기에서 바꾼 곡 — 아직 DB 에 안 올라간 변경. 평소 저장·삭제는 모두 여기로(2026-11-19 사용자 결정: DB 는 [⬆ 업로드]로만).
+ * 업로드 화면에서 중복·충돌을 검사한 뒤 올리고 지운다.
+ *  - kind 'new'   : id 는 'local-…'(DB 에 없음)
+ *  - kind 'edit'  : id 는 DB 곡 id. base = 고치기 시작할 때의 DB 버전(updated_at 으로 충돌 판정)
+ *  - kind 'delete': 이 기기에서 지움(목록에서 숨김). title/slides = 지울 때 보던 내용, base = 그때의 DB 버전
  */
 export interface PendingSong {
   id: string
-  kind: 'new' | 'edit'
+  kind: 'new' | 'edit' | 'delete'
   title: string
   slides: string[]
   base: { updated_at: string; title: string; slides: string[] } | null
@@ -73,6 +74,20 @@ export async function applyChanges(upserts: Song[], deletes: string[], lastSync:
 
 export async function getLastSync(): Promise<string | null> {
   return (await (await db()).get('meta', 'lastSync')) ?? null
+}
+export async function setLastSync(ts: string) {
+  await (await db()).put('meta', ts, 'lastSync')
+}
+
+/** 전체 받기: 이 기기의 곡·바꾼 내용(pending)을 모두 지우고 DB 곡으로 교체 — 한 트랜잭션 */
+export async function replaceAll(songs: Song[], ts: string) {
+  const tx = (await db()).transaction(['songs', 'meta', 'pending'], 'readwrite')
+  const s = tx.objectStore('songs')
+  await s.clear()
+  await tx.objectStore('pending').clear()
+  for (const x of songs) void s.put(x)
+  void tx.objectStore('meta').put(ts, 'lastSync')
+  await tx.done
 }
 
 /** 곡 캐시만 비운다(서버에서 전체 다시 받기). 올리지 않은 변경(pending)은 지우지 않는다 */

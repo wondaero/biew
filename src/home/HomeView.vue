@@ -22,7 +22,9 @@ import { requireLogin } from '@/lib/loginPrompt'
 import UploadDialog from '@/control/UploadDialog.vue'
 import { dbNotice } from '@/library/db'
 import { needRefresh, applyUpdate } from '@/pwa'
-import { useLibrary, loadCache, syncNow, resetCache, syncStatus, syncError, lastSync } from '@/library/library'
+import { useLibrary, loadCache, checkRemote, syncStatus, syncError, lastSync } from '@/library/library'
+import { useSyncDialogs } from '@/control/useSyncDialogs'
+import DownloadDialog from '@/control/DownloadDialog.vue'
 import { isMobileOS } from '@/lib/device'
 
 const router = useRouter()
@@ -118,7 +120,7 @@ async function removeRow(r: api.ChannelRow) {
   device.value = loadDevice()
   await Promise.all([loadServer(), loadPublic()])
 }
-onMounted(() => { document.title = 'Biew'; void loadServer(); void loadPublic(); void loadCache() })
+onMounted(() => { document.title = 'Biew'; void loadServer(); void loadPublic(); void loadCache().then(() => checkRemote()) })
 
 // 제목 검색(대소문자·띄어쓰기 무시) — 세 목록 모두
 const q = ref('')
@@ -127,17 +129,17 @@ const fPub = computed(() => pub.value.filter((e) => titleMatches(e.title, q.valu
 const fRows = computed(() => rows.value.filter((e) => titleMatches(e.title, q.value)))
 const anyList = computed(() => device.value.length + pub.value.length + rows.value.length > 0)
 
-// 곡 다운로드(오프라인용). 로그인하면 library 가 자동으로 받는다(바뀐 곡만)
+// 곡(오프라인용). 평소 저장은 이 기기, DB 와는 [⬇ 다운로드]·[⬆ 업로드](비밀번호 재확인 → 목록) — src/library/library.ts
 const lib = useLibrary()
-
-const showUpload = ref(false)
+const sync = useSyncDialogs()
 const dlText = computed(() => {
   switch (syncStatus.value) {
     case 'loading': return '저장된 곡 불러오는 중…'
-    case 'syncing': return '서버에서 받는 중…'
+    case 'checking': return 'DB 와 비교하는 중…'
+    case 'downloading': return 'DB 에서 받는 중…'
     case 'offline': return '오프라인 — 저장된 곡 사용 중'
     case 'error': return `받기 실패: ${syncError.value}`
-    default: return lastSync.value ? `마지막 다운로드 ${new Date(lastSync.value).toLocaleString('ko-KR')}` : '아직 받지 않음'
+    default: return (lastSync.value ? `마지막 다운로드 ${new Date(lastSync.value).toLocaleString('ko-KR')}` : '아직 받지 않음') + (lib.remoteCount.value ? ` · DB 에서 바뀐 곡 ${lib.remoteCount.value}` : '')
   }
 })
 
@@ -198,19 +200,14 @@ const build = __APP_BUILD__
       <h2>곡 <small>{{ lib.count.value }}곡 저장됨</small></h2>
       <p class="muted" :class="{ err: syncStatus === 'error' }">{{ dlText }}</p>
       <p v-if="dbNotice" class="warn">{{ dbNotice }}</p>
-      <template v-if="session">
-        <div class="row">
-          <button :disabled="syncStatus === 'syncing'" @click="syncNow()">바뀐 곡 받기</button>
-          <button :disabled="syncStatus === 'syncing'" @click="resetCache()">전체 다시 받기</button>
-        </div>
-      </template>
-      <template v-else>
-        <button class="primary" @click="requireLogin('곡은 저작권 데이터라 로그인해야 받을 수 있습니다. 받은 곡은 로그인·인터넷 없이 계속 쓸 수 있습니다.')">곡 다운로드</button>
-
-      </template>
-      <button v-if="lib.pendingCount.value" class="upload" @click="showUpload = true">↑ PC 에서 고친 곡 서버에 올리기 {{ lib.pendingCount.value }}건</button>
+      <!-- DB 와 주고받기: 곡 목록 팝업과 같은 두 버튼(비밀번호 재확인 → 목록) -->
+      <div class="row">
+        <button :class="{ primary: !lib.count.value }" title="DB → 이 기기: 다른 곡 골라 받기 / 전체 받기" @click="sync.openDownload()">⬇ 곡 다운로드{{ lib.remoteCount.value ? ` ${lib.remoteCount.value}` : '' }}</button>
+        <button class="upload" title="이 기기 → DB: 이 기기에서 바꾼 곡 골라 올리기" @click="sync.openUpload()">⬆ 업로드{{ lib.pendingCount.value ? ` ${lib.pendingCount.value}` : '' }}</button>
+      </div>
     </section>
-    <UploadDialog v-if="showUpload" @close="showUpload = false" />
+    <UploadDialog v-if="sync.open.value === 'up'" @close="sync.close()" />
+    <DownloadDialog v-if="sync.open.value === 'down'" @close="sync.close()" />
 
     <!-- ── 인터넷 송출 ── -->
     <h2 class="group">인터넷 송출 <small>폰 리모컨·보기 기기 · 서버를 거침 · 가끔 쓸 때</small></h2>
