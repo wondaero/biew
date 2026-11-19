@@ -10,6 +10,7 @@
  * FREEZE 는 호스트만(리모컨은 BLANK 하나).
  */
 import { useLive } from '@/live/liveStore'
+import FreezeSnow from './FreezeSnow.vue' // FREEZE 켜짐 = 버튼 안 눈(2026-11-19). 되돌리려면 이 줄과 아래 <FreezeSnow> 한 줄 삭제
 
 withDefaults(defineProps<{ host: boolean; bottom?: boolean; stretch?: boolean }>(), { bottom: false, stretch: false })
 const live = useLive()
@@ -42,6 +43,7 @@ const ARMS = [0, 60, 120, 180, 240, 300]
       :aria-pressed="!!live.state.frozen"
       @click="live.state.frozen ? live.actions.unfreeze() : live.actions.freeze()"
     >
+      <FreezeSnow v-if="live.state.frozen" />
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <g v-for="a in ARMS" :key="a" :transform="`rotate(${a} 12 12)`"><path d="M12 12V2.5M9.3 4.6 12 7.2l2.7-2.6" /></g>
       </svg>
@@ -63,6 +65,8 @@ const ARMS = [0, 60, 120, 180, 240, 300]
 .blank:hover { background-color: #3a3222; border-color: var(--warn); }
 .freeze { --edge: #0b3a50; color: var(--freeze); border-color: rgba(56, 189, 248, .5); }
 .freeze:hover { background-color: #1f3340; border-color: var(--freeze); }
+.freeze { position: relative; } /* 눈(FreezeSnow)이 버튼 안에서만 */
+.freeze .ic, .freeze .lbl { position: relative; z-index: 1; } /* 아이콘·글자가 눈 위에 */
 .blank.on, .blank.on:hover { --edge: #93600c; background-color: var(--warn); border-color: #ffc25a; color: #222; font-weight: 700; }
 .freeze.on, .freeze.on:hover { --edge: #13729b; background-color: var(--freeze); border-color: #7dd6fb; color: #fff; font-weight: 700; } /* 켜짐 = 흰 아이콘·글자(사용자 요청) */
 @media (max-width: 1150px) { .blank, .freeze { min-width: 0; } }
