@@ -33,10 +33,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div class="srch-backdrop" @mousedown.self="emit('close')">
-    <div class="srch" role="dialog" aria-modal="true" aria-label="곡 검색">
+    <div class="srch" role="dialog" aria-modal="true" aria-label="곡 목록">
       <header>
-        <h2>곡 검색</h2>
-        <small class="keys">Enter = 콘티에 추가(계속 추가 가능) · Esc = 지우기/닫기</small>
+        <h2>곡 목록</h2>
+        <small class="keys">곡 누르기 = 보기·수정 · [+ 콘티] 또는 Enter = 콘티에 추가 · Esc = 지우기/닫기</small>
         <span class="spacer" />
         <small class="cnt">콘티 {{ live.state.setlist.length }}곡</small>
         <button class="x" title="닫기 (Esc)" @click="emit('close')">✕</button>

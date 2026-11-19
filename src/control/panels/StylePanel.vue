@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { DEFAULT_STYLE, type OutputStyle } from '@shared/types'
 import { useLive } from '@/live/liveStore'
 import { KEY_BLACK, KEY_GREEN, keyable, backdropCss, type Backdrop, type BgDirection } from '@shared/backdrop'
@@ -8,6 +8,51 @@ import { useStyleDraft } from '@/live/styleDraft'
 import { presets, savePreset, deletePreset, findByName, exportJson, importJson, NAME_MAX, type StylePreset } from '@/live/stylePresets'
 
 const live = useLive()
+/**
+ * touchGuard(모바일 바텀시트): 터치 화면에서 시트를 스크롤하려고 슬라이더 위를 끌면 값이 바뀌던 문제 방지(사용자 요청 2026-11-19).
+ * 슬라이더는 평소 터치를 받지 않고(pointer-events: none — 그 위를 끌면 그냥 스크롤), 한 번 눌러 '켜진' 것만 움직인다.
+ * 켜기 = 그 줄을 누름. 스크롤하거나 다른 곳을 누르면 꺼짐. 마우스(hover 가능) 화면에선 CSS 가 막지 않으므로 그대로.
+ */
+const props = withDefaults(defineProps<{ touchGuard?: boolean }>(), { touchGuard: false })
+const rootEl = ref<HTMLElement>()
+const armed = ref<HTMLInputElement | null>(null)
+let dragging = false
+let armedAt = 0
+function arm(r: HTMLInputElement | null) {
+  if (armed.value === r) return
+  armedAt = r ? performance.now() : 0
+  armed.value?.removeAttribute('data-armed')
+  armed.value?.closest('label')?.classList.remove('armed-row')
+  armed.value = r
+  r?.setAttribute('data-armed', '')
+  r?.closest('label')?.classList.add('armed-row')
+}
+/** 켜진 슬라이더를 끄는 중엔 스크롤로 꺼지지 않게 */
+function onGuardDown(e: PointerEvent) {
+  const t = e.target as HTMLElement
+  if (props.touchGuard && t instanceof HTMLInputElement && t.type === 'range') dragging = true
+}
+/** 켜기 = 탭(click). 누름(pointerdown)으로 켜면 스크롤하려고 끄는 동작에서도 켜져 버린다 — 스크롤엔 click 이 생기지 않음 */
+function onGuardClick(e: MouseEvent) {
+  if (!props.touchGuard) return
+  const t = e.target as HTMLElement
+  if (t instanceof HTMLInputElement && t.type === 'range') return
+  arm(t.closest('label')?.querySelector<HTMLInputElement>('input[type=range]') ?? null)
+}
+const onGuardUp = () => { dragging = false }
+// 켠 직후 잠깐(눌러서 생기는 초점 이동 스크롤·관성 스크롤 끝자락)은 무시
+const onGuardScroll = () => { if (!dragging && performance.now() - armedAt > 400) arm(null) }
+onMounted(() => {
+  if (!props.touchGuard) return
+  document.addEventListener('scroll', onGuardScroll, true) // 시트(스크롤 상자)의 스크롤 — scroll 은 버블링이 안 돼서 capture
+  window.addEventListener('pointerup', onGuardUp)
+  window.addEventListener('pointercancel', onGuardUp)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('scroll', onGuardScroll, true)
+  window.removeEventListener('pointerup', onGuardUp)
+  window.removeEventListener('pointercancel', onGuardUp)
+})
 /**
  * 설정을 바꾸면 수정본(적용 전)만 바뀐다 — 송출엔 '적용'을 눌러야 나간다(src/live/styleDraft.ts).
  * st = 화면에 보이는 설정(수정본이 있으면 수정본, 없으면 송출 중 설정)
@@ -110,8 +155,9 @@ async function importFile(e: Event) {
 </script>
 
 <template>
-  <section class="style">
+  <section ref="rootEl" class="style" :class="{ guard: touchGuard }" @pointerdown.capture="onGuardDown" @click.capture="onGuardClick">
     <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag">적용 안 된 변경</span></h2>
+    <p v-if="touchGuard" class="guard-hint">슬라이더는 <b>한 번 눌러 켠 뒤</b> 움직이세요 — 스크롤하다 값이 바뀌지 않게</p>
 
     <!-- 저장된 설정: 이 PC 에만(서버로 안 보냄) -->
     <div class="presets full">
@@ -226,6 +272,14 @@ async function importFile(e: Event) {
  * 각 항목: 위 줄 = 이름(왼쪽) · 값(오른쪽), 아래 줄 = 조절(슬라이더·선택) 전체 폭. 색은 한 줄(이름 · 코드 · 견본).
  */
 .style { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; font-size: 12px; }
+/* 터치 슬라이더 안전장치(touchGuard) — 터치 화면(hover 없음)에서만. 켜진 줄은 파랑 테두리 */
+.guard-hint { display: none; margin: 0; color: var(--muted); font-size: 12px; }
+@media (hover: none) {
+  .guard .guard-hint { display: block; }
+  .guard input[type=range]:not([data-armed]) { pointer-events: none; opacity: .5; }
+  .guard label:has(> input[type=range]) { border-radius: 8px; padding: 4px 6px; margin: -4px -6px; border: 1px solid transparent; }
+  .guard label.armed-row { border-color: var(--accent); background: rgba(79, 140, 255, .08); }
+}
 h2 { margin: 0; font-size: 14px; }
 label { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; color: var(--muted); }
 label > output { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -245,7 +299,7 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
 .grad input[type='color'] { width: 100%; }
 .seg { display: flex; align-items: center; gap: 4px; }
 .seg span { color: var(--muted); width: 36px; }
-.seg button { flex: 1; padding: 4px; font-size: 12px; }
+.seg button { flex: 1; padding: 6px 4px; font-size: 14px; }
 /* 고르기(세그먼트): 주요 동작(파랑 채움)과 헷갈리지 않게 옅게 채움 + 파랑 테두리 */
 /* 고른 것 = 눌린 상태(평평 + 안쪽 그림자). 제자리(내려가지 않음) — 받침은 어두운 패널에서 거의 안 보여
    내리면 옆 버튼보다 아래로 처져 보인다(사용자 지적) → 위·아래를 옆 버튼의 보이는 면에 맞춘다 */
@@ -282,7 +336,10 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
 .p-del { flex: none; padding: 0 8px; color: var(--muted); }
 .p-save { display: flex; gap: 4px; }
 .p-save input { flex: 1; min-width: 0; width: 0; }
-.p-save button, .p-file button, .p-import { font-size: 12px; padding: 4px 8px; white-space: nowrap; }
+/* 버튼은 부모(12px) 글자 크기를 따라가므로 보통 크기(14px)를 명시 — 사용자 요청 2026-11-19 */
+.style button, .p-import { font-size: 14px; }
+.p-import { padding: 6px 10px; }
+.p-save button, .p-file button, .p-import { white-space: nowrap; }
 .p-file { display: flex; gap: 4px; }
 .p-file > * { flex: 1; text-align: center; }
 /* 버튼처럼 보이는 파일 선택(label) — 버튼과 같은 3D 모양 */

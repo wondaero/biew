@@ -220,16 +220,16 @@ onBeforeUnmount(() => {
       모바일: 송출 화면만 위에 보이고, 콘티는 바텀시트(sheet === 'set'), 곡 검색은 팝업, 버튼은 하단 도크.
     -->
     <aside class="side">
-      <MonitorPanel />
+      <MonitorPanel @jump="gridRef?.scrollToLive()" />
       <template v-if="isHost">
         <StyleSummary v-if="!narrow" @open="showStyle = true" />
         <div class="side-actions desk-only">
-          <button class="find" title="곡 검색 — 찾아서 Enter 로 콘티에 추가 ( / )" @click="openSearch()">
-            🔍 곡 검색 <kbd>/</kbd><b v-if="lib.pendingCount.value" class="badge" title="PC 에서 고친 곡 — 서버에 올리기 대기">{{ lib.pendingCount.value }}</b>
+          <button class="find" title="곡 목록 — 찾아서 [+ 콘티] 또는 Enter 로 추가 ( / )" @click="openSearch()">
+            🔍 곡 목록 <kbd>/</kbd><b v-if="lib.pendingCount.value" class="badge" title="PC 에서 고친 곡 — 서버에 올리기 대기">{{ lib.pendingCount.value }}</b>
           </button>
           <button title="새 곡 등록(오프라인이면 PC 에 저장)" @click="openSearch(true)">+ 새 곡</button>
         </div>
-        <p v-if="!narrow && !lib.count.value" class="side-hint">저장된 곡이 없습니다 — <b>곡 검색</b>에서 로그인해 곡을 받으세요.</p>
+        <p v-if="!narrow && !lib.count.value" class="side-hint">저장된 곡이 없습니다 — <b>곡 목록</b>에서 로그인해 곡을 받으세요.</p>
         <div class="set-wrap" :class="{ open: sheet === 'set' }">
           <div class="sheet-head">
             <b>콘티</b>
@@ -256,11 +256,11 @@ onBeforeUnmount(() => {
         </div>
         <StylePreview class="sheet-pv" />
       </div>
-      <StylePanel />
+      <StylePanel touch-guard />
     </div>
 
     <nav v-if="isHost" class="dock">
-      <button @click="openSearch()">🔍 곡 검색<b v-if="lib.pendingCount.value" class="badge">{{ lib.pendingCount.value }}</b></button>
+      <button @click="openSearch()">🔍 곡 목록<b v-if="lib.pendingCount.value" class="badge">{{ lib.pendingCount.value }}</b></button>
       <button @click="openSheet('set')">☰ 콘티 {{ live.state.setlist.length }}</button>
       <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
     </nav>

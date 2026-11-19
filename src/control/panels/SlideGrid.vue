@@ -96,7 +96,15 @@ async function saveEdit(p: { text: string; indexes: number[]; toSong: boolean; a
   }
 }
 
-defineExpose({ scrollToItem })
+/** 송출 중인 장으로(모니터를 누르면) — 접혀 있으면 펼치고 가운데로. FREEZE 중이면 고정된 화면 쪽 */
+async function scrollToLive() {
+  const it = live.state.setlist[air.value.itemIndex]
+  if (it && closed.value.has(it.key)) toggle(it.key)
+  await nextTick()
+  root.value?.querySelector('.card.live')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+defineExpose({ scrollToItem, scrollToLive })
 </script>
 
 <template>
@@ -147,10 +155,10 @@ defineExpose({ scrollToItem })
 .grid-wrap { overflow-y: auto; padding: 0 8px 16px; min-height: 0; }
 .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
 .song { margin-bottom: 18px; scroll-margin-top: 4px; }
-.tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { padding: 4px 10px; font-size: 12px; color: var(--muted); }
+.tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { font-size: 14px; color: var(--muted); }
 h3 {
   /* 좌우 -8px: 스크롤 영역 padding 을 뚫고 끝까지 → 옆 틈으로 카드 glow 가 비치지 않게 (글자 위치는 padding 으로 유지) */
-  position: sticky; top: 0; z-index: 1; margin: 0 -8px 8px; padding: 6px 16px; font-size: 14px; cursor: pointer; user-select: none;
+  position: sticky; top: 0; z-index: 2; /* ✎(z-index 1)보다 위 — 스크롤하면 곡 제목 아래로 들어가게 */ margin: 0 -8px 8px; padding: 6px 16px; font-size: 14px; cursor: pointer; user-select: none;
   background: var(--bg); border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 8px;
 }
 h3.closed { margin-bottom: 0; }
@@ -182,8 +190,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .cell { position: relative; min-width: 0; display: grid; }
 /* ✎ = 카드 오른쪽 위 구석(카드 클릭 = 송출이므로 카드 밖 형제 버튼, 누를 자리 충분히). PC 는 마우스를 올렸을 때만 */
 .edit {
-  position: absolute; top: 3px; right: 3px; width: 30px; height: 26px; padding: 0; margin: 0; z-index: 1;
-  font-size: 14px; line-height: 1; border-radius: 6px; background: rgba(20, 20, 26, .9); box-shadow: none; color: #cfd3dc;
+  position: absolute; top: 3px; right: 3px; width: 36px; height: 32px; padding: 0; margin: 0; z-index: 1;
+  font-size: 15px; line-height: 1; border-radius: 6px; background: rgba(20, 20, 26, .9); box-shadow: none; color: #cfd3dc;
 }
 .edit:active { transform: none; }
 .edit:hover { border-color: var(--accent); color: #fff; }
@@ -204,8 +212,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   /* .card .txt: 아래 기본 .txt 규칙보다 뒤에 있어도 이기도록(예전엔 순서 때문에 14px 가 안 먹고 12.5px 였음) */
   .card .txt { font-size: 14px; }
   /* 폰: ✎ 항상 보임(마우스 올리기 없음) — 글이 ✎ 아래로 가지 않게 오른쪽 자리 비움 */
-  .card { padding-right: 38px; gap: 8px; padding-left: 8px; }
-  .edit { top: 50%; right: 4px; transform: translateY(-50%); width: 32px; height: 34px; }
+  .card { padding-right: 42px; gap: 8px; padding-left: 8px; }
+  .edit { top: 50%; right: 8px; transform: translateY(-50%); width: 32px; height: 34px; }
   .edit:active { transform: translateY(-50%); }
   .se-notice { bottom: 80px; }
   h3 { margin: 0 -10px 8px; padding: 10px 18px; }

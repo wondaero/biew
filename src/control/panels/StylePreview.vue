@@ -71,7 +71,7 @@ const label = computed(() => (showAir.value ? '지금 송출 중' : draft.dirty.
 .style-pv.compact .pv-screen { width: min(100%, 260px); }
 /* 비교 전환: 고른 쪽은 눌린 모양(세그먼트 규칙) — 적용 전 = 파랑, 송출 중 = 초록 */
 .pv-tabs { display: flex; gap: 4px; }
-.pv-tabs button { flex: 1; padding: 5px 8px; margin-bottom: 0; font-size: 12px; }
+.pv-tabs button { flex: 1; margin-bottom: 0; font-size: 14px; }
 .pv-tabs button.on { background: rgba(79, 140, 255, .2); border-color: var(--accent); color: #dbe7ff; font-weight: 600; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .45); }
 .style-pv.air .pv-tabs button.on { background: var(--live-bg); border-color: var(--live); color: #c9f5d9; }
 .style-pv.air .pv-screen { border: 2px solid var(--live); }

@@ -113,8 +113,8 @@ try {
   const editSong = async (q, newText) => {
     await page.$eval('input.search', (e) => { e.value = ''; e.dispatchEvent(new Event('input')) })
     await page.type('input.search', q)
-    await page.waitForSelector('ol.hits li.sel .edit', { timeout: 5000 })
-    await page.click('ol.hits li.sel .edit')
+    await page.waitForSelector('ol.hits li.sel', { timeout: 5000 })
+    await page.click('ol.hits li.sel .title') // 곡 누르기 = 보기·수정
     await page.waitForSelector('.dialog textarea')
     await page.$eval('.dialog textarea', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')) }, newText)
     await page.click('.dialog footer button.primary')

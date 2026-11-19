@@ -54,7 +54,7 @@ const detail = computed(() => {
 .ss-k { color: var(--muted); flex: none; }
 .ss-line, .ss-preset { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ss-preset { color: var(--live); font-weight: 600; }
-button { flex: none; margin-bottom: 0; padding: 4px 10px; font-size: 12px; }
+button { flex: none; margin-bottom: 0; font-size: 14px; white-space: nowrap; }
 button.dirty { color: #dbe7ff; border-color: var(--preview); }
 .dot { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; background: var(--preview); vertical-align: middle; }
 </style>

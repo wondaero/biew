@@ -338,7 +338,7 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; } /* 좁은 폰(280px)에선 버튼이 두 줄로 쌓인다 — 글자가 버튼 안에서 꺾이지 않게 */
 .row button { flex: 1 1 120px; min-width: 0; padding: 10px; white-space: nowrap; }
 .card > button, .form > button { padding: 10px; }
-.ghost { margin-left: auto; padding: 2px 8px; font-size: 12px; font-weight: normal; }
+.ghost { margin-left: auto; font-size: 14px; font-weight: normal; white-space: nowrap; }
 .who { font-size: 12px; color: var(--live); }
 .who + .ghost { margin-left: 8px; }
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -352,7 +352,7 @@ h2 small { color: var(--muted); font-weight: normal; flex: 1; }
 .pub-go { grid-area: g; margin-top: 6px; }
 /* 내 계정의 채널: 삭제 버튼 칸 추가 */
 .list li.mine { grid-template-columns: 1fr auto auto auto; grid-template-areas: 't c x del' 'd d d d'; }
-.del { grid-area: del; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+.del { grid-area: del; font-size: 14px; color: var(--muted); white-space: nowrap; }
 .del:hover { color: var(--pgm); border-color: var(--pgm); }
 
 .pub-go button { padding: 8px; }

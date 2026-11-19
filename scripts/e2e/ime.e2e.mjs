@@ -23,6 +23,8 @@ try {
   }))
   await p.reload({ waitUntil: 'networkidle0' })
   const hits = () => p.$$eval('ol.hits li', (l) => l.map((x) => x.textContent?.trim() ?? ''))
+  await p.click('.side-actions .find') // 곡 목록 = 팝업
+  await p.waitForSelector('input.search')
   await p.focus('input.search')
   const cdp = await p.createCDPSession()
   // '안' 확정 → '녀' 조합 중 → '녕' 조합 중(아직 확정 안 함)

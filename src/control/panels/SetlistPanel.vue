@@ -67,7 +67,7 @@ function clear() {
 header { display: flex; align-items: center; }
 header h2 { margin: 0; font-size: 14px; flex: 1; }
 header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
-.ghost { padding: 4px 10px; font-size: 12px; }
+.ghost { font-size: 14px; white-space: nowrap; }
 .items { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; flex: 1; }
 .items li { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 5px; cursor: pointer; border-left: 3px solid transparent; }
 .items li:hover { background: var(--panel-2); }
@@ -81,7 +81,7 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .no { width: 18px; color: var(--muted); font-size: 12px; text-align: right; }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n { font-size: 11px; color: var(--muted); }
-.upd { padding: 1px 7px; font-size: 11px; color: var(--warn); --edge: #2e260f; border-color: #5a4a1e; background-color: rgba(245, 165, 36, .08); white-space: nowrap; }
+.upd { font-size: 14px; color: var(--warn); --edge: #2e260f; border-color: #5a4a1e; background-color: rgba(245, 165, 36, .08); white-space: nowrap; }
 .x { padding: 0 6px; border: none; background: none; color: var(--muted); box-shadow: none; margin: 0; }
 .x:hover { color: var(--pgm); }
 .empty { color: var(--muted); font-size: 12px; margin: 0; }

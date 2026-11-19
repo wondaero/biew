@@ -26,5 +26,5 @@ const show = computed(() => needRefresh.value && !later.value && !route.path.sta
 }
 .upd span { flex: 1; min-width: 200px; }
 .upd small { color: var(--muted); }
-.upd button { padding: 4px 10px; font-size: 12px; }
+.upd button { font-size: 14px; white-space: nowrap; }
 </style>
