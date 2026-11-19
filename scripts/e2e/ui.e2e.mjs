@@ -83,10 +83,20 @@ try {
   check('폰: 곡 제목이 ✎ 보다 위(스크롤 시 ✎ 가 제목을 가리지 않음)', z[0] > z[1], JSON.stringify(z))
   const gap = await m.$eval('.cell', (c) => c.getBoundingClientRect().right - c.querySelector('.edit').getBoundingClientRect().right)
   check('폰: ✎ 오른쪽 여백 ≥ 8px', gap >= 7.5, `${gap}px`)
-  // 배치(2026-11-19): 위 = 상단 바 → 준비 버튼 줄 → 송출 화면, 맨 아래 = 송출 버튼(위 BLANK·FREEZE, 아래 ◀ ▶)
-  const lay = await m.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { dock: r('.dock').bottom, mon: r('.monitors').top, tb: r('.transport').bottom, blank: r('.transport .blank').top, next: r('.transport .next').top, h: innerHeight, topGroup: !!document.querySelector('.top .group') } })
+  // 배치(2026-11-19): 위 = 상단 바 → 준비 버튼 줄 → 송출 화면, 맨 아래 = 송출 버튼 한 줄 [BLANK][FREEZE][◀][▶ 가장 넓게], 아이콘만
+  const lay = await m.evaluate(() => {
+    const r = (s) => document.querySelector(s).getBoundingClientRect()
+    const order = ['.blank', '.freeze', '.prev', '.next'].map((s) => r('.transport ' + s))
+    return {
+      dock: r('.dock').bottom, mon: r('.monitors').top, tb: r('.transport').bottom, h: innerHeight, topGroup: !!document.querySelector('.top .group'),
+      oneRow: order.every((x) => Math.abs(x.top - order[0].top) < 1), leftToRight: order.every((x, i) => i === 0 || x.left > order[i - 1].left),
+      nextWidest: order[3].width > order[2].width + 10, iconsOnly: [...document.querySelectorAll('.transport .lbl')].every((e) => getComputedStyle(e).display === 'none'),
+      svg: document.querySelectorAll('.transport svg').length,
+    }
+  })
   check('폰: 준비 버튼 줄이 송출 화면 위', lay.dock <= lay.mon + 1, JSON.stringify(lay))
-  check('폰: 송출 버튼이 맨 아래(◀ ▶ 가 BLANK 아래), 상단 바엔 없음', Math.abs(lay.tb - lay.h) < 2 && lay.next > lay.blank && !lay.topGroup, JSON.stringify(lay))
+  check('폰: 송출 버튼이 맨 아래 한 줄 [BLANK][FREEZE][◀][▶ 가장 넓게], 상단 바엔 없음', Math.abs(lay.tb - lay.h) < 2 && lay.oneRow && lay.leftToRight && lay.nextWidest && !lay.topGroup, JSON.stringify(lay))
+  check('폰: 송출 버튼은 그린 아이콘만(글자 숨김)', lay.iconsOnly && lay.svg === 4, JSON.stringify(lay))
   check('폰: 도크 "곡 목록"', (await m.$$eval('.dock button', (bs) => bs[0].textContent)).includes('곡 목록'))
   await m.$eval('.grid-wrap', (g) => { g.scrollTop = 0; window.scrollTo(0, 0) })
   await sleep(300)
