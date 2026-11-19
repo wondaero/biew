@@ -30,7 +30,7 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
     <div v-if="live.pvwMode.value" class="mon">
       <div class="bar pvw">
         <b>미리보기</b> <span>{{ label(live.upcoming.value) }}</span>
-        <button class="take" :disabled="!live.upcoming.value" title="미리보기를 송출 (Enter)" @click="live.actions.take()">송출 ⏎</button>
+        <button class="take" :disabled="!live.upcoming.value" title="미리보기를 송출 (Enter)" @click="live.actions.take()">송출<span class="take-key"> ⏎</span></button>
       </div>
       <div class="screen"><SlideRender :text="nextText" :style-cfg="s.style" :animate="false" /></div>
     </div>
@@ -39,15 +39,22 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
 
 <style scoped>
 .monitors { display: grid; gap: 10px; }
-.bar { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 2px; }
-.bar b { padding: 1px 6px; border-radius: 4px; color: #fff; font-size: 11px; }
+/* 머리줄 높이 고정 — 송출 중/미리보기 두 화면이 나란히 있을 때(폰) 화면 위치가 맞게. 글자는 꺾지 않음 */
+.bar { display: flex; align-items: center; gap: 8px; height: 34px; font-size: 12px; padding: 0 2px; min-width: 0; }
+.bar b { flex: none; padding: 1px 6px; border-radius: 4px; color: #fff; font-size: 11px; white-space: nowrap; }
 .bar.pgm b { background: var(--live); color: var(--live-ink); }
 .bar.pvw b { background: var(--preview); }
 .bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .bar em { font-style: normal; color: var(--warn); font-weight: 700; }
 .bar em.frz { color: var(--freeze); }
 /* 송출(TAKE) = 누르면 이게 나간다 → 송출 색(초록)으로 채움. 미리보기 색(파랑)과 구분 */
-.take { font-size: 14px; --edge: #12803b; background-color: var(--live); border-color: #4be080; color: var(--live-ink); font-weight: 700; }
+.take { flex: none; padding: 3px 12px; margin-bottom: 0; white-space: nowrap; line-height: 1.3; font-size: 14px; --edge: #12803b; background-color: var(--live); border-color: #4be080; color: var(--live-ink); font-weight: 700; }
+/* 아주 좁은 폰(≤360px, 두 화면 나란히): 미리보기 쪽 곡 이름·⏎ 생략 — 송출 버튼이 화면 밖으로 밀리지 않게 */
+@media (max-width: 360px) {
+  .bar.pvw span:not(.take-key) { display: none; }
+  .take-key { display: none; }
+  .bar.pvw { justify-content: space-between; }
+}
 .take:hover { background-color: #34d36b; border-color: #5fe891; }
 .screen.jump { cursor: pointer; }
 .screen { aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }

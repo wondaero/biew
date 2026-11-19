@@ -107,6 +107,13 @@ try {
   check('폰: 콘티 = 전체 화면', await full('.set-wrap.open'))
   await m.evaluate(() => history.back()); await sleep(400)
 
+  // 미리보기 후 송출(두 화면 나란히): 화면 높이·위치가 같고 송출 버튼이 화면 안
+  await m.click('.mode input'); await sleep(400)
+  const pv = await m.$$eval('.monitors .mon', (ms) => ms.map((x) => { const s = x.querySelector('.screen').getBoundingClientRect(); return [Math.round(s.top), Math.round(s.height)] }))
+  const take = await m.$eval('.monitors .take', (b) => b.getBoundingClientRect().right <= innerWidth)
+  check('폰 미리보기 모드: 두 화면 높이·위치 같음, 송출 버튼 화면 안', pv.length === 2 && pv[0][0] === pv[1][0] && pv[0][1] === pv[1][1] && take, JSON.stringify(pv))
+  await m.click('.mode input'); await sleep(300)
+
   // 출력 설정 슬라이더 안전장치
   await m.$$eval('.dock button', (bs) => bs[2].click())
   await sleep(600)
