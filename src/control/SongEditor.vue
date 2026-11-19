@@ -4,6 +4,7 @@
  * 오른쪽에 현재 출력 스타일 그대로 슬라이드 미리보기.
  * 오프라인/로그인 없이 저장하면 PC 에 저장되고(나중에 '서버에 올리기'), 삭제는 온라인에서만.
  */
+import OnAirStrip from './OnAirStrip.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import type { Song } from '@shared/types'
 import { textToSlides, slidesToText, slideRanges, slideIndexAt } from '@shared/slidesText'
@@ -122,14 +123,18 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="backdrop" @mousedown.self="close">
-    <div class="dialog" role="dialog" aria-modal="true">
-      <header>
-        <h2>{{ isNew ? '새 곡' : '곡 수정' }}</h2>
+    <div class="dialog m-full" role="dialog" aria-modal="true">
+      <!-- 머리 두 줄(사용자 결정 2026-11-19): 위 = 제목 + ✕, 아래 = 원본 파일·PC 저장 상태(길면 …) -->
+      <header class="two">
+        <div class="row">
+          <h2>{{ isNew ? '새 곡' : '곡 수정' }}</h2>
+          <span class="spacer" />
+          <button class="x" title="닫기 (Esc)" @click="close">✕</button>
+        </div>
         <small v-if="song?.source_file" class="src">원본: {{ song.source_file }}</small>
         <small v-if="localKind" class="local">PC 에서 {{ localKind === 'new' ? '등록한' : '고친' }} 곡 — 아직 서버에 안 올라감</small>
-        <span class="spacer" />
-        <button class="x" title="닫기 (Esc)" @click="close">✕</button>
       </header>
+      <OnAirStrip />
 
       <div class="body">
         <section class="edit">
@@ -185,6 +190,9 @@ onBeforeUnmount(() => {
 }
 header, footer { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
 header { border-bottom: 1px solid var(--line); }
+header.two { flex-direction: column; align-items: stretch; gap: 2px; flex-wrap: nowrap !important; } /* 폰 규칙의 wrap 이면 머리 폭이 긴 파일 이름에 맞춰 늘어나 ✕ 가 화면 밖으로 밀림(겪음) */
+header.two .row { display: flex; align-items: center; gap: 10px; }
+header.two small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 12px; }
 footer { border-top: 1px solid var(--line); }
 h2 { margin: 0; font-size: 16px; }
 .src { color: var(--muted); }
@@ -219,7 +227,6 @@ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 /* 폰(≤768px, 접는 폰 280px 포함): 전체 화면 · 위 가사 입력(가득) · 아래 미리보기 가로 한 줄.
    예전엔 좌우 2단이라 280px 에서 가사 칸이 한 줄에 서너 글자였음 */
 @media (max-width: 768px) {
-  .dialog { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
   header, footer { padding: 10px 12px; flex-wrap: wrap; }
   .body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
   .edit { border-right: 0; padding: 10px 12px; }

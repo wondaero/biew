@@ -13,6 +13,7 @@ import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
 import { cleanSlideText, sameTextIndexes } from './slideEdit'
 import SlideRender from '@/components/SlideRender.vue'
+import OnAirStrip from './OnAirStrip.vue'
 
 const props = defineProps<{ itemKey: string; slideIndex: number }>()
 const emit = defineEmits<{ close: []; save: [p: { text: string; indexes: number[]; toSong: boolean; all: boolean }] }>()
@@ -63,12 +64,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div class="se-backdrop" @mousedown.self="close()">
-    <div class="se" role="dialog" aria-modal="true" aria-label="슬라이드 수정">
+    <div class="se m-full" role="dialog" aria-modal="true" aria-label="슬라이드 수정">
       <header>
-        <h2>슬라이드 수정</h2>
+        <div class="row">
+          <h2>슬라이드 수정</h2>
+          <button class="x" title="닫기 (Esc)" @click="close()">✕</button>
+        </div>
         <small class="where">{{ item?.title }} · {{ slideIndex + 1 }}장</small>
-        <button class="x" title="닫기 (Esc)" @click="close()">✕</button>
       </header>
+      <OnAirStrip />
       <div class="body">
         <textarea ref="box" v-model="text" class="txt" rows="5" spellcheck="false" aria-label="슬라이드 글" />
         <p v-if="error" class="err">{{ error }}</p>
@@ -92,11 +96,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   width: min(560px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 16px 48px rgba(0, 0, 0, .6);
 }
-header { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+/* 머리 두 줄: 위 = 제목 + ✕, 아래 = 곡·장 */
+header { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+header .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 h2 { margin: 0; font-size: 16px; white-space: nowrap; }
-.where { flex: 1; min-width: 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.where { min-width: 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .x { border: none; background: none; box-shadow: none; margin: 0; padding: 2px 8px; color: var(--muted); }
-.body { display: grid; gap: 10px; padding: 12px 14px; overflow-y: auto; min-height: 0; }
+.body { flex: 1; display: grid; gap: 10px; align-content: start; padding: 12px 14px; overflow-y: auto; min-height: 0; }
 .txt { width: 100%; box-sizing: border-box; font-size: 16px; line-height: 1.5; resize: vertical; white-space: pre; overflow-x: auto; }
 .err { margin: 0; color: var(--danger, #ff6b6b); font-size: 12px; }
 .pv { aspect-ratio: 16 / 9; width: 100%; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -107,8 +113,6 @@ footer { display: flex; align-items: center; gap: 8px; padding: 10px 14px; borde
 .keys { flex: 1; color: var(--muted); font-size: 12px; }
 footer button { min-width: 72px; }
 @media (max-width: 768px) {
-  .se-backdrop { place-items: end stretch; }
-  .se { width: auto; max-height: 92dvh; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
   .keys { display: none; }
   footer { justify-content: flex-end; }
   footer button { flex: 1; min-width: 0; }

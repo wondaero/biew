@@ -10,6 +10,7 @@ import { useLive } from '@/live/liveStore'
 import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
 import LibraryPanel from './panels/LibraryPanel.vue'
+import OnAirStrip from './OnAirStrip.vue'
 
 const props = withDefaults(defineProps<{ startNew?: boolean }>(), { startNew: false })
 const emit = defineEmits<{ close: [] }>()
@@ -33,7 +34,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div class="srch-backdrop" @mousedown.self="emit('close')">
-    <div class="srch" role="dialog" aria-modal="true" aria-label="곡 목록">
+    <div class="srch m-full" role="dialog" aria-modal="true" aria-label="곡 목록">
       <header>
         <h2>곡 목록</h2>
         <small class="keys">곡 누르기 = 보기·수정 · [+ 콘티] 또는 Enter = 콘티에 추가 · Esc = 지우기/닫기</small>
@@ -41,6 +42,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <small class="cnt">콘티 {{ live.state.setlist.length }}곡</small>
         <button class="x" title="닫기 (Esc)" @click="emit('close')">✕</button>
       </header>
+      <OnAirStrip />
       <LibraryPanel ref="lib" class="srch-lib" />
     </div>
   </div>
@@ -58,10 +60,8 @@ h2 { margin: 0; font-size: 16px; }
 .spacer { flex: 1; }
 .x { border: none; background: none; box-shadow: none; margin: 0; padding: 2px 8px; color: var(--muted); }
 .srch-lib { flex: 1; min-height: 0; padding: 12px 14px; }
-/* 모바일: 아래에서 올라오는 시트(다른 바텀시트와 같은 높이) */
+/* 모바일: 전체 화면(.m-full, src/style.css) */
 @media (max-width: 768px) {
-  .srch-backdrop { place-items: end stretch; }
-  .srch { width: auto; height: 92dvh; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
   .keys { display: none; }
   .srch-lib { padding: 10px 12px; }
 }

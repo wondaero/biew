@@ -108,3 +108,17 @@ input[type='range']::-moz-range-thumb {
   width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
 }
 input[type='range']:disabled { opacity: .45; cursor: default; }
+
+/*
+ * 폰 전체 화면 팝업(사용자 결정 2026-11-19): 내용이 많은 작업 화면(곡 목록·곡 편집기·서버 올리기·슬라이드 수정·콘티·출력 설정)은
+ * ≤768px 에서 화면 전체. 짧은 확인·입력(로그인·인터넷 송출 전환 등)은 작은 창/아래 시트 그대로.
+ * 팝업 바깥 상자에 class="m-full" — 각 컴포넌트의 scoped 크기 규칙보다 이겨야 해서 !important.
+ * 머리 아래엔 OnAirStrip(송출 중 한 줄)을 둔다 — 전체 화면은 송출 모니터를 완전히 가리므로.
+ */
+@media (max-width: 768px) {
+  .m-full {
+    position: fixed !important; inset: 0 !important; width: auto !important; height: 100dvh !important; max-height: none !important;
+    margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+    padding-top: env(safe-area-inset-top) !important; padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+}

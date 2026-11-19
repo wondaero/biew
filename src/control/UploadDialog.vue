@@ -14,6 +14,7 @@ import { useLive } from '@/live/liveStore'
 import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
+import OnAirStrip from './OnAirStrip.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const live = useLive()
@@ -85,12 +86,13 @@ const compareWith = (r: Row) => r.item.server ?? r.item.dup.sameLyrics[0] ?? r.i
 
 <template>
   <div class="backdrop" @mousedown.self="emit('close')">
-    <div class="dialog" role="dialog" aria-modal="true">
+    <div class="dialog m-full" role="dialog" aria-modal="true">
       <header>
         <h2>서버에 올리기</h2>
         <span class="spacer" />
         <button class="x" title="닫기" @click="emit('close')">✕</button>
       </header>
+      <OnAirStrip />
 
       <div class="body">
         <p v-if="!session" class="muted">서버에 올리려면 로그인해야 합니다. <button class="primary" @click="requireLogin(UPLOAD_REASON)">로그인</button></p>

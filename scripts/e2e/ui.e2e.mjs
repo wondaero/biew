@@ -91,6 +91,18 @@ try {
   const liveVis = await m.evaluate(() => { const c = document.querySelector('.card.live').getBoundingClientRect(); return c.top >= 0 && c.bottom <= innerHeight })
   check('폰: 송출 화면 누르기 → 송출 중 장이 보임', liveVis)
 
+  // 전체 화면 팝업 + 송출 중 한 줄 + 곡 수정 머리 두 줄(✕ 가 화면 안)
+  const full = (sel) => m.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return Math.abs(r.left) < 1 && Math.abs(r.top) < 1 && Math.abs(r.width - innerWidth) < 1 && Math.abs(r.height - innerHeight) < 1 })
+  await m.$$eval('.dock button', (bs) => bs[0].click()); await m.waitForSelector('.srch input.search'); await sleep(400)
+  check('폰: 곡 목록 = 전체 화면', await full('.srch'))
+  check('폰: 곡 목록에 송출 중 한 줄', await m.$eval('.srch .onair-strip', (e) => getComputedStyle(e).display !== 'none' && e.textContent.includes('Lorem 2')))
+  await m.type('.srch input.search', 'Lorem'); await m.waitForSelector('.srch ol.hits li .title'); await m.click('.srch ol.hits li .title'); await m.waitForSelector('.dialog header.two')
+  check('폰: 곡 편집기 = 전체 화면, ✕ 가 화면 안', await full('.dialog') && await m.$eval('.dialog header .x', (b) => b.getBoundingClientRect().right <= innerWidth))
+  await m.evaluate(() => history.back()); await sleep(300); await m.evaluate(() => history.back()); await sleep(400)
+  await m.$$eval('.dock button', (bs) => bs[1].click()); await sleep(500)
+  check('폰: 콘티 = 전체 화면', await full('.set-wrap.open'))
+  await m.evaluate(() => history.back()); await sleep(400)
+
   // 출력 설정 슬라이더 안전장치
   await m.$$eval('.dock button', (bs) => bs[2].click())
   await sleep(600)

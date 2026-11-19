@@ -14,6 +14,7 @@ import SearchDialog from './SearchDialog.vue'
 import SetlistPanel from './panels/SetlistPanel.vue'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
+import OnAirStrip from './OnAirStrip.vue'
 import StylePanel from './panels/StylePanel.vue'
 import StylePreview from './panels/StylePreview.vue'
 import StyleDialog from './StyleDialog.vue'
@@ -237,6 +238,7 @@ onBeforeUnmount(() => {
             <button @click="openSearch()">🔍 곡 추가</button>
             <button aria-label="닫기" @click="sheet = null">✕</button>
           </div>
+          <OnAirStrip class="sheet-strip" />
           <SetlistPanel class="set" @jump="onJump" />
         </div>
       </template>
@@ -251,9 +253,11 @@ onBeforeUnmount(() => {
       <!-- 머리 + 미리보기를 시트 위에 고정, 설정은 그 아래에서 스크롤 -->
       <div class="sheet-top">
         <div class="sheet-head">
+          <b>출력 설정</b>
           <span class="spacer" />
           <button aria-label="닫기" @click="sheet = null">✕</button>
         </div>
+        <OnAirStrip class="sheet-strip" />
         <StylePreview class="sheet-pv" />
       </div>
       <StylePanel touch-guard />
@@ -395,26 +399,31 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
 
   .set-wrap, .style-sheet {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    height: 92dvh; /* 내용을 더 보이게(사용자 요청) — 위에 한 줄 남겨 시트임을 알고, 그 틈을 눌러 닫을 수 있게 */
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    background: var(--panel); border: 1px solid var(--line); border-bottom: 0; border-radius: 14px 14px 0 0;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
+    /* 전체 화면(사용자 결정 2026-11-19 — 92% 시트는 위 틈만 애매하게 남았다). 열고 닫을 땐 아래에서 올라옴 */
+    top: 0; height: 100dvh;
+    padding: calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--panel); border: 0; border-radius: 0;
     transform: translateY(105%); visibility: hidden; transition: transform .2s, visibility 0s .2s;
   }
   .set-wrap.open, .style-sheet.open { transform: none; visibility: visible; transition: transform .2s; }
   .set-wrap { gap: 8px; }
   .style-sheet { overflow-y: auto; padding-top: 0; }
   /* 시트 머리 + 미리보기 고정, 설정만 스크롤 */
-  .style-sheet .sheet-top { position: sticky; top: 0; z-index: 2; margin: 0 -12px 10px; padding: 10px 12px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .style-sheet .sheet-top { position: sticky; top: 0; z-index: 2; margin: 0 -12px 10px; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
   .style-sheet .sheet-top .sheet-head { margin-bottom: 4px; }
-  /* 출력 설정 시트의 ✕ 는 작게 — 버튼 하나에 한 줄을 다 쓰지 않게 */
-  .style-sheet .sheet-top .sheet-head button { padding: 3px 12px; font-size: 13px; }
+  /* 송출 중 한 줄: 시트 가로 여백을 뚫고 끝까지 */
+  .sheet-strip { margin: 0 -12px; }
+  .style-sheet .sheet-strip { margin-bottom: 8px; }
   .sheet-pv { display: grid; }
 
   .sheet-head { display: flex; align-items: center; gap: 6px; }
   .sheet-head b { font-size: 15px; }
   .sheet-head .spacer { display: block; flex: 1; }
   .sheet-head button { padding: 8px 14px; margin-bottom: 0; }
+  /* ✕ 는 다른 전체 화면 팝업과 같은 평평한 글자 버튼 */
+  .sheet-head button[aria-label="닫기"] { border: none; background: none; box-shadow: none; color: var(--muted); font-size: 18px; padding: 6px 10px; }
+  /* 시트 머리에 제목이 있으므로 설정 패널 안 제목은 숨김(적용 안 된 변경은 미리보기가 알려 줌) */
+  .style-sheet :deep(.style > h2) { display: none; }
   /* 시트 안의 콘티 제목 줄은 머리와 겹치므로 숨김 */
   .set-wrap .set :deep(header h2) { display: none; }
   .set-wrap .set :deep(header) { justify-content: flex-end; }
