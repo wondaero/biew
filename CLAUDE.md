@@ -117,6 +117,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 사용자는 한국어로 소통. 실무 권장 방식과 이유를 함께 설명하고 더 나은 구조가 있으면 먼저 제안.
 
 ## 함정
+- **pull 뒤에는 `npm install`** — 새 의존성(예: 송출 글꼴 `pretendard`)이 없으면 빌드가 에러 없이 글꼴을 빼먹는다(겪음 — 오프라인 E2E 글꼴 확인 실패). 운영(Vercel)은 매번 새로 설치하므로 영향 없음.
 - **Vue scoped 스타일은 자식 컴포넌트의 최상위 요소에도 걸린다.** 부모에 `.backdrop { display:none }` 같은 범용 이름을 두면 같은 이름의 자식 대화창이 통째로 숨는다(겪음 — 인터넷 송출 전환 창). 부모 쪽은 접두사(`sheet-`)를 붙일 것.
 - 가려진(백그라운드) 탭은 브라우저가 타이머를 늦춘다 → 주기 확인(호스트 10초 주소 확인 등)이 늦어질 수 있음. E2E 에서 해당 탭을 `bringToFront()` 할 것.
 - 송출 배경은 `style.backdrop`(shared/backdrop.ts). 예전 `style.background` 는 normalizeLive 가 이전하고 지운다. ATEM 키잉은 검정·초록 단색만 가능.

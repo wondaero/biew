@@ -1,5 +1,5 @@
 // 슬라이드 카드 글자 E2E: 원래 줄바꿈 그대로(브라우저가 임의로 꺾지 않음) + 넘치면 글자 크기만 줄임(v-fit-lines).
-// PC(16:9 카드)·폰 280px(한 줄 목록). Lorem 더미, 서버 불필요.
+// PC(16:9 카드)·폰 360px·280px(한 줄 목록, 터치 = 연필 버튼 보임). Lorem 더미, 서버 불필요.
 import puppeteer from 'puppeteer-core'
 import path from 'node:path'
 import { CHROME, OUT, ensureServer } from './_lib.mjs'
@@ -19,9 +19,11 @@ const slides = [
 const seed = () => ({ version: Date.now(), origin: 'e2e', itemIndex: 0, slideIndex: 1, blank: false, frozen: null, style: {}, setlist: [{ key: 'k', songId: 'd', title: 'Lorem', slides }] })
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true })
 try {
-  for (const [label, w, h] of [['PC', 1600, 900], ['폰 280px', 280, 653]]) {
+  // 폰은 터치 화면으로(실제 폰처럼 연필 ✎ 버튼이 늘 보이고 그 자리를 비워 둔다)
+  for (const [label, w, h] of [['PC', 1600, 900], ['폰 360px', 360, 740], ['폰 280px', 280, 653]]) {
+    const phone = label !== 'PC'
     const p = await (await browser.createBrowserContext()).newPage()
-    await p.setViewport({ width: w, height: h })
+    await p.setViewport({ width: w, height: h, isMobile: phone, hasTouch: phone })
     await p.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
     await p.evaluate((s) => localStorage.setItem('biew.live.v1:LOCAL', JSON.stringify(s)), seed())
     await p.goto(BASE + '/local', { waitUntil: 'networkidle0' })
@@ -38,9 +40,14 @@ try {
         idxOverlap: getComputedStyle(idx).position === 'absolute' && ir.bottom > tr.top + 1 && tr.height > 0 && [...range.getClientRects()].some((r) => r.top < ir.bottom && r.left < ir.right),
       }
     }))
+    const pageOverflowX = await p.evaluate(() => document.documentElement.scrollWidth > innerWidth)
     await p.screenshot({ path: path.join(OUT, `cards-${w}.png`) })
     check(`${label}: 짧은 슬라이드 — 2줄, 글자 크기 그대로`, info[0].lines === 2 && !info[0].clip, JSON.stringify(info[0]))
-    check(`${label}: 긴 줄 슬라이드 — 원래 3줄 유지(꺾이지 않음), 글자만 작아짐, 가로로 안 넘침`, info[1].lines === 3 && info[1].fs < info[0].fs && !info[1].overflowX, JSON.stringify(info[1]))
+    if (w !== 280) check(`${label}: 긴 줄 슬라이드 — 원래 3줄 유지(꺾이지 않음), 글자만 작아짐, 다 들어감`, info[1].lines === 3 && info[1].fs < info[0].fs && !info[1].overflowX && !info[1].clip, JSON.stringify(info[1]))
+    // 280px(아주 작은 폰): 연필 버튼 자리(42px)를 빼면 50자 줄은 최소 크기로도 못 들어갈 수 있다 → 설계대로 카드 안에서 잘림 표시 + 전체 글(title)
+    else check(`${label}: 긴 줄 슬라이드 — 3줄 유지, 글자 작아짐, 다 들어가거나 카드 안 잘림 표시(전체 글 보기)`, info[1].lines === 3 && info[1].fs < info[0].fs
+      && (!info[1].overflowX || (info[1].clip && info[1].title.startsWith('Lorem ipsum dolor sit amet consectetur elit'))), JSON.stringify(info[1]))
+    check(`${label}: 화면이 가로로 밀리지 않음`, !pageOverflowX)
     check(`${label}: 카드 번호와 글자가 겹치지 않음`, info.every((x) => !x.idxOverlap), JSON.stringify(info.map((x) => x.idxOverlap)))
     if (label === 'PC') check('PC: 줄 많은 슬라이드 — 줄이거나(최소 크기 넘으면) 잘림 표시', info[2].fs < info[0].fs || info[2].clip, JSON.stringify(info[2]))
     else check('폰: 줄 많은 슬라이드 — 12줄 그대로(높이가 늘어남)', info[2].lines === 12, JSON.stringify(info[2]))
