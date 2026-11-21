@@ -56,8 +56,21 @@ export function lockedSeconds(k: Kind, code: string): number {
 
 const NO_SUPABASE = 'Supabase 설정(.env)이 없습니다'
 
+/**
+ * 채널 번호: 새 채널 = 숫자 6자리(2026-11-21~, 폰 숫자 키패드·불러 주기 쉬움).
+ * 그 전에 만든 채널 = 영문 대문자+숫자 6자(A-Z2-9) — 계속 동작한다.
+ * 숫자 번호는 짧은 주소(/123456, /123456/control), 예전 번호는 예전 주소(/view/X, /control/X).
+ * 맨 앞 주소(/:code)를 숫자로만 받아야 /local 같은 고정 주소와 영원히 겹치지 않는다.
+ */
+const NUM_CODE = /^[0-9]{6}$/
+const OLD_CODE = /^[A-Z2-9]{6}$/
 export const normalizeCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
-export const isCode = (s: string) => /^[A-Z2-9]{6}$/.test(s)
+export const isCode = (s: string) => NUM_CODE.test(s) || OLD_CODE.test(s)
+export const isNumericCode = (s: string) => NUM_CODE.test(s)
+/** 보기 주소 */
+export const viewPath = (code: string) => (NUM_CODE.test(code) ? `/${code}` : `/view/${code}`)
+/** 리모컨·호스트 주소 */
+export const controlPath = (code: string) => (NUM_CODE.test(code) ? `/${code}/control` : `/control/${code}`)
 
 // ── 소유 계정 ─────────────────────────────────────────
 export async function createChannel(title: string, controlPassword: string, viewPassword: string): Promise<{ code?: string; error?: string }> {

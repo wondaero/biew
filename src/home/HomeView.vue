@@ -47,7 +47,7 @@ function loadDevice(): DeviceEntry[] {
 }
 const device = ref(loadDevice())
 const hostCodes = computed(() => new Set(device.value.filter((d) => d.role === 'host').map((d) => d.code)))
-const openEntry = (e: DeviceEntry) => router.push(e.role === 'view' ? `/view/${e.code}` : `/control/${e.code}`)
+const openEntry = (e: DeviceEntry) => router.push(e.role === 'view' ? api.viewPath(e.code) : api.controlPath(e.code))
 function forget(e: DeviceEntry) {
   if (e.role === 'host') {
     if (!confirm(`"${e.title}" 을(를) 이 기기 목록에서 지울까요?\n이 PC 의 콘티와 호스트 권한이 지워집니다. 서버의 채널은 그대로입니다.`)) return
@@ -163,14 +163,14 @@ async function create() {
   const g = await api.issueHostToken(r.code)
   saveHost(r.code, { title: title.value.trim(), token: g.grant?.token ?? null, controlTopic: g.grant?.controlTopic ?? null, viewTopic: g.grant?.viewTopic ?? null })
   creating.value = false
-  router.push(`/control/${r.code}`)
+  router.push(api.controlPath(r.code))
 }
 
 // 번호로 입장 (로그인 불필요)
 const joinRaw = ref('')
 const joinCode = computed(() => api.normalizeCode(joinRaw.value))
 const joinOk = computed(() => api.isCode(joinCode.value))
-const go = (kind: 'view' | 'control') => { if (joinOk.value) router.push(`/${kind}/${joinCode.value}`) }
+const go = (kind: 'view' | 'control') => { if (joinOk.value) router.push(kind === 'view' ? api.viewPath(joinCode.value) : api.controlPath(joinCode.value)) }
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
@@ -247,8 +247,8 @@ const build = __APP_BUILD__
           <span class="badge" title="들어갈 때 비밀번호가 필요합니다">🔒 비밀번호</span>
           <span class="d">{{ fmt(c.updated_at) }} 사용</span>
           <div class="row pub-go">
-            <button @click="router.push(`/view/${c.code}`)">보기로 입장</button>
-            <button @click="router.push(`/control/${c.code}`)">컨트롤로 입장</button>
+            <button @click="router.push(api.viewPath(c.code))">보기로 입장</button>
+            <button @click="router.push(api.controlPath(c.code))">컨트롤로 입장</button>
           </div>
         </li>
       </ul>
@@ -278,7 +278,7 @@ const build = __APP_BUILD__
       <p v-if="listErr" class="err">{{ listErr }}</p>
       <p v-if="delErr" class="err">{{ delErr }}</p>
       <ul v-if="!listErr && fRows.length" class="list">
-        <li v-for="r in fRows" :key="r.code" class="mine" @click="router.push(`/control/${r.code}?as=host`)">
+        <li v-for="r in fRows" :key="r.code" class="mine" @click="router.push(`${api.controlPath(r.code)}?as=host`)">
           <span class="t">{{ r.title }}</span>
           <span class="c">{{ r.code }}</span>
           <span v-if="hostCodes.has(r.code)" class="badge">이 기기</span>
@@ -296,11 +296,12 @@ const build = __APP_BUILD__
       <input
         :value="joinCode"
         class="code"
+        inputmode="numeric"
         autocapitalize="characters"
         autocomplete="off"
         spellcheck="false"
         maxlength="12"
-        placeholder="ABC234"
+        placeholder="123456"
         @input="joinRaw = ($event.target as HTMLInputElement).value"
         @keydown.enter="go('view')"
       />

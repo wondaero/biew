@@ -59,8 +59,8 @@ try {
   await host.type('input[placeholder^="채널 제목 ("]', 'Lorem 채널')
   await host.type('input[placeholder^="컨트롤 비밀번호"]', 'ctlpass1')
   await host.locator('::-p-text(채널 만들기)').click()
-  await host.waitForFunction(() => /\/control\/[A-Z2-9]{6}$/.test(location.pathname), { timeout: 15000 })
-  code = host.url().split('/').pop()
+  await host.waitForFunction(() => /^\/(\d{6}\/control|control\/[A-Z2-9]{6})$/.test(location.pathname), { timeout: 15000 })
+  code = new URL(host.url()).pathname.match(/^\/(?:(\d{6})\/control|control\/([A-Z2-9]{6}))$/)?.slice(1).find(Boolean) // 숫자 /123456/control · 예전 /control/ABC234
   check('호스트 화면 + 서버 연결', !!(await host.$('aside.side .set-wrap')) && await until(() => host.$('button.share.live')))
 
   // 콘티(Lorem) → 로그아웃(저장된 로그인 지움) + 새로고침 → 호스트 토큰만으로 호스트 유지 + 서버에 올라감

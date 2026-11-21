@@ -62,7 +62,7 @@ async function run() {
   retargetOutputWindow(code)
   // 로컬 송출은 옮겨 갔으므로 비운다(출력 설정 유지). 출력 창은 이미 새 채널로 갈아타 영향 없음
   saveLive(LOCAL_CODE, { ...emptyLiveState(st.origin), version: nextVersion(st.version), style: st.style })
-  router.push(`/control/${code}?share=1`)
+  router.push(`${api.controlPath(code)}?share=1`)
 }
 
 const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && step.value !== 'working') emit('close') }

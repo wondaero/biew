@@ -18,8 +18,8 @@ const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
 useBackClose(() => true, () => emit('close')) // 뒤로가기 = 닫기
 
-const viewUrl = computed(() => `${location.origin}/view/${props.code}`)
-const controlUrl = computed(() => `${location.origin}/control/${props.code}`)
+const viewUrl = computed(() => location.origin + api.viewPath(props.code))
+const controlUrl = computed(() => location.origin + api.controlPath(props.code))
 const isLocal = /^(localhost|127\.|\[::1\])/.test(location.hostname)
 const qr = ref<string | null>(null)
 watch(viewUrl, async (u) => { qr.value = await QRCode.toDataURL(u, { margin: 1, width: 200 }) }, { immediate: true })

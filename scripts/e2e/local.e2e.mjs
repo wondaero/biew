@@ -66,8 +66,8 @@ try {
   await c.type('.login-dlg input[name=username]', email)
   await c.type('.login-dlg input[name=password]', password)
   await c.click('.login-dlg form.login button')
-  check('로그인 → 채널 생성 → 인터넷 송출 화면', await c.waitForFunction(() => /\/control\/[A-Z2-9]{6}$/.test(location.pathname), { timeout: 15000 }).then(() => true).catch(() => false))
-  code = c.url().split('/').pop().split('?')[0]
+  check('로그인 → 채널 생성 → 인터넷 송출 화면', await c.waitForFunction(() => /^\/(\d{6}\/control|control\/[A-Z2-9]{6})$/.test(location.pathname), { timeout: 15000 }).then(() => true).catch(() => false))
+  code = new URL(c.url()).pathname.match(/^\/(?:(\d{6})\/control|control\/([A-Z2-9]{6}))$/)?.slice(1).find(Boolean) // 숫자 /123456/control · 예전 /control/ABC234
   check('📡 창이 자동으로 열림(QR·번호)', !!(await c.waitForSelector('.pop .code', { timeout: 8000 }).catch(() => null)))
   check('콘티·위치 그대로(PGM Lorem A 2/2)', await until(async () => (await c.$eval('.bar.pgm span', (e) => e.textContent ?? '').catch(() => '')).includes('Lorem A · 2/2')))
   check('출력 창: 새로고침 없이 새 채널로 갈아탐', await until(async () => (await out.evaluate(() => window.__marker === 1 && location.pathname)) === `/output/${code}`))

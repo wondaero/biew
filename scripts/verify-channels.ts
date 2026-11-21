@@ -51,7 +51,7 @@ try {
 
   const mk = await rpc(owner, 'create_channel', { p_title: 'Lorem ipsum', p_control_password: 'ctl-pass-1', p_view_password: 'view-pass-1' })
   const code = mk.data as string
-  check('채널 생성(6자 코드)', !mk.error && /^[A-Z2-9]{6}$/.test(code ?? ''), mk.error?.message)
+  check('채널 생성(숫자 6자리 코드)', !mk.error && /^[0-9]{6}$/.test(code ?? ''), mk.error?.message)
   if (!code) throw new Error('채널 생성 실패로 중단')
   created.push(code)
   const mk2 = await rpc(owner, 'create_channel', { p_title: 'Lorem open', p_control_password: 'ctl-pass-2' })

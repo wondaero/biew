@@ -1,25 +1,35 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 /**
- * 채널 구조: 채널 하나 = 번호(6자) 하나.
- *  /                  채널 만들기·목록(로그인) + 번호로 입장
- *  /control/:code     호스트(채널 만든 계정) 또는 리모컨(컨트롤 비밀번호)
- *  /local             오프라인 모드: 채널·서버 없이 이 PC 하나에서만(출력은 /output/LOCAL)
- *  /output/:code      송출 화면(같은 PC 의 컨트롤러와 BroadcastChannel)
- *  /view/:code        보기(선택적 보기 비밀번호)
+ * 채널 구조: 채널 하나 = 번호 하나. 새 채널은 숫자 6자리, 예전 채널은 영문+숫자 6자(src/channel/api.ts).
+ *  /                     채널 만들기·목록(로그인) + 번호로 입장
+ *  /:code                보기(선택적 보기 비밀번호) — 숫자 번호만
+ *  /:code/control        호스트(채널 만든 계정) 또는 리모컨(컨트롤 비밀번호) — 숫자 번호만
+ *  /view/:code           보기 — 예전(영문) 번호. 숫자 번호면 /:code 로 이동
+ *  /control/:code        호스트·리모컨 — 예전(영문) 번호. 숫자 번호면 /:code/control 로 이동
+ *  /local                오프라인 모드: 채널·서버 없이 이 PC 하나에서만(출력은 /output/LOCAL)
+ *  /output/:code         송출 화면(같은 PC 의 컨트롤러와 BroadcastChannel). 버튼이 여는 내부 주소라 바꾸지 않음
+ * 맨 앞 /:code 는 숫자 6자리만 받으므로 /local 같은 고정 주소와 겹치지 않는다.
  * 번호 없는 예전 주소(/control, /output, /view)는 홈으로.
  */
+const NUM = /^\d{6}$/
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: () => import('./home/HomeView.vue') },
-    { path: '/control/:code', component: () => import('./control/ControlGate.vue') },
     { path: '/local', component: () => import('./control/LocalView.vue') },
     { path: '/output/:code', component: () => import('./output/OutputView.vue') },
-    { path: '/view/:code', component: () => import('./viewer/ViewerView.vue') },
+    { path: '/:code(\\d{6})', component: () => import('./viewer/ViewerView.vue') },
+    { path: '/:code(\\d{6})/control', component: () => import('./control/ControlGate.vue') },
+    // 예전 주소: 영문 번호는 그대로, 숫자 번호는 짧은 주소로(이미 퍼진 링크·QR 대비, 쿼리 유지)
+    { path: '/view/:code', component: () => import('./viewer/ViewerView.vue'), beforeEnter: (to) => (NUM.test(String(to.params.code)) ? { path: `/${to.params.code}`, query: to.query, replace: true } : true) },
+    { path: '/control/:code', component: () => import('./control/ControlGate.vue'), beforeEnter: (to) => (NUM.test(String(to.params.code)) ? { path: `/${to.params.code}/control`, query: to.query, replace: true } : true) },
     { path: '/control', redirect: '/' },
     { path: '/output', redirect: '/' },
     { path: '/view', redirect: '/' },
+    // 그 밖의 주소(잘못 친 번호 등)는 빈 화면 대신 홈으로
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
