@@ -66,7 +66,7 @@ watch(
   },
 )
 
-// ── 슬라이드 한 장 고치기(✎) — 콘티는 즉시, 곡 원본은 그 글만(src/control/slideEdit.ts) ──
+// ── 슬라이드 한 장 고치기(✎) — 선곡은 즉시, 곡 원본은 그 글만(src/control/slideEdit.ts) ──
 const lib = useLibrary()
 const editing = ref<{ key: string; j: number } | null>(null)
 const notice = ref<{ text: string; warn: boolean } | null>(null)
@@ -84,18 +84,18 @@ async function saveEdit(p: { pieces: string[]; indexes: number[]; toSong: boolea
   live.setlist.editSlides(e.key, p.indexes, p.pieces)
   editing.value = null
   const split = p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다 — ` : ''
-  if (!p.toSong) return say(`${split}콘티만 고쳤습니다(곡 원본은 그대로)`)
+  if (!p.toSong) return say(`${split}선곡만 고쳤습니다(곡 원본은 그대로)`)
   await loadCache()
   const song = lib.byId.value.get(it.songId)
   const slides = song && patchSongSlides(song.slides, e.j, oldText, p.pieces, p.all)
-  if (!song || !slides) return say(song ? '콘티는 고쳤지만 곡 원본은 그 사이 바뀌어 저장하지 않았습니다 — 곡 목록에서 그 곡을 눌러 확인하세요' : '콘티는 고쳤지만 곡 원본을 찾을 수 없습니다', true)
+  if (!song || !slides) return say(song ? '선곡은 고쳤지만 곡 원본은 그 사이 바뀌어 저장하지 않았습니다 — 곡 목록에서 그 곡을 눌러 확인하세요' : '선곡은 고쳤지만 곡 원본을 찾을 수 없습니다', true)
   try {
     // base = 고친 기준(이 기기가 받아 둔 버전) — 업로드 때 그 사이 DB 가 바뀌었는지 판정
     const r = await saveSong({ id: song.id, title: song.title, slides, base: { updated_at: song.updated_at, title: song.title, slides: [...song.slides] } })
     void r
     say(`${split || '고쳤습니다 — '}곡 원본은 이 기기에 저장(DB 에는 곡 목록의 ⬆ 업로드로)`)
   } catch (err) {
-    say(`콘티는 고쳤지만 곡 원본 저장 실패: ${err instanceof Error ? err.message : err}`, true)
+    say(`선곡은 고쳤지만 곡 원본 저장 실패: ${err instanceof Error ? err.message : err}`, true)
   }
 }
 
@@ -112,7 +112,7 @@ defineExpose({ scrollToItem, scrollToLive })
 
 <template>
   <section ref="root" class="grid-wrap">
-    <p v-if="!live.state.setlist.length" class="empty">콘티에 곡을 추가하면 슬라이드가 여기에 펼쳐집니다.</p>
+    <p v-if="!live.state.setlist.length" class="empty">선곡에 곡을 추가하면 슬라이드가 여기에 펼쳐집니다.</p>
     <div v-if="live.state.setlist.length > 1" class="tools">
       <button @click="toggleAll">{{ allClosed ? '전체 펼치기' : '전체 접기' }}</button>
     </div>

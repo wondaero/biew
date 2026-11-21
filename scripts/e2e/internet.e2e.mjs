@@ -63,7 +63,7 @@ try {
   code = new URL(host.url()).pathname.match(/^\/(?:(\d{6})\/control|control\/([A-Z2-9]{6}))$/)?.slice(1).find(Boolean) // 숫자 /123456/control · 예전 /control/ABC234
   check('호스트 화면 + 서버 연결', !!(await host.$('aside.side .set-wrap')) && await until(() => host.$('button.share.live')))
 
-  // 콘티(Lorem) → 로그아웃(저장된 로그인 지움) + 새로고침 → 호스트 토큰만으로 호스트 유지 + 서버에 올라감
+  // 선곡(Lorem) → 로그아웃(저장된 로그인 지움) + 새로고침 → 호스트 토큰만으로 호스트 유지 + 서버에 올라감
   await host.evaluate((c, s) => {
     localStorage.setItem('biew.live.v1:' + c, JSON.stringify(s))
     for (const k of Object.keys(localStorage)) if (/^sb-.+-auth-token$/.test(k)) localStorage.removeItem(k)
@@ -71,7 +71,7 @@ try {
   await host.reload({ waitUntil: 'networkidle0' })
   check('로그아웃 상태 새로고침에도 호스트 + 서버 연결', !!(await host.$('aside.side .set-wrap')) && await until(() => host.$('button.share.live')))
   const serverState = async () => (await admin.from('channels').select('state').eq('code', code).single()).data?.state
-  check('PC 콘티가 서버(원본)에 올라감', await until(async () => (await serverState())?.setlist?.length === 3))
+  check('PC 선곡이 서버(원본)에 올라감', await until(async () => (await serverState())?.setlist?.length === 3))
 
   // ── 리모컨: 폰별 잠금 ──
   await remote.goto(`${BASE}/control/${code}`, { waitUntil: 'networkidle0' })

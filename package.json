@@ -21,6 +21,7 @@
     "e2e:local": "node scripts/e2e/local.e2e.mjs",
     "e2e:home": "node scripts/e2e/home.e2e.mjs",
     "e2e:routes": "node scripts/e2e/routes.e2e.mjs",
+    "e2e:focus": "node scripts/e2e/focus.e2e.mjs",
     "e2e:device": "node scripts/e2e/device.e2e.mjs",
     "e2e:delete": "node scripts/e2e/delete.e2e.mjs",
     "e2e:back": "node scripts/e2e/back.e2e.mjs",

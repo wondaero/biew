@@ -89,9 +89,9 @@ const showHelp = ref(false)
 const showChannel = ref(route.query.share === '1')
 const showSwitch = ref(false)
 
-/** 로컬 송출 종료: 콘티를 비우고(출력 설정 유지) 출력 창은 검은 화면으로 남긴다 — 다음 예배를 그대로 이어서 */
+/** 로컬 송출 종료: 선곡을 비우고(출력 설정 유지) 출력 창은 검은 화면으로 남긴다 — 다음 예배를 그대로 이어서 */
 function endLocal() {
-  if (!confirm('이 송출을 끝낼까요?\n콘티가 비워지고 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.')) return
+  if (!confirm('이 송출을 끝낼까요?\n선곡이 비워지고 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.')) return
   live.actions.endSession()
 }
 
@@ -103,7 +103,7 @@ function leaveRemote() {
   router.push('/')
 }
 
-// 모바일 바텀시트: 콘티(set)·출력 설정(style). 곡 검색은 PC·모바일 모두 팝업(SearchDialog)
+// 모바일 바텀시트: 선곡(set)·출력 설정(style). 곡 검색은 PC·모바일 모두 팝업(SearchDialog)
 const sheet = ref<'set' | 'style' | null>(null)
 /** 출력 설정에 적용 안 된 수정본이 있으면 하단 버튼에 표시(시트를 닫아도 수정본은 남음) */
 const styleDraft = useStyleDraft()
@@ -167,7 +167,7 @@ onBeforeUnmount(() => {
 
       <span v-if="netWarn" class="netwarn" role="status">{{ netWarn }}</span>
       <template v-if="isLocalMode">
-        <button class="endlocal danger-line" title="콘티를 비우고 다음 예배 준비(출력 창은 검은 화면으로 유지)" @click="endLocal">송출 종료</button>
+        <button class="endlocal danger-line" title="선곡을 비우고 다음 예배 준비(출력 창은 검은 화면으로 유지)" @click="endLocal">송출 종료</button>
         <button class="tonet" title="지금 송출을 그대로 인터넷 송출로 옮겨 폰 리모컨·보기를 씀" @click="showSwitch = true">🌐<span class="net-word"> 인터넷 송출</span><span class="wide-word">로 전환</span></button>
       </template>
       <template v-if="isHost">
@@ -205,15 +205,15 @@ onBeforeUnmount(() => {
 
     <!--
       사이드바(PC 왼쪽, 사용자 결정 2026-11-18 — 메인은 핵심만, 자잘한 건 팝업):
-      송출 화면 → 출력 설정 한 줄 → [곡 검색][+ 새 곡] → 콘티(남는 높이 전부).
-      모바일: 송출 화면만 위에 보이고, 콘티는 바텀시트(sheet === 'set'), 곡 검색은 팝업, 버튼은 하단 도크.
+      송출 화면 → 출력 설정 한 줄 → [곡 검색][+ 새 곡] → 선곡(남는 높이 전부).
+      모바일: 송출 화면만 위에 보이고, 선곡은 바텀시트(sheet === 'set'), 곡 검색은 팝업, 버튼은 하단 도크.
     -->
     <aside class="side">
       <MonitorPanel @jump="gridRef?.scrollToLive()" />
       <template v-if="isHost">
         <StyleSummary v-if="!narrow" @open="showStyle = true" />
         <div class="side-actions desk-only">
-          <button class="find" title="곡 목록 — 찾아서 [+ 콘티] 또는 Enter 로 추가 ( / )" @click="openSearch()">
+          <button class="find" title="곡 목록 — 찾아서 [+ 선곡] 또는 Enter 로 추가 ( / )" @click="openSearch()">
             🔍 곡 목록 <kbd>/</kbd><b v-if="lib.remoteCount.value" class="badge down" title="DB 에서 바뀐 곡 — 다운로드로 받기">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge" title="이 기기에서 바꾼 곡 — 업로드 대기">⬆{{ lib.pendingCount.value }}</b>
           </button>
           <button title="새 곡 등록(오프라인이면 PC 에 저장)" @click="openSearch(true)">+ 새 곡</button>
@@ -221,7 +221,7 @@ onBeforeUnmount(() => {
         <p v-if="!narrow && !lib.count.value" class="side-hint">저장된 곡이 없습니다 — <b>곡 목록</b>에서 로그인해 곡을 받으세요.</p>
         <div class="set-wrap" :class="{ open: sheet === 'set' }">
           <div class="sheet-head">
-            <b>콘티</b>
+            <b>선곡</b>
             <span class="spacer" />
             <button @click="openSearch()">🔍 곡 추가</button>
             <button aria-label="닫기" @click="sheet = null">✕</button>
@@ -251,10 +251,10 @@ onBeforeUnmount(() => {
       <StylePanel touch-guard />
     </div>
 
-    <!-- 폰: 준비용 버튼(곡 목록·콘티·출력 설정)은 위, 송출 버튼은 맨 아래(사용자 결정 2026-11-19) -->
+    <!-- 폰: 준비용 버튼(곡 목록·선곡·출력 설정)은 위, 송출 버튼은 맨 아래(사용자 결정 2026-11-19) -->
     <nav v-if="isHost" class="dock">
       <button @click="openSearch()">🔍 곡 목록<b v-if="lib.remoteCount.value" class="badge down">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge">⬆{{ lib.pendingCount.value }}</b></button>
-      <button @click="openSheet('set')">☰ 콘티 {{ live.state.setlist.length }}</button>
+      <button @click="openSheet('set')">☰ 선곡 {{ live.state.setlist.length }}</button>
       <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
     </nav>
     <TransportBar v-if="narrow" class="transport" bottom :host="isHost" />
@@ -308,7 +308,7 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
 .badge { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; background: #5a4a1e; color: #f5d27a; }
 .side-hint { margin: 0; font-size: 12px; color: var(--warn); }
 .side-hint b { color: var(--text); }
-/* 콘티: 사이드바의 남는 높이 전부 */
+/* 선곡: 사이드바의 남는 높이 전부 */
 .set-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: 10px; border-top: 1px solid var(--line); }
 .set-wrap .set { flex: 1; min-height: 0; }
 .center { grid-area: center; display: flex; flex-direction: column; min-height: 0; }
@@ -338,7 +338,7 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
 }
 .help td:first-child { color: var(--accent); padding-right: 16px; white-space: nowrap; }
 
-/* ── 모바일: 모니터 + 슬라이드 목록 한 줄 스크롤, 검색/콘티/설정은 바텀시트 ── */
+/* ── 모바일: 모니터 + 슬라이드 목록 한 줄 스크롤, 검색/선곡/설정은 바텀시트 ── */
 /* 이름 주의: scoped 스타일은 자식 컴포넌트의 최상위 요소에도 걸린다 — 자식 대화창(.backdrop)과 겹치지 않게 sheet- 접두사 */
 .sheet-head, .dock, .sheet-backdrop { display: none; }
 
@@ -346,7 +346,7 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   .control {
     height: 100dvh;
     grid-template-columns: minmax(0, 1fr);
-    /* 위 = 관리(상단 바) → 준비(곡 목록·콘티·출력 설정) → 송출 화면 → 가사 목록, 맨 아래 = 송출 버튼 */
+    /* 위 = 관리(상단 바) → 준비(곡 목록·선곡·출력 설정) → 송출 화면 → 가사 목록, 맨 아래 = 송출 버튼 */
     grid-template-rows: auto auto auto minmax(0, 1fr) auto;
     grid-template-areas: 'top' 'dock' 'side' 'center' 'transport';
   }
@@ -365,7 +365,7 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   /* 좁은 폰: 🌐 만(글자 빼고) — 세 개가 한 줄에 들어가게 */
   @media (max-width: 360px) { .net-word { display: none; } }
 
-  /* 사이드바 = 위쪽 송출 화면 줄(콘티는 바텀시트로 빠짐) */
+  /* 사이드바 = 위쪽 송출 화면 줄(선곡은 바텀시트로 빠짐) */
   .side { padding: 6px 10px; border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; gap: 0; }
   .side :deep(.monitors) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
   .side :deep(.screen) { width: min(100%, calc(30dvh * 16 / 9)); margin: 0 auto; }
@@ -399,7 +399,7 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   .sheet-head button[aria-label="닫기"] { border: none; background: none; box-shadow: none; color: var(--muted); font-size: 18px; padding: 6px 10px; }
   /* 시트 머리에 제목이 있으므로 설정 패널 안 제목은 숨김(적용 안 된 변경은 미리보기가 알려 줌) */
   .style-sheet :deep(.style > h2) { display: none; }
-  /* 시트 안의 콘티 제목 줄은 머리와 겹치므로 숨김 */
+  /* 시트 안의 선곡 제목 줄은 머리와 겹치므로 숨김 */
   .set-wrap .set :deep(header h2) { display: none; }
   .set-wrap .set :deep(header) { justify-content: flex-end; }
 

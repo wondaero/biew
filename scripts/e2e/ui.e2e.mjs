@@ -1,5 +1,5 @@
-// 컨트롤러 사용성 E2E(2026-11-19 피드백) — 로컬 송출, Lorem 콘티·곡(IndexedDB). 서버·계정 안 씀.
-// 곡 목록: 곡 누르기 = 보기·수정, [+ 콘티] = 추가 · 송출 화면 누르면 목록에서 송출 중 장으로 · ✎ 는 곡 제목 아래로 ·
+// 컨트롤러 사용성 E2E(2026-11-19 피드백) — 로컬 송출, Lorem 선곡·곡(IndexedDB). 서버·계정 안 씀.
+// 곡 목록: 곡 누르기 = 보기·수정, [+ 선곡] = 추가 · 송출 화면 누르면 목록에서 송출 중 장으로 · ✎ 는 곡 제목 아래로 ·
 // 폰 출력 설정 슬라이더: 그 위를 끌어도 값 안 바뀜(스크롤), 한 번 눌러 켠 뒤에만 조절 · 버튼 보통 크기.
 import puppeteer from 'puppeteer-core'
 import path from 'node:path'
@@ -59,16 +59,16 @@ try {
   const n0 = (await state(p)).setlist.length
   await p.click('.srch ol.hits li .title')
   await sleep(400)
-  check('곡 누르기 → 편집기(보기·수정) 열림, 콘티 그대로', !!(await p.$('.dialog textarea')) && (await state(p)).setlist.length === n0)
+  check('곡 누르기 → 편집기(보기·수정) 열림, 선곡 그대로', !!(await p.$('.dialog textarea')) && (await state(p)).setlist.length === n0)
   await p.keyboard.press('Escape'); await sleep(300)
   check('Esc → 편집기만 닫힘', !(await p.$('.dialog textarea')) && !!(await p.$('.srch')))
   await p.click('.srch ol.hits li .add')
   await sleep(300)
-  check('[+ 콘티] → 콘티에 추가', (await state(p)).setlist.length === n0 + 1)
+  check('[+ 선곡] → 선곡에 추가', (await state(p)).setlist.length === n0 + 1)
   await p.focus('.srch input.search'); await p.keyboard.press('Enter'); await sleep(300)
-  check('Enter → 콘티에 추가(키보드 빠른 길 유지)', (await state(p)).setlist.length === n0 + 2)
+  check('Enter → 선곡에 추가(키보드 빠른 길 유지)', (await state(p)).setlist.length === n0 + 2)
   const fs = await p.$eval('.srch ol.hits li .add', (b) => parseFloat(getComputedStyle(b).fontSize))
-  check('[+ 콘티] 보통 크기(14px)', fs === 14, `${fs}px`)
+  check('[+ 선곡] 보통 크기(14px)', fs === 14, `${fs}px`)
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await sleep(300)
 
   // 작은 버튼 → 보통 크기
@@ -114,7 +114,7 @@ try {
   check('폰: 곡 편집기 = 전체 화면, ✕ 가 화면 안', await full('.dialog') && await m.$eval('.dialog header .x', (b) => b.getBoundingClientRect().right <= innerWidth))
   await m.evaluate(() => history.back()); await sleep(300); await m.evaluate(() => history.back()); await sleep(400)
   await m.$$eval('.dock button', (bs) => bs[1].click()); await sleep(500)
-  check('폰: 콘티 = 전체 화면', await full('.set-wrap.open'))
+  check('폰: 선곡 = 전체 화면', await full('.set-wrap.open'))
   await m.evaluate(() => history.back()); await sleep(400)
 
   // 미리보기 후 송출(두 화면 나란히): 화면 높이·위치가 같고 송출 버튼이 화면 안

@@ -2,7 +2,7 @@
 /**
  * 곡 검색 팝업(사용자 결정 2026-11-18 — 메인은 핵심만, 자잘한 건 팝업). PC = 가운데 창, 모바일 = 아래 시트(92dvh).
  * 안에 곡 라이브러리 전체(검색·추가·동기화 상태·새 곡·✎ 수정·서버 올리기)를 그대로 쓴다(LibraryPanel).
- * 예배 중에도 빨라야 한다: '/' 로 열리고 검색칸에 바로 커서 → ↑↓ 고르고 Enter = 콘티에 추가(팝업은 열린 채 — 연달아 추가),
+ * 예배 중에도 빨라야 한다: '/' 로 열리고 검색칸에 바로 커서 → ↑↓ 고르고 Enter = 선곡에 추가(팝업은 열린 채 — 연달아 추가),
  * Esc = 검색어 지우기 → 한 번 더 Esc = 닫기. 열린 동안 송출 단축키는 막는다.
  */
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
@@ -37,9 +37,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <div class="srch m-full" role="dialog" aria-modal="true" aria-label="곡 목록">
       <header>
         <h2>곡 목록</h2>
-        <small class="keys">곡 누르기 = 보기·수정 · [+ 콘티] 또는 Enter = 콘티에 추가 · Esc = 지우기/닫기</small>
+        <small class="keys">곡 누르기 = 보기·수정 · [+ 선곡] 또는 Enter = 선곡에 추가 · Esc = 지우기/닫기</small>
         <span class="spacer" />
-        <small class="cnt">콘티 {{ live.state.setlist.length }}곡</small>
+        <small class="cnt">선곡 {{ live.state.setlist.length }}곡</small>
         <button class="x" title="닫기 (Esc)" @click="emit('close')">✕</button>
       </header>
       <OnAirStrip />

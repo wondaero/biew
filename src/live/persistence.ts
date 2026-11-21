@@ -10,7 +10,7 @@ const keyOf = (code: string) => `${KEY}:${code}`
 
 /**
  * 예전 버전이 남긴 브라우저 저장값 정리(시작할 때 한 번, 여러 번 돌아도 무해).
- *  - biew.live.v1 (채널 번호 없는 옛 단일 콘티) · biew.room.v1 (옛 폰 공유 코드) · biew.hosted.* (옛 호스트 표시)
+ *  - biew.live.v1 (채널 번호 없는 옛 단일 선곡) · biew.room.v1 (옛 폰 공유 코드) · biew.hosted.* (옛 호스트 표시)
  */
 export function cleanupLegacyStorage() {
   try {
@@ -107,7 +107,7 @@ export function setHostDirty(code: string, dirty: boolean) {
 export function isHostDirty(code: string): boolean {
   try { return localStorage.getItem(DIRTY + code) === '1' } catch { return false }
 }
-/** 이 기기에서 채널 흔적(호스트 기록 + 콘티) 지우기. 서버의 채널은 그대로 */
+/** 이 기기에서 채널 흔적(호스트 기록 + 선곡) 지우기. 서버의 채널은 그대로 */
 export function forgetChannelLocal(code: string) {
   try { localStorage.removeItem(HOST + code); localStorage.removeItem(DIRTY + code); localStorage.removeItem(keyOf(code)) } catch { /* ignore */ }
 }

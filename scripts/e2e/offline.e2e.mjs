@@ -81,13 +81,13 @@ try {
   check('오프라인에서 /local 직접 열기', await until(() => page.$('aside.side .set-wrap')))
   check('오프라인 모드: 채널 버튼 없음', !(await page.$('button.share')))
 
-  // ── 4. 오프라인 모드 송출: 저장된 곡 검색 → 콘티 → 출력 창 ──
+  // ── 4. 오프라인 모드 송출: 저장된 곡 검색 → 선곡 → 출력 창 ──
   // 곡 검색 = 팝업: '/' 로 열고 → 입력 → Enter 추가 → Esc(검색어 지움) → Esc(닫기)
   await page.keyboard.press('/')
   await page.waitForSelector('.srch input.search', { timeout: 5000 })
   await page.type('input.search', `${tag} Alpha`)
   await page.keyboard.press('Enter')
-  check('저장된 곡으로 콘티 추가(검색 팝업에 추가 알림)', await until(async () => (await page.$$('.song')).length === 1) && !!(await page.$('.srch .added')))
+  check('저장된 곡으로 선곡 추가(검색 팝업에 추가 알림)', await until(async () => (await page.$$('.song')).length === 1) && !!(await page.$('.srch .added')))
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape')
   check('Esc 두 번 → 검색 팝업 닫힘', await until(async () => !(await page.$('.srch'))))
   await page.locator('.song .card').click()
@@ -130,7 +130,7 @@ try {
   await page.click('.dialog footer button.primary')
   await page.waitForSelector('.dialog', { hidden: true, timeout: 5000 })
   check('오프라인 저장 → 업로드 배지 3', await until(async () => (await text('.srch .sync .upload .cnt')) === '3'))
-  check('콘티의 곡에 "↻ 최신" 표시(오프라인 수정 반영)', !!(await page.$('.setlist button.upd')))
+  check('선곡의 곡에 "↻ 최신" 표시(오프라인 수정 반영)', !!(await page.$('.setlist button.upd')))
 
   // ── 6. 온라인 복귀 + 그 사이 서버에서 Beta 가 바뀜(충돌) ──
   await admin.from('songs').update({ slides: ['Sed do beta one SERVER', 'Sed do beta two'] }).eq('id', idB)

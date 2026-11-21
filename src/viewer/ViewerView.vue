@@ -118,7 +118,7 @@ async function enter(password?: string) {
 
 /** 상태가 아직 없을 때: 연결됐는데 응답이 없으면 호스트 PC 가 꺼져 있거나 오프라인인 것 */
 const waitText = computed(() =>
-  status.value === 'error' ? '연결할 수 없습니다.' : status.value === 'live' ? '송출 대기 중 — 아직 콘티가 없습니다' : '불러오는 중…',
+  status.value === 'error' ? '연결할 수 없습니다.' : status.value === 'live' ? '송출 대기 중 — 아직 선곡이 없습니다' : '불러오는 중…',
 )
 
 // 컨트롤러가 FREEZE 중이면 고정된 화면을 따라간다(실제 송출과 같게)

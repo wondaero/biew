@@ -9,6 +9,7 @@ import SongEditor from '../SongEditor.vue'
 import UploadDialog from '../UploadDialog.vue'
 import DownloadDialog from '../DownloadDialog.vue'
 import { dbNotice } from '@/library/db'
+import { canAutoFocus } from '@/lib/device'
 
 const lib = useLibrary()
 const live = useLive()
@@ -18,17 +19,17 @@ const input = ref<HTMLInputElement>()
 const hits = computed(() => lib.search(q.value, 60))
 watch(q, () => { sel.value = 0 })
 
-/** 추가 알림 — 곡 검색이 팝업이라 뒤의 콘티가 안 보이므로 '몇 번째로 들어갔는지' 잠깐 보여 준다 */
+/** 추가 알림 — 곡 검색이 팝업이라 뒤의 선곡이 안 보이므로 '몇 번째로 들어갔는지' 잠깐 보여 준다 */
 const added = ref<string | null>(null)
 let addedTimer: number | undefined
 function add(i = sel.value) {
   const h = hits.value[i]
   if (!h) return
   live.setlist.add(h.song)
-  added.value = `"${h.song.title}" — 콘티 ${live.state.setlist.length}번째로 추가`
+  added.value = `"${h.song.title}" — 선곡 ${live.state.setlist.length}번째로 추가`
   clearTimeout(addedTimer)
   addedTimer = window.setTimeout(() => { added.value = null }, 2500)
-  input.value?.select()
+  if (canAutoFocus()) input.value?.select() // PC: 바로 다음 곡 검색. 폰: 키패드가 올라오지 않게 그대로
 }
 /** v-model 은 한글 조합이 끝날 때까지 값을 갱신하지 않아("안녕" 입력 중에도 "안"으로 검색) — 입력마다 바로 반영 */
 function onInput(e: Event) {
@@ -72,7 +73,7 @@ window.addEventListener('online', () => (online.value = true))
 window.addEventListener('offline', () => (online.value = false))
 
 defineExpose({
-  focus: () => input.value?.focus(),
+  focus: () => { if (canAutoFocus()) input.value?.focus() },
   /** 새 곡 편집기 바로 열기(사이드바 "+ 새 곡") */
   newSong: () => { editing.value = null },
   /** 안에 편집기·서버 올리기 창이 떠 있는지(그땐 바깥 검색 팝업이 Esc 로 닫히면 안 됨) */
@@ -126,7 +127,7 @@ defineExpose({
         <span v-if="lib.localKind.value.get(h.song.id)" class="badge pc" title="PC 에만 있는 변경(아직 서버에 안 올라감)">PC</span>
         <span v-if="!h.inTitle" class="badge">가사</span>
         <span class="n">{{ h.song.slides.length }}</span>
-        <button class="add" title="콘티에 추가 (Enter)" @click.stop="add(i)">+ 콘티</button>
+        <button class="add" title="선곡에 추가 (Enter)" @click.stop="add(i)">+ 선곡</button>
       </li>
       <li v-if="q && !hits.length" class="empty">결과 없음</li>
     </ol>
@@ -141,7 +142,7 @@ defineExpose({
 header .h { display: flex; align-items: center; gap: 6px; }
 header h2 { margin: 0; font-size: 14px; flex: 1; }
 .new { font-size: 14px; white-space: nowrap; }
-/* 곡 누르기 = 보기·수정(편집기), 콘티 추가는 오른쪽 버튼으로만(사용자 결정 2026-11-19 — 잘못 눌러 콘티에 들어가지 않게). Enter 는 그대로 추가(키보드 빠른 길) */
+/* 곡 누르기 = 보기·수정(편집기), 선곡 추가는 오른쪽 버튼으로만(사용자 결정 2026-11-19 — 잘못 눌러 선곡에 들어가지 않게). Enter 는 그대로 추가(키보드 빠른 길) */
 .add { font-size: 14px; white-space: nowrap; }
 header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .sync { display: flex; gap: 6px; margin-top: 6px; }

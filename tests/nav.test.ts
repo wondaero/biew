@@ -25,7 +25,7 @@ describe('nav', () => {
     expect(nav.nth(at(0, 0), 3)).toEqual({ itemIndex: 0, slideIndex: 2 })
     expect(nav.nth(at(0, 0), 4)).toBeNull()
   })
-  it('빈 콘티', () => {
+  it('빈 선곡', () => {
     expect(nav.next({ setlist: [], itemIndex: 0, slideIndex: 0 })).toBeNull()
     expect(nav.currentText({ setlist: [], itemIndex: 0, slideIndex: 0 })).toBeNull()
   })

@@ -1,6 +1,6 @@
 // 컨트롤러 화면 스크린샷(디자인 비교용, 검사 아님): node scripts/e2e/shot-control.mjs <이름>
 //  → out/e2e/<이름>-desk.png(즉시 모드) · -desk-pvw.png(미리보기 후 송출 + BLANK + FREEZE) · -mobile.png
-// Lorem 콘티를 로컬 송출(localStorage biew.live.v1:LOCAL)에 심어 찍는다. 서버·계정 불필요.
+// Lorem 선곡을 로컬 송출(localStorage biew.live.v1:LOCAL)에 심어 찍는다. 서버·계정 불필요.
 import puppeteer from 'puppeteer-core'
 import path from 'node:path'
 import { CHROME, OUT, ensureServer } from './_lib.mjs'

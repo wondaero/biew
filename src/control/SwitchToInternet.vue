@@ -2,8 +2,8 @@
 /**
  * 로컬 송출 → 인터넷 송출 전환(반대 방향은 없음 — 인터넷 송출은 끊겨도 PC 송출이 계속되므로).
  * 순서: 채널 이름·비밀번호 → 로그인 → 채널 생성 + 이 PC 를 호스트로 등록 →
- *       지금 송출(콘티·위치·FREEZE·출력 설정)을 그대로 옮김 → 출력 창은 화면을 유지한 채 새 채널로 갈아탐 → 📡 창 열기.
- * 로컬 송출의 콘티는 옮겨 갔으므로 비운다(출력 설정은 유지).
+ *       지금 송출(선곡·위치·FREEZE·출력 설정)을 그대로 옮김 → 출력 창은 화면을 유지한 채 새 채널로 갈아탐 → 📡 창 열기.
+ * 로컬 송출의 선곡은 옮겨 갔으므로 비운다(출력 설정은 유지).
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
@@ -79,7 +79,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <span class="spacer" />
         <button v-if="step !== 'working'" class="x" title="닫기" @click="emit('close')">✕</button>
       </header>
-      <p class="muted">지금 송출(콘티·위치·FREEZE·출력 설정)을 그대로 새 인터넷 송출 채널로 옮깁니다. 프로젝터 화면은 끊기지 않습니다. 옮긴 뒤 폰 리모컨·보기를 쓸 수 있습니다.</p>
+      <p class="muted">지금 송출(선곡·위치·FREEZE·출력 설정)을 그대로 새 인터넷 송출 채널로 옮깁니다. 프로젝터 화면은 끊기지 않습니다. 옮긴 뒤 폰 리모컨·보기를 쓸 수 있습니다.</p>
 
       <form v-if="step === 'form'" class="form" @submit.prevent="next">
         <label>채널 이름<input v-model="title" maxlength="60" /></label>

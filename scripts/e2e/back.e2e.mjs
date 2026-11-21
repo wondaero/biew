@@ -1,5 +1,5 @@
 // 뒤로가기 = 팝업 닫기 E2E(모바일 요청): 바텀시트·곡 편집기(겹침)·저장 안 한 변경 확인·버튼으로 닫은 뒤의 뒤로가기·PC 단축키 도움말
-// 서버·계정 불필요(로컬 송출, Lorem 콘티).
+// 서버·계정 불필요(로컬 송출, Lorem 선곡).
 import puppeteer from 'puppeteer-core'
 import { CHROME, ensureServer } from './_lib.mjs'
 const server = await ensureServer('dev', 5179)
@@ -33,8 +33,8 @@ try {
   m.on('dialog', (d) => { dialog = d })
   const sheetOpen = () => m.$('.set-wrap.open')
   const searchOpen = () => m.$('.srch')
-  await m.$$eval('.dock button', (bs) => bs[1].click()) // 콘티
-  check('폰: 콘티 시트 열림', await until(sheetOpen))
+  await m.$$eval('.dock button', (bs) => bs[1].click()) // 선곡
+  check('폰: 선곡 시트 열림', await until(sheetOpen))
   await back(m)
   check('뒤로가기 → 시트만 닫힘(페이지 그대로)', await until(async () => !(await sheetOpen())) && (await path(m)) === '/local' && !!(await m.$('.control')))
 
@@ -123,7 +123,7 @@ try {
   await back(d)
   check('PC: 뒤로가기 → 도움말만 닫힘', await until(async () => !(await d.$('.help'))) && (await path(d)) === '/local')
   // ── PC: 출력 설정 = 팝업 ──
-  check('PC: 2단 — 사이드바(송출 화면·설정 한 줄·곡 검색·콘티), 오른쪽 패널 없음, 위 줄에 출력 설정 버튼 없음', !(await d.$('aside.right')) && !!(await d.$('aside.side .monitors')) && !!(await d.$('aside.side .style-sum')) && !!(await d.$('aside.side .side-actions .find')) && !!(await d.$('aside.side .set-wrap .setlist')) && !(await d.$$eval('.top button', (bs) => bs.some((b) => b.textContent?.includes('출력 설정')))))
+  check('PC: 2단 — 사이드바(송출 화면·설정 한 줄·곡 검색·선곡), 오른쪽 패널 없음, 위 줄에 출력 설정 버튼 없음', !(await d.$('aside.right')) && !!(await d.$('aside.side .monitors')) && !!(await d.$('aside.side .style-sum')) && !!(await d.$('aside.side .side-actions .find')) && !!(await d.$('aside.side .set-wrap .setlist')) && !(await d.$$eval('.top button', (bs) => bs.some((b) => b.textContent?.includes('출력 설정')))))
   const openStyle = () => d.click('.style-sum button')
   const live = () => d.evaluate(() => JSON.parse(localStorage.getItem('biew.live.v1:LOCAL') ?? '{}'))
   await openStyle()

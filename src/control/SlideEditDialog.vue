@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * 슬라이드 한 장 고치기(콘티 카드의 ✎, 사용자 결정 2026-11-18). 예배 중 오타를 바로 고치는 용도.
- *  - 고치는 동안 송출은 그대로. [저장]을 누르면 콘티가 바뀌고, 송출 중인 장이면 바로 새 글이 나간다(FREEZE 중이면 풀 때).
+ * 슬라이드 한 장 고치기(선곡 카드의 ✎, 사용자 결정 2026-11-18). 예배 중 오타를 바로 고치는 용도.
+ *  - 고치는 동안 송출은 그대로. [저장]을 누르면 선곡이 바뀌고, 송출 중인 장이면 바로 새 글이 나간다(FREEZE 중이면 풀 때).
  *  - '곡 원본에도 저장'(기본 켜짐): 원본의 그 글만 바꿔 곡 저장 규칙대로(온라인+로그인 = 서버, 아니면 PC). 실제 저장은 부모(SlideGrid).
  *  - 같은 글이 여러 장(후렴 반복)이면 '같은 글 N장 모두'(기본 켜짐).
  *  - 빈 줄 = 그 자리에서 장 나누기(2026-11-19 — 현장에서 한 장을 둘로 쪼개기·뒤에 장 추가). 나뉜 장마다 미리보기.
@@ -16,6 +16,7 @@ import { usePauseHotkeys } from './usePauseHotkeys'
 import { parseSlideEdit, sameTextIndexes } from './slideEdit'
 import SlideRender from '@/components/SlideRender.vue'
 import OnAirStrip from './OnAirStrip.vue'
+import { canAutoFocus } from '@/lib/device'
 
 const props = defineProps<{ itemKey: string; slideIndex: number }>()
 const emit = defineEmits<{ close: []; save: [p: { pieces: string[]; indexes: number[]; toSong: boolean; all: boolean }] }>()
@@ -60,7 +61,7 @@ function onKey(e: KeyboardEvent) {
 }
 onMounted(() => {
   window.addEventListener('keydown', onKey)
-  void nextTick(() => { box.value?.focus(); box.value?.setSelectionRange(0, 0) })
+  if (canAutoFocus()) void nextTick(() => { box.value?.focus(); box.value?.setSelectionRange(0, 0) })
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
@@ -88,7 +89,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </div>
         </div>
         <label v-if="same.length > 1" class="chk"><input v-model="sameAll" type="checkbox" /> 이 곡에서 같은 글 {{ same.length }}장 모두 고치기</label>
-        <label class="chk"><input v-model="toSong" type="checkbox" /> 곡 원본에도 저장 <small>(끄면 오늘 콘티만)</small></label>
+        <label class="chk"><input v-model="toSong" type="checkbox" /> 곡 원본에도 저장 <small>(끄면 오늘 선곡만)</small></label>
         <p v-if="onAirNote" class="air">{{ onAirNote }}</p>
       </div>
       <footer>

@@ -6,7 +6,7 @@
  *  - host   : 이 PC 의 컨트롤러. 변경은 commit() — 화면을 먼저 바꾸고, 인터넷 송출이면 publish 로 서버에 올린다.
  *             리모컨이 서버 상태를 바꾸면 adoptState() 로 따라간다(로컬 송출이면 서버 없음).
  *  - remote : 폰 리모컨. 상태는 서버가 준 것을 비추기만 하고(commit 불가),
- *             actions 는 명령(Command)으로 바뀌어 서버(remote_command)로 간다. 곡/콘티/스타일 변경 권한 없음.
+ *             actions 는 명령(Command)으로 바뀌어 서버(remote_command)로 간다. 곡/선곡/스타일 변경 권한 없음.
  */
 import { reactive, ref, computed, readonly } from 'vue'
 import { emptyLiveState, nextVersion, type LiveState, type OutputStyle, type SetlistItem } from '@shared/types'
@@ -146,7 +146,7 @@ const actions = {
   /** FREEZE 풀기: 컨트롤러의 현재 위치가 바로 송출된다. 실수 방지로 단축키 없이 버튼으로만 */
   unfreeze: () => { if (state.frozen) commit((s) => { s.frozen = null }) },
   /**
-   * 송출 종료(로컬 송출): 콘티·위치·BLANK·FREEZE 를 비운다. 출력 설정(폰트·여백 등)은 유지.
+   * 송출 종료(로컬 송출): 선곡·위치·BLANK·FREEZE 를 비운다. 출력 설정(폰트·여백 등)은 유지.
    * 출력 창은 닫지 않고 검은 화면이 된다 — 전체화면 출력 창을 닫으면 프로젝터에 PC 바탕화면이 보이므로.
    * 실수로 닫거나 새로고침한 경우는 이어지고(저장됨), 이 버튼을 눌렀을 때만 끝난다.
    */
@@ -158,12 +158,12 @@ const actions = {
   pick: (c: Cursor) => (pvwMode.value ? (preview.value = c) : actions.go(c)),
 }
 
-// ── 콘티 (호스트 전용: commit 이 리모컨에선 동작하지 않는다) ─────────────
+// ── 선곡 (호스트 전용: commit 이 리모컨에선 동작하지 않는다) ─────────────
 function liveKey(): string | undefined {
   return state.setlist[state.itemIndex]?.key
 }
 
-/** 콘티 변경 후 송출 중이던 곡을 key 로 다시 찾아 itemIndex 보정 */
+/** 선곡 변경 후 송출 중이던 곡을 key 로 다시 찾아 itemIndex 보정 */
 function setSetlist(list: SetlistItem[]) {
   const key = liveKey()
   const previewKey = preview.value ? state.setlist[preview.value.itemIndex]?.key : undefined
@@ -192,7 +192,7 @@ const setlist = {
     setSetlist(state.setlist.filter((x) => x.key !== key))
   },
   replace: setSetlist,
-  /** 콘티 항목을 라이브러리의 최신 가사로 교체. 송출 중이면 슬라이드 번호를 범위 안으로 보정 */
+  /** 선곡 항목을 라이브러리의 최신 가사로 교체. 송출 중이면 슬라이드 번호를 범위 안으로 보정 */
   refresh(key: string, song: { title: string; slides: string[] }) {
     const i = state.setlist.findIndex((x) => x.key === key)
     if (i < 0) return

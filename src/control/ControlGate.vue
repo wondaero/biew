@@ -141,7 +141,7 @@ onBeforeUnmount(() => { ticket++; teardown() })
     <div v-else-if="phase === 'choose'" class="card choose">
       <h1>{{ title || '채널' }}</h1>
       <p>이 채널을 만든 계정으로 로그인돼 있습니다. 이 기기를 어떻게 쓸까요?</p>
-      <button class="primary" @click="chooseHost">이 기기를 호스트로<br /><small>송출 PC — 콘티·곡·출력 설정 전체 조작, 출력 창</small></button>
+      <button class="primary" @click="chooseHost">이 기기를 호스트로<br /><small>송출 PC — 선곡·곡·출력 설정 전체 조작, 출력 창</small></button>
       <button @click="chooseRemote">리모컨으로<br /><small>이동·BLANK·점프만 (컨트롤 비밀번호)</small></button>
       <p><small>송출하는 PC 가 따로 있다면 리모컨을 고르세요. 호스트로 등록한 기기는 홈 "이 기기의 채널"에서 지울 수 있습니다.</small></p>
       <router-link to="/">← 처음으로</router-link>

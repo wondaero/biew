@@ -153,7 +153,7 @@ try {
   const r2 = await rc({ cmd: 'next' })
   check('리모컨 ▶ → 빈 곡 건너뛰고 다음 곡', r2?.status === 'ok' && r2.state.itemIndex === 2 && r2.state.slideIndex === 0)
   check('범위 밖 점프는 무시(noop)', (await rc({ cmd: 'go', itemIndex: 1, slideIndex: 0 }))?.status === 'noop')
-  check('허용 안 된 명령(freeze·콘티 교체)은 무시', (await rc({ cmd: 'freeze' }))?.status === 'noop' && (await rc({ cmd: 'replace', setlist: [] }))?.status === 'noop')
+  check('허용 안 된 명령(freeze·선곡 교체)은 무시', (await rc({ cmd: 'freeze' }))?.status === 'noop' && (await rc({ cmd: 'replace', setlist: [] }))?.status === 'noop')
   check('보기 토큰으로는 리모컨 명령 불가', (await rc({ cmd: 'next' }, vok?.token ?? 'x'))?.status === 'token_rejected')
   // 변경 알림은 변경한 클라이언트가 보낸다(DB 발 공개 알림은 전달되지 않음 — 20261118010000 참고)
   check('호스트는 리모컨이 바꾼 상태를 읽음', ((await hj(hostTok))?.state as LiveState)?.itemIndex === 2)

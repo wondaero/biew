@@ -10,7 +10,7 @@ export interface Song {
 }
 
 export interface SetlistItem {
-  /** 콘티 항목 고유키 — 같은 곡을 두 번 넣어도 구분 */
+  /** 선곡 항목 고유키 — 같은 곡을 두 번 넣어도 구분 */
   key: string
   songId: string
   title: string
@@ -44,7 +44,7 @@ export interface OutputStyle {
 
 /**
  * FREEZE: 걸어 둔 순간의 송출 화면. 컨트롤러는 계속 움직여도 출력·뷰어는 이걸 유지한다.
- * 텍스트까지 스냅샷으로 들고 있는 이유: freeze 중 가사를 고쳐 콘티를 갱신해도 송출이 바뀌면 안 되므로.
+ * 텍스트까지 스냅샷으로 들고 있는 이유: freeze 중 가사를 고쳐 선곡을 갱신해도 송출이 바뀌면 안 되므로.
  */
 export interface Frozen {
   itemIndex: number

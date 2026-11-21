@@ -1,5 +1,5 @@
-// 슬라이드 한 장 고치기(카드 ✎) E2E — 로컬 송출, Lorem 콘티 + PC 새 곡(IndexedDB pending) 하나. 서버·계정 안 씀.
-// 콘티 즉시 반영·송출 중 장 반영·같은 글 모두·곡 원본(그 글만)·오늘만·빈 줄 = 장 나누기(송출 위치 따라감)·Esc/뒤로가기·단축키 막힘·폰(280px) 넘침.
+// 슬라이드 한 장 고치기(카드 ✎) E2E — 로컬 송출, Lorem 선곡 + PC 새 곡(IndexedDB pending) 하나. 서버·계정 안 씀.
+// 선곡 즉시 반영·송출 중 장 반영·같은 글 모두·곡 원본(그 글만)·오늘만·빈 줄 = 장 나누기(송출 위치 따라감)·Esc/뒤로가기·단축키 막힘·폰(280px) 넘침.
 import puppeteer from 'puppeteer-core'
 import path from 'node:path'
 import { CHROME, OUT, ensureServer } from './_lib.mjs'
@@ -66,8 +66,8 @@ try {
   await sleep(500)
   let s = await state(p)
   check('Ctrl+Enter 저장 → 창 닫힘', !(await p.$('.se')))
-  check('콘티: 같은 글 2장 모두 고쳐짐(줄 끝 공백 정리)', s.setlist[0].slides[1] === 'Sed do eiusmod\ntempor FIXED' && s.setlist[0].slides[3] === s.setlist[0].slides[1])
-  check('콘티: 다른 장·장 수·위치 그대로', s.setlist[0].slides.length === 4 && s.setlist[0].slides[0] === SONG[0] && s.itemIndex === 0 && s.slideIndex === 1 && !s.blank)
+  check('선곡: 같은 글 2장 모두 고쳐짐(줄 끝 공백 정리)', s.setlist[0].slides[1] === 'Sed do eiusmod\ntempor FIXED' && s.setlist[0].slides[3] === s.setlist[0].slides[1])
+  check('선곡: 다른 장·장 수·위치 그대로', s.setlist[0].slides.length === 4 && s.setlist[0].slides[0] === SONG[0] && s.itemIndex === 0 && s.slideIndex === 1 && !s.blank)
   const orig = await pendingSong(p)
   check('곡 원본: 그 글만 바뀜', JSON.stringify(orig) === JSON.stringify(s.setlist[0].slides))
   check('알림 표시', !!(await p.$('.se-notice')))
@@ -82,17 +82,17 @@ try {
   await p.click('.se footer .primary')
   await sleep(400)
   s = await state(p)
-  check('오늘만: 콘티는 바뀜', s.setlist[0].slides[0] === 'Lorem ipsum\ndolor TODAY')
+  check('오늘만: 선곡은 바뀜', s.setlist[0].slides[0] === 'Lorem ipsum\ndolor TODAY')
   check('오늘만: 곡 원본은 그대로', (await pendingSong(p))[0] === SONG[0])
   check('오늘만: ↻ 최신 버튼 생김(원본과 다름)', !!(await p.$('.set-wrap .upd')))
 
-  // 원본 없는 곡 → 콘티만 + 경고
+  // 원본 없는 곡 → 선곡만 + 경고
   await cellEdit(p, 1, 0)
   await p.waitForSelector('.se')
   await setText(p, 'Lorem\nipsum X')
   await p.click('.se footer .primary')
   await sleep(400)
-  check('원본 없는 곡: 콘티는 고침 + 경고 알림', (await state(p)).setlist[1].slides[0] === 'Lorem\nipsum X' && !!(await p.$('.se-notice.warn')))
+  check('원본 없는 곡: 선곡은 고침 + 경고 알림', (await state(p)).setlist[1].slides[0] === 'Lorem\nipsum X' && !!(await p.$('.se-notice.warn')))
 
   // 고친 뒤 Esc → 확인창(accept) → 닫힘, 변경 없음
   const v = (await state(p)).version

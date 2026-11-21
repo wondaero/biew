@@ -24,3 +24,10 @@ function currentDevice(): DeviceInfo {
   const n = navigator as Navigator & { userAgentData?: { mobile?: boolean; platform?: string } }
   return { userAgent: n.userAgent, maxTouchPoints: n.maxTouchPoints ?? 0, uaData: n.userAgentData }
 }
+
+/**
+ * 입력칸에 스스로 포커스를 줘도 되는가. 폰·태블릿에선 안 된다 — 화면 키패드가 올라와 목록·미리보기를 가린다
+ * (사용자 요청 2026-11-21: 곡 [+ 선곡] 할 때마다 키패드가 열림). 곡 검색·편집기 등 '쓰다가 또 쓰는' 곳에 쓴다.
+ * 비밀번호·로그인 화면은 입력이 유일한 할 일이라 예외(그대로 포커스).
+ */
+export const canAutoFocus = (): boolean => !isMobileOS()

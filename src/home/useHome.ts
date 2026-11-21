@@ -47,14 +47,14 @@ export function useHome() {
   const device = ref(loadDevice())
   const hostCodes = computed(() => new Set(device.value.filter((d) => d.role === 'host').map((d) => d.code)))
   const openEntry = (e: DeviceEntry) => router.push(e.role === 'view' ? api.viewPath(e.code) : api.controlPath(e.code))
-  /** 확인 없이 이 기기 기록 하나 지우기(호스트 = 콘티·호스트 권한, 리모컨·보기 = 방문 기록·입장 토큰) */
+  /** 확인 없이 이 기기 기록 하나 지우기(호스트 = 선곡·호스트 권한, 리모컨·보기 = 방문 기록·입장 토큰) */
   function forgetSilently(e: Pick<DeviceEntry, 'code' | 'role'>) {
     if (e.role === 'host') forgetChannelLocal(e.code)
     else { forgetVisit(e.code, e.role); api.forgetToken(e.role, e.code) }
   }
   function forget(e: DeviceEntry) {
     const msg = e.role === 'host'
-      ? `"${e.title}" 을(를) 이 기기 목록에서 지울까요?\n이 PC 의 콘티와 호스트 권한이 지워집니다. 서버의 채널은 그대로입니다.`
+      ? `"${e.title}" 을(를) 이 기기 목록에서 지울까요?\n이 PC 의 선곡과 호스트 권한이 지워집니다. 서버의 채널은 그대로입니다.`
       : `"${e.title}" 을(를) 이 기기 목록에서 지울까요?\n다음에 들어갈 때 비밀번호를 다시 입력해야 할 수 있습니다.`
     if (!confirm(msg)) return
     forgetSilently(e)
@@ -65,7 +65,7 @@ export function useHome() {
     const roles = device.value.filter((d) => d.code === code)
     if (!roles.length) return
     const host = roles.some((r) => r.role === 'host')
-    if (!confirm(`"${title}" 을(를) 이 기기 목록에서 지울까요?\n` + (host ? '이 PC 의 콘티와 호스트 권한이 지워집니다. ' : '다음에 들어갈 때 비밀번호를 다시 입력해야 할 수 있습니다. ') + '서버의 채널은 그대로입니다.')) return
+    if (!confirm(`"${title}" 을(를) 이 기기 목록에서 지울까요?\n` + (host ? '이 PC 의 선곡과 호스트 권한이 지워집니다. ' : '다음에 들어갈 때 비밀번호를 다시 입력해야 할 수 있습니다. ') + '서버의 채널은 그대로입니다.')) return
     roles.forEach(forgetSilently)
     device.value = loadDevice()
   }
@@ -126,7 +126,7 @@ export function useHome() {
     if (!confirm(msg)) return
     const err = await api.deleteChannel(r.code)
     if (err) { delErr.value = err; return }
-    forgetChannelLocal(r.code) // 이 기기에 남은 호스트 기록·콘티도
+    forgetChannelLocal(r.code) // 이 기기에 남은 호스트 기록·선곡도
     device.value = loadDevice()
     await Promise.all([loadServer(), loadPublic()])
   }

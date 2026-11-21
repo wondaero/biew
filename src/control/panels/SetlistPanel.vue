@@ -9,7 +9,7 @@ import { useLibrary } from '@/library/library'
 const live = useLive()
 const lib = useLibrary()
 
-/** 라이브러리의 곡이 콘티에 넣은 뒤 수정됐는지 */
+/** 라이브러리의 곡이 선곡에 넣은 뒤 수정됐는지 */
 function latest(it: SetlistItem) {
   const s = lib.byId.value.get(it.songId)
   if (!s) return null
@@ -29,18 +29,18 @@ const list = computed<SetlistItem[]>({
 })
 
 function remove(it: SetlistItem, i: number) {
-  if (i === live.state.itemIndex && !confirm(`송출 중인 "${it.title}"을(를) 콘티에서 뺄까요? 자막이 내려갑니다.`)) return
+  if (i === live.state.itemIndex && !confirm(`송출 중인 "${it.title}"을(를) 선곡에서 뺄까요? 자막이 내려갑니다.`)) return
   live.setlist.remove(it.key)
 }
 function clear() {
-  if (confirm('콘티를 모두 비울까요?')) live.setlist.clear()
+  if (confirm('선곡을 모두 비울까요?')) live.setlist.clear()
 }
 </script>
 
 <template>
   <section class="setlist">
     <header>
-      <h2>콘티 <small>{{ list.length }}곡</small></h2>
+      <h2>선곡 <small>{{ list.length }}곡</small></h2>
       <button v-if="list.length" class="ghost danger-line" @click="clear">비우기</button>
     </header>
     <VueDraggable v-model="list" :animation="150" handle=".grip" tag="ol" class="items">
@@ -55,7 +55,7 @@ function clear() {
         <span class="title">{{ it.title }}</span>
         <button v-if="latest(it)" class="upd" title="라이브러리에서 수정된 최신 가사로 갱신" @click.stop="refresh(it)">↻ 최신</button>
         <span class="n">{{ it.slides.length }}</span>
-        <button class="x" title="콘티에서 빼기" @click.stop="remove(it, i)">✕</button>
+        <button class="x" title="선곡에서 빼기" @click.stop="remove(it, i)">✕</button>
       </li>
     </VueDraggable>
     <p v-if="!list.length" class="empty">검색 결과를 클릭(또는 Enter)해서 곡을 추가하세요.</p>

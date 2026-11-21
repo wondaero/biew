@@ -185,7 +185,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
             <button class="ctl" :class="{ primary: isHost(c) }" :title="!isHost(c) && c.mine ? '이 PC 를 이 채널의 송출 PC(호스트)로 등록하고 엽니다' : undefined" @click="openCtl(c)">{{ ctlLabel(c) }}</button>
           </div>
           <div v-if="c.roles.length || (c.mine && session)" class="ch-more">
-            <button v-if="c.roles.length" class="link" title="이 PC 에 남은 기록(콘티·입장 정보)만 지웁니다. 서버의 채널은 그대로" @click="forgetAll(c.code, c.title)">이 PC 목록에서 지우기</button>
+            <button v-if="c.roles.length" class="link" title="이 PC 에 남은 기록(선곡·입장 정보)만 지웁니다. 서버의 채널은 그대로" @click="forgetAll(c.code, c.title)">이 PC 목록에서 지우기</button>
             <button v-if="c.mine && session" class="link del" title="서버에서 채널 삭제(되돌릴 수 없음)" @click="removeRow(c.mine!)">채널 삭제</button>
           </div>
         </li>

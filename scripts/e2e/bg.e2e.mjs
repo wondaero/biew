@@ -14,7 +14,7 @@ try {
   const c = await ctx.newPage()
   await c.setViewport({ width: 1400, height: 1000 })
   await c.goto(BASE + '/local', { waitUntil: 'networkidle0' })
-  // 예전 형식으로 저장된 콘티(배경 'green')
+  // 예전 형식으로 저장된 선곡(배경 'green')
   await c.evaluate(() => localStorage.setItem('biew.live.v1:LOCAL', JSON.stringify({
     version: Date.now(), origin: 'old', itemIndex: 0, slideIndex: 0, blank: false,
     style: { background: 'green' }, setlist: [{ key: 'k', songId: 'd', title: 'Lorem', slides: ['Lorem ipsum dolor\nsit amet'] }],

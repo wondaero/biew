@@ -14,6 +14,7 @@ import { useLive } from '@/live/liveStore'
 import SlideRender from '@/components/SlideRender.vue'
 import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
+import { canAutoFocus } from '@/lib/device'
 
 const props = defineProps<{ song: Song | null }>() // null = 새 곡
 const emit = defineEmits<{ close: []; saved: [song: Song] }>()
@@ -92,7 +93,7 @@ async function remove() {
   if (!props.song) return
   if (isLocalNewId(props.song.id)) {
     if (!confirm(`이 기기에만 있는 새 곡 "${props.song.title}"을(를) 지울까요?`)) return
-  } else if (!confirm(`"${props.song.title}"을(를) 이 기기에서 삭제할까요?\nDB 에서도 지우려면 [⬆ 업로드]에서 올리세요. 이미 콘티에 들어간 곡은 이번 예배 동안 그대로 남습니다.`)) return
+  } else if (!confirm(`"${props.song.title}"을(를) 이 기기에서 삭제할까요?\nDB 에서도 지우려면 [⬆ 업로드]에서 올리세요. 이미 선곡에 들어간 곡은 이번 예배 동안 그대로 남습니다.`)) return
   busy.value = true
   try {
     await deleteSong(props.song.id)
@@ -117,7 +118,7 @@ function onKey(e: KeyboardEvent) {
 usePauseHotkeys()
 onMounted(() => {
   window.addEventListener('keydown', onKey)
-  nextTick(() => titleInput.value?.focus())
+  if (canAutoFocus()) nextTick(() => titleInput.value?.focus())
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
