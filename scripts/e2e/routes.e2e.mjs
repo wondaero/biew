@@ -10,7 +10,9 @@ async function until(fn, ms = 6000) { const t0 = Date.now(); while (Date.now() -
 const b = await puppeteer.launch({ executablePath: CHROME, headless: true })
 try {
   const p = await (await b.createBrowserContext()).newPage()
-  await p.setViewport({ width: 390, height: 844 })
+  // 폰(아이폰 UA): 홈 맨 위에 번호 입력칸이 바로 있다(PC 는 [번호로 입장] 대화창 — 같은 입력칸)
+  await p.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1')
+  await p.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true })
   const at = () => p.evaluate(() => location.pathname + location.search)
   const go = (u) => p.goto(BASE + u, { waitUntil: 'networkidle0' })
   // 존재하지 않는 숫자 채널(000000 은 생성될 확률 100만분의 1 — 그래도 '보기 화면이 뜨는지'만 본다)
@@ -32,11 +34,11 @@ try {
   await go('/')
   check('번호 입력칸 = 숫자 키패드', (await p.$eval('input.code', (e) => e.inputMode)) === 'numeric')
   await p.type('input.code', '123 456')
-  await p.$$eval('button', (bs) => bs.find((x) => x.textContent?.trim() === '보기')?.click())
+  await p.click('form.join-inline button[type=submit]') // 보기
   check('홈 번호 입력 → /123456', await until(async () => (await at()) === '/123456'), await at())
   await go('/')
   await p.type('input.code', '123456')
-  await p.$$eval('button', (bs) => bs.find((x) => x.textContent?.includes('컨트롤'))?.click())
+  await p.$$eval('form.join-inline button', (bs) => bs.find((x) => x.textContent?.includes('컨트롤'))?.click())
   check('홈 번호 입력 → /123456/control', await until(async () => (await at()) === '/123456/control'), await at())
 } catch (e) { fail++; console.error('✖ 중단:', e.message) } finally {
   await b.close()

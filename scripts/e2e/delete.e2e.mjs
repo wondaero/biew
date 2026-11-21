@@ -44,10 +44,8 @@ try {
     await p.type('.login-dlg input[name=password]', u.password)
     await p.click('.login-dlg form.login button')
   }
-  // 내 계정의 채널 글자: 폰 화면 = '내 계정의 채널' 칸, 넓은 PC = '내 계정' 표시가 붙은 카드들
+  // 내 계정의 채널 글자 = '내 계정' 표시가 붙은 카드들
   const mineText = (p) => p.evaluate(() => {
-    const sec = [...document.querySelectorAll('section.card')].find((e) => e.querySelector('h2')?.textContent?.startsWith('내 계정의 채널'))
-    if (sec) return sec.textContent ?? ''
     return [...document.querySelectorAll('li.ch')].filter((li) => [...li.querySelectorAll('.tag')].some((t) => t.textContent === '내 계정')).map((li) => li.textContent).join(' | ')
   })
 
@@ -91,11 +89,11 @@ try {
     && !(await phone.evaluate((c) => !!localStorage.getItem('biew.host.' + c), A)))
   await phone.goto(BASE + '/', { waitUntil: 'networkidle0' })
   await until(async () => (await mineText(phone)).includes(`Lorem 삭제 ${tag}`))
-  await phone.$$eval('section.card li.mine', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('button.del')?.click(), `Lorem 삭제 ${tag}`)
+  await phone.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('.ch-more .link.del')?.click(), `Lorem 삭제 ${tag}`)
   check('삭제 확인창: 최근 사용 → "지금 예배 중일 수 있습니다" 경고', await until(async () => dialogMsg.includes('지금 예배 중일 수 있습니다')), dialogMsg.slice(0, 40))
   check('삭제 후 목록에서 사라짐', await until(async () => !(await mineText(phone)).includes(`Lorem 삭제 ${tag}`)))
   check('서버에서도 삭제됨', !(await admin.from('channels').select('code').eq('code', A).maybeSingle()).data)
-  check('폰은 호스트로 등록되지 않음(이 기기의 채널에 A 없음)', !(await phone.$$eval('section.card li', (lis, t) => lis.some((li) => li.textContent?.includes(t) && li.querySelector('.role')), `Lorem 삭제 ${tag}`)))
+  check('폰은 호스트로 등록되지 않음(이 기기의 채널에 A 없음)', !(await phone.$$eval('li.ch', (lis, t) => lis.some((li) => li.textContent?.includes(t) && li.querySelector('.role.host')), `Lorem 삭제 ${tag}`)))
 
   // ── 호스트 PC: 10초 확인 주기 안에 '삭제됨'(인터넷 끊김 아님), 이후에도 그대로 ──
   await host.bringToFront()

@@ -79,7 +79,7 @@ try {
   const h = await open()
   await h.goto(BASE + '/', { waitUntil: 'networkidle0' })
   await audit(h, 'home')
-  await h.click('main.home > header button.ghost') // 로그인 칸
+  await h.click('button.login-btn') // 로그인 칸
   await audit(h, 'home-login')
 
   // 로컬 송출

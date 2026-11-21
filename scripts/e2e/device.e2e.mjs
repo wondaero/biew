@@ -29,11 +29,6 @@ async function page(ua, w, h, touch = 0) {
   if (touch) await p.evaluateOnNewDocument((n) => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => n }), touch)
   return p
 }
-/** 홈 카드 제목 순서(h2 첫 글자들) */
-const cardOrder = (p) => p.$$eval('main.home section.card', (els) => els.filter((e) => getComputedStyle(e).display !== 'none')
-  .map((e) => ({ t: e.querySelector('h2')?.textContent?.trim() ?? e.querySelector('button')?.textContent?.trim() ?? '', y: e.getBoundingClientRect().top }))
-  .sort((a, b) => a.y - b.y).map((x) => x.t))
-
 try {
   userId = (await admin.auth.admin.createUser({ email, password, email_confirm: true })).data.user.id
   await owner.auth.signInWithPassword({ email, password })
@@ -43,18 +38,24 @@ try {
   // ── 홈: 폰(아이폰) ──
   const phone = await page(UA.iphone, 390, 844, 5)
   await phone.goto(BASE + '/', { waitUntil: 'networkidle0' })
-  const po = await cardOrder(phone)
-  check('폰 홈: 로컬 송출 카드 없음', !po.some((t) => t.startsWith('로컬 송출')), po.join(' | '))
-  check('폰 홈: 곡 다운로드 카드 없음', !po.some((t) => t.startsWith('곡')), po.join(' | '))
-  check('폰 홈: 맨 위 카드 = 채널 번호로 입장', po[0]?.startsWith('채널 번호로 입장'), po.join(' | '))
-  check('폰 홈: 채널 만들기 있음', po.some((t) => t.includes('채널 만들기')), po.join(' | '))
+  const ph = await phone.evaluate(() => ({
+    join: !!document.querySelector('form.join-inline'),
+    joinTop: (() => { const j = document.querySelector('form.join-inline'), t = document.querySelector('.hd-tools'); return !!j && !!t && j.getBoundingClientRect().top < t.getBoundingClientRect().top })(),
+    local: !!document.querySelector('button.local-open'),
+    songs: [...document.querySelectorAll('button')].some((b) => b.textContent?.includes('곡 다운로드')),
+    create: !!document.querySelector('button.create-open'),
+  }))
+  check('폰 홈: 로컬 송출 버튼 없음', !ph.local, JSON.stringify(ph))
+  check('폰 홈: 곡 다운로드 없음', !ph.songs, JSON.stringify(ph))
+  check('폰 홈: 맨 위 = 채널 번호로 입장', ph.join && ph.joinTop, JSON.stringify(ph))
+  check('폰 홈: 채널 만들기 있음', ph.create, JSON.stringify(ph))
 
   // ── 홈: 윈도우 PC(터치 노트북 — 터치 포인트 10) ──
   const pc = await page(UA.win, 1280, 900, 10)
   await pc.goto(BASE + '/', { waitUntil: 'networkidle0' })
   // PC 로 취급 → 넓은 PC 홈(HomeDesk): 로컬 송출 버튼·곡 다운로드 버튼 있음
   const desk = await pc.evaluate(() => ({
-    desk: !!document.querySelector('main.desk'),
+    desk: !document.querySelector('form.join-inline'),
     local: !!document.querySelector('button.local-open'),
     songs: [...document.querySelectorAll('button')].some((b) => b.textContent?.includes('곡 다운로드')),
   }))

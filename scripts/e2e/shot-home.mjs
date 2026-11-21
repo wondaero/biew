@@ -1,4 +1,4 @@
-// 홈 화면 스크린샷(확인용, 검사 없음): PC 빈 상태 · PC 채널 있음(Lorem 기록을 이 기기에 심음) · 폰. out/e2e/home-*.png
+// 홈 화면 스크린샷(확인용): PC 빈 상태 · PC 채널 있음(Lorem 기록을 이 기기에 심음) · 폰 390/280(가로 넘침 출력) · 좁은 PC 창. out/e2e/home-*.png
 import puppeteer from 'puppeteer-core'
 import { CHROME, OUT, ensureServer } from './_lib.mjs'
 const server = await ensureServer('dev', 5179)
@@ -25,10 +25,15 @@ try {
   await p.$$eval('button', (bs) => bs.find((x) => x.textContent?.trim() === '번호로 입장')?.click())
   await new Promise((r) => setTimeout(r, 300))
   await p.screenshot({ path: OUT + '/home-desk-join.png' })
-  const m = await ctx.newPage()
-  await m.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true })
-  await m.goto(BASE + '/', { waitUntil: 'networkidle0' })
-  await m.screenshot({ path: OUT + '/home-phone.png', fullPage: true })
+  // 폰(아이폰 UA): 같은 기록이 보이게 위 PC 탭과 같은 브라우저 컨텍스트(localStorage 공유)
+  for (const w of [390, 280]) {
+    const m = await ctx.newPage()
+    await m.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1')
+    await m.setViewport({ width: w, height: 844, isMobile: true, hasTouch: true })
+    await m.goto(BASE + '/', { waitUntil: 'networkidle0' })
+    await m.screenshot({ path: OUT + `/home-phone-${w}.png`, fullPage: true })
+    console.log(w, 'overflowX', await m.evaluate(() => document.documentElement.scrollWidth > innerWidth))
+  }
   const n = await ctx.newPage()
   await n.setViewport({ width: 900, height: 900 })
   await n.goto(BASE + '/', { waitUntil: 'networkidle0' })
