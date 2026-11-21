@@ -38,25 +38,30 @@ try {
   const page = async (w, h) => { const p = await (await browser.createBrowserContext()).newPage(); await p.setViewport({ width: w, height: h }); return p }
   const login = async (p, u, idOnly = false) => {
     await p.goto(BASE + '/', { waitUntil: 'networkidle0' })
-    await p.click('main.home > header button.ghost')
+    await p.click('button.login-btn')
     await p.waitForSelector('.login-dlg input[name=username]', { timeout: 5000 })
     await p.type('.login-dlg input[name=username]', idOnly ? u.email.split('@')[0] : u.email)
     await p.type('.login-dlg input[name=password]', u.password)
     await p.click('.login-dlg form.login button')
   }
-  const mineText = (p) => p.$$eval('section.card', (els) => els.find((e) => e.querySelector('h2')?.textContent?.startsWith('내 계정의 채널'))?.textContent ?? '')
+  // 내 계정의 채널 글자: 폰 화면 = '내 계정의 채널' 칸, 넓은 PC = '내 계정' 표시가 붙은 카드들
+  const mineText = (p) => p.evaluate(() => {
+    const sec = [...document.querySelectorAll('section.card')].find((e) => e.querySelector('h2')?.textContent?.startsWith('내 계정의 채널'))
+    if (sec) return sec.textContent ?? ''
+    return [...document.querySelectorAll('li.ch')].filter((li) => [...li.querySelectorAll('.tag')].some((t) => t.textContent === '내 계정')).map((li) => li.textContent).join(' | ')
+  })
 
   // ── 호스트 PC: 홈에서 로그인 → 내 계정의 채널에서 A 열기(이 PC 가 호스트) ──
   const host = await page(1400, 900)
-  check('홈(로그아웃 상태): 머리에 로그인 버튼', (await host.goto(BASE + '/', { waitUntil: 'networkidle0' }), (await host.$eval('main.home > header button.ghost', (b) => b.textContent?.trim())) === '로그인'))
+  check('홈(로그아웃 상태): 머리에 로그인 버튼', (await host.goto(BASE + '/', { waitUntil: 'networkidle0' }), (await host.$eval('button.login-btn', (b) => b.textContent?.trim())) === '로그인'))
   // 공용 로그인 팝업: 열고 Esc → 닫힘(취소)
-  await host.click('main.home > header button.ghost')
+  await host.click('button.login-btn')
   check('로그인 버튼 → 공용 로그인 팝업(이유 문구·아이디 칸에 커서)', !!(await host.waitForSelector('.login-dlg .reason', { timeout: 5000 }).catch(() => null))
     && (await host.evaluate(() => document.activeElement?.getAttribute('name'))) === 'username')
   await host.keyboard.press('Escape')
   check('Esc → 로그인 팝업 닫힘', await until(async () => !(await host.$('.login-dlg'))))
   // 채널 만들기 → 로그인 팝업 → (여기선 취소) 폼이 열리지 않음
-  await host.locator('::-p-text(＋ 인터넷 송출 채널 만들기)').click()
+  await host.click('button.create-open')
   await host.waitForSelector('.login-dlg', { timeout: 5000 })
   await host.click('.login-dlg .x')
   check('채널 만들기 → 로그인 취소 → 폼 안 열림', await until(async () => !(await host.$('.login-dlg'))) && !(await host.$('input[placeholder^="채널 제목 ("]')))
@@ -64,8 +69,10 @@ try {
   check('아이디만 입력(도메인 없이)으로 로그인 → 내 계정의 채널에 A, 로그인 칸 닫힘', await until(async () => (await mineText(host)).includes(`Lorem 삭제 ${tag}`)) && !(await host.$('.login-dlg')))
   // 로그인은 이 기기에 저장 → 새로고침해도 유지, 머리에 아이디 표시
   await host.reload({ waitUntil: 'networkidle0' })
-  check('새로고침해도 로그인 유지 + 머리에 "아이디 로그인됨"', await until(async () => (await host.$eval('main.home > header .who', (e) => e.textContent ?? '').catch(() => '')) === `${me.email.split('@')[0]} 로그인됨`) && (await mineText(host)).includes(`Lorem 삭제 ${tag}`))
-  await host.$$eval('section.card li.mine', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.click(), `Lorem 삭제 ${tag}`)
+  check('새로고침해도 로그인 유지 + 머리에 "아이디 로그인됨"', await until(async () => (await host.$eval('.who', (e) => e.textContent ?? '').catch(() => '')) === `${me.email.split('@')[0]} 로그인됨`) && (await mineText(host)).includes(`Lorem 삭제 ${tag}`))
+  // 넓은 PC: 내 계정 카드의 [이 PC 로 열기] → 이 PC 가 호스트(역할 고르기 없이)
+  check('넓은 PC: 내 계정 카드 버튼 = "이 PC 로 열기"', (await host.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('button.ctl')?.textContent?.trim(), `Lorem 삭제 ${tag}`)) === '이 PC 로 열기')
+  await host.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('button.ctl')?.click(), `Lorem 삭제 ${tag}`)
   await host.waitForSelector('.control', { timeout: 10000 })
   check('호스트 PC: A 연결됨(경고 없음)', await until(async () => !(await host.$('.netwarn')) && (await host.$eval('.share', (e) => e.className)).includes('live'), 15000))
 

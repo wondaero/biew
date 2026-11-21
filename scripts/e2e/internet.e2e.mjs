@@ -49,8 +49,8 @@ try {
 
   // ── 홈: 로컬/인터넷 구분, 인터넷 채널 만들기(그때 로그인) ──
   await host.goto(BASE + '/', { waitUntil: 'networkidle0' })
-  check('홈: 로컬 송출이 첫 번째(예배용 기본)', (await text(host, 'main section h2')).startsWith('로컬 송출'))
-  await host.locator('::-p-text(＋ 인터넷 송출 채널 만들기)').click()
+  check('홈(넓은 PC): 로컬 송출 버튼이 강조(예배용 기본)', await host.$eval('.hd-tools button.local-open', (b) => b.classList.contains('primary')).catch(() => false))
+  await host.click('button.create-open')
   await host.waitForSelector('input[name=username]', { timeout: 5000 })
   await host.type('input[name=username]', email)
   await host.type('input[name=password]', password)
@@ -58,7 +58,7 @@ try {
   await host.waitForSelector('input[placeholder^="채널 제목 ("]', { timeout: 10000 })
   await host.type('input[placeholder^="채널 제목 ("]', 'Lorem 채널')
   await host.type('input[placeholder^="컨트롤 비밀번호"]', 'ctlpass1')
-  await host.locator('::-p-text(채널 만들기)').click()
+  await host.click('form button.primary') // 채널 만들기
   await host.waitForFunction(() => /^\/(\d{6}\/control|control\/[A-Z2-9]{6})$/.test(location.pathname), { timeout: 15000 })
   code = new URL(host.url()).pathname.match(/^\/(?:(\d{6})\/control|control\/([A-Z2-9]{6}))$/)?.slice(1).find(Boolean) // 숫자 /123456/control · 예전 /control/ABC234
   check('호스트 화면 + 서버 연결', !!(await host.$('aside.side .set-wrap')) && await until(() => host.$('button.share.live')))

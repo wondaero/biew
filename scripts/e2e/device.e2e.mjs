@@ -52,8 +52,13 @@ try {
   // ── 홈: 윈도우 PC(터치 노트북 — 터치 포인트 10) ──
   const pc = await page(UA.win, 1280, 900, 10)
   await pc.goto(BASE + '/', { waitUntil: 'networkidle0' })
-  const co = await cardOrder(pc)
-  check('터치 노트북(윈도우) 홈: 그대로 — 맨 위 로컬 송출, 곡 카드 있음', co[0]?.startsWith('로컬 송출') && co.some((t) => t.startsWith('곡')), co.join(' | '))
+  // PC 로 취급 → 넓은 PC 홈(HomeDesk): 로컬 송출 버튼·곡 다운로드 버튼 있음
+  const desk = await pc.evaluate(() => ({
+    desk: !!document.querySelector('main.desk'),
+    local: !!document.querySelector('button.local-open'),
+    songs: [...document.querySelectorAll('button')].some((b) => b.textContent?.includes('곡 다운로드')),
+  }))
+  check('터치 노트북(윈도우) 홈: PC 화면 — 로컬 송출·곡 다운로드 버튼 있음', desk.desk && desk.local && desk.songs, JSON.stringify(desk))
 
   // ── 출력 시작: 아이패드(맥 UA + 터치, 가로 1180px → 버튼 보임) ──
   const ipad = await page(UA.ipad, 1180, 820, 5)

@@ -19,7 +19,7 @@ try {
     await p.setViewport({ width: w, height: h })
     await p.goto(BASE + '/', { waitUntil: 'networkidle0' })
     await p.evaluate((s) => localStorage.setItem('biew.live.v1:LOCAL', JSON.stringify(s)), seed())
-    await p.click('section.card.local button.primary') // 홈 → 로컬 송출(앱 안 이동: 히스토리 '/' → '/local')
+    await p.click('button.local-open') // 홈 → 로컬 송출(앱 안 이동: 히스토리 '/' → '/local')
     await p.waitForSelector('.control')
     await sleep(300)
     return p

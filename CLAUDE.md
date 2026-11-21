@@ -41,7 +41,7 @@ scripts/           import.ts, create-staff.ts, make-fixture.ts
 src/sync/          SyncTransport 인터페이스, BroadcastChannelTransport, SupabaseRealtimeTransport, SyncHub(version 필터)
 src/live/          liveStore(채널 하나를 연 동안의 상태 소유, commit 단일 경로. host/remote 역할), nav(이동·onAir — 서버 `_apply_command` 와 같은 규칙), persistence(채널별 localStorage·호스트/방문 기록·옛 키 정리)
 src/channel/       api(채널 RPC·기기 토큰 저장), sync(호스트/리모컨 Realtime 연결)
-src/home/          채널 만들기·목록·번호 입력(`/`)
+src/home/          홈(`/`): HomeView = 폭에 따라 고름 · HomeDesk(넓은 PC, 모바일 OS 아님+1000px↑: 위쪽 버튼 + 채널 카드 그리드·탭) · HomeMobile(폰·좁은 창, 한 줄 카드) · useHome(공용 데이터·동작)
 src/library/       IndexedDB(이 기기: 받아 둔 DB 곡 songs + 이 기기 변경 pending), DB 와 통째로 비교(diffIndex)·골라 받기/전체 받기·업로드(pending.ts 분류), 검색
 src/components/    SlideRender/FitText — 출력·미리보기 공용 렌더러(cqh 단위, 자동 축소)
 src/control/       ControlGate(호스트/리모컨 분기·비밀번호 입력), LocalView(/local 오프라인 모드), ControlView, panels/*, SongEditor, UploadDialog, 단축키, 출력창 열기
