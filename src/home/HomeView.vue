@@ -353,6 +353,8 @@ h2 { margin: 0; font-size: 15px; }
   .hd-head { flex-wrap: wrap; gap: 10px; }
   .tabs { max-width: 100%; overflow-x: auto; }
   .empty { padding: 28px 8px; }
-  .empty-go { flex-wrap: wrap; justify-content: center; }
+  /* 빈 상태 버튼: 한 줄에 하나씩, 폭 꽉 채워(사용자 요청 2026-11-21) */
+  .empty-go { flex-direction: column; justify-self: stretch; }
+  .empty-go button { width: 100%; }
 }
 </style>
