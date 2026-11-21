@@ -86,6 +86,8 @@ try {
   await page.keyboard.press('/')
   await page.waitForSelector('.srch input.search', { timeout: 5000 })
   await page.type('input.search', `${tag} Alpha`)
+  // 사람처럼 결과가 뜬 걸 보고 Enter — 막 연 직후엔 이 기기 곡(1000여 곡)을 불러오는 중이라 결과가 잠깐 비어 있다(그동안 '곡 불러오는 중…')
+  await page.waitForSelector('.srch ol.hits li:not(.empty)', { timeout: 10000 })
   await page.keyboard.press('Enter')
   check('저장된 곡으로 선곡 추가(검색 팝업에 추가 알림)', await until(async () => (await page.$$('.song')).length === 1) && !!(await page.$('.srch .added')))
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape')

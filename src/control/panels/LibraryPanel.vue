@@ -129,7 +129,8 @@ defineExpose({
         <span class="n">{{ h.song.slides.length }}</span>
         <button class="add" title="선곡에 추가 (Enter)" @click.stop="add(i)">+ 선곡</button>
       </li>
-      <li v-if="q && !hits.length" class="empty">결과 없음</li>
+      <!-- 이 기기 곡을 불러오는 동안(앱을 막 연 직후)은 "결과 없음" 대신 — 곡이 없다고 오해하지 않게 -->
+      <li v-if="q && !hits.length" class="empty">{{ syncStatus === 'loading' ? '곡 불러오는 중…' : '결과 없음' }}</li>
     </ol>
     <SongEditor v-if="editing !== undefined" :song="editing" @close="editing = undefined" @saved="onSaved" />
     <UploadDialog v-if="sync.open.value === 'up'" @close="sync.close()" />
