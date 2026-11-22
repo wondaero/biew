@@ -1,5 +1,5 @@
 // 슬라이드 한 장 고치기(카드 ✎) E2E — 로컬 송출, Lorem 선곡 + PC 새 곡(IndexedDB pending) 하나. 서버·계정 안 씀.
-// 선곡 즉시 반영·송출 중 장 반영·같은 글 모두·곡 원본(그 글만)·오늘만·빈 줄 = 장 나누기(송출 위치 따라감)·Esc/뒤로가기·단축키 막힘·폰(280px) 넘침.
+// 선곡 즉시 반영·송출 중 장 반영·같은 글 모두·곡 원본(그 글만)·오늘만·빈 줄 = 장 나누기(송출 위치 따라감)·장 삭제(송출 중이면 BLANK)·Esc/뒤로가기·단축키 막힘·폰(280px) 넘침.
 import puppeteer from 'puppeteer-core'
 import path from 'node:path'
 import { CHROME, OUT, ensureServer } from './_lib.mjs'
@@ -126,6 +126,26 @@ try {
   check('같은 글 모두 나누기: 앞쪽 1곳만큼 번호 밀림, 송출 글 그대로', s.setlist[0].slides.length === 8 && s.slideIndex === 4 && (await onAirText()) === 'Ut X1', JSON.stringify({ n: s.setlist[0].slides.length, i: s.slideIndex, sl: s.setlist[0].slides }))
   check('카드도 8장으로', (await p.$$('[data-item="0"] .cell')).length === 8)
   check('나누기 알림', (await p.$eval('.se-notice', (e) => e.textContent).catch(() => '')).includes('2장으로 나눴습니다'))
+
+  // 장 삭제(2026-11-22): 앞을 지우면 번호가 당겨지고 송출 글 그대로 · 곡 원본에서도 그 장만 · 송출 중인 장을 지우면 BLANK · 마지막 한 장은 못 지움
+  // (지금 선곡: Lorem A1, Lorem A2, S1, S2, Ut X1(송출 중), Ut X2, S1, S2 — 곡 원본엔 Lorem A1·A2 가 없음: 앞에서 '오늘만'으로 고쳤음)
+  const del = async (item, j) => { await cellEdit(p, item, j); await p.waitForSelector('.se'); await p.click('.se footer .del'); await sleep(600) }
+  const air2 = await onAirText()
+  await del(0, 0)
+  s = await state(p)
+  check('앞 장 삭제: 장 수 -1, 송출 번호 -1, 송출 글 그대로', s.setlist[0].slides.length === 7 && s.slideIndex === 3 && (await onAirText()) === air2 && !s.blank, JSON.stringify({ n: s.setlist[0].slides.length, i: s.slideIndex }))
+  const songBefore = (await pendingSong(p))?.length
+  await del(0, 4) // Ut X2 — 송출 중(3) 뒤, 곡 원본에도 한 장 있음
+  s = await state(p)
+  check('뒤 장 삭제: 송출 번호 그대로', s.setlist[0].slides.length === 6 && s.slideIndex === 3 && (await onAirText()) === air2)
+  check('삭제: 곡 원본에서도 그 장만 지움', (await pendingSong(p))?.length === songBefore - 1 && !(await pendingSong(p)).includes('Ut X2'), `${songBefore} → ${(await pendingSong(p))?.length}`)
+  check('삭제 알림', (await p.$eval('.se-notice', (e) => e.textContent).catch(() => '')).includes('1장 지웠습니다'))
+  await del(0, 3) // 송출 중인 장
+  s = await state(p)
+  check('송출 중인 장 삭제 → BLANK, 위치는 그 자리로 당겨진 다음 장', s.setlist[0].slides.length === 5 && s.blank === true && s.slideIndex === 3, JSON.stringify({ n: s.setlist[0].slides.length, i: s.slideIndex, b: s.blank }))
+  await cellEdit(p, 1, 0); await p.waitForSelector('.se')
+  check('곡의 마지막 한 장은 삭제 버튼 꺼짐', await p.$eval('.se footer .del', (b) => b.disabled))
+  await p.click('.se footer button:not(.primary):not(.del)'); await sleep(200)
 
   // ── 폰 280px ──
   const m = await (await browser.createBrowserContext()).newPage()

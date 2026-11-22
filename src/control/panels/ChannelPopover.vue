@@ -12,6 +12,7 @@ import { session } from '@/lib/auth'
 import { forgetChannelLocal } from '@/live/persistence'
 import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
+import OnAirStrip from '../OnAirStrip.vue'
 
 const props = defineProps<{ code: string; title: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -82,12 +83,13 @@ async function remove() {
 </script>
 
 <template>
-  <div class="pop" @click.stop>
+  <div class="pop m-full" @click.stop>
     <header>
       <h3>{{ title }}</h3>
       <button class="x" @click="emit('close')">✕</button>
     </header>
 
+    <OnAirStrip class="strip" />
     <div class="code">{{ code }}</div>
     <img v-if="qr" :src="qr" alt="QR" class="qr" />
     <p class="muted center">QR/링크는 <b>보기용</b>입니다. 리모컨은 컨트롤 링크로 들어가 컨트롤 비밀번호를 입력합니다.</p>
@@ -157,7 +159,9 @@ h3 { margin: 0; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-o
 .row2 { display: flex; gap: 6px; }
 .row2 button { flex: 1; }
 
+/* 폰: 전체 화면(비밀번호 바꾸기 입력칸이 있으므로 — 아래 시트는 화면 키패드에 가림), 내용은 위에서부터 */
 @media (max-width: 768px) {
-  .pop { top: auto; bottom: 0; left: 0; right: 0; width: auto; border-radius: 14px 14px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom)); max-height: 85dvh; }
+  .pop { --m-pad-top: 12px; --m-pad-bottom: 14px; align-content: start; z-index: 45; }
+  .strip { margin: 0 -14px; }
 }
 </style>

@@ -3,6 +3,9 @@
  * 곡 원본 전체를 선곡 스냅샷으로 덮어쓰지 않고 '그 글'만 바꾼다 → 그 사이 원본의 다른 장이 고쳐졌어도 지우지 않는다.
  * 2026-11-19: 빈 줄 = 그 자리에서 장 나누기(현장에서 한 장을 둘로 쪼개기·뒤에 장 추가). 장 수가 바뀌면 송출·미리보기 위치를
  * '같은 글'을 가리키도록 옮긴다(remapIndex) — 번호를 그대로 두면 송출 화면이 다른 장으로 튄다.
+ * 2026-11-22: 장 삭제 = 그 장을 0장으로 바꾸기(pieces = []). 지운 장을 가리키던 위치는 그 자리로 당겨진 다음 장(마지막이었으면 앞 장).
+ *   송출 중인 장을 지우면 BLANK(송출 중 곡을 선곡에서 빼면 BLANK 인 것과 같은 규칙 — 예배 중 엉뚱한 장이 갑자기 나가지 않게).
+ *   곡의 마지막 한 장은 못 지운다(곡을 빼려면 선곡에서).
  */
 import { textToSlides } from '@shared/slidesText'
 
@@ -24,12 +27,13 @@ export function replaceSlides(slides: readonly string[], targets: readonly numbe
 }
 
 /**
- * 장을 나눈 뒤의 새 번호. 바뀐 장보다 앞에서 늘어난 만큼 뒤로 밀린다.
- * 바뀐 장 자체를 가리키던 위치는 나눈 것 중 첫 장으로(같은 자리의 글).
+ * 장을 나누거나(n > 1) 지운(n = 0) 뒤의 새 번호. 바뀐 장보다 앞에서 늘거나 준 만큼 밀린다.
+ * 바뀐 장 자체를 가리키던 위치는 나눈 것 중 첫 장으로(같은 자리의 글) — 지웠으면 그 자리로 당겨진 다음 장.
+ * total(바뀐 뒤 장 수)을 주면 범위 안으로(마지막 장을 지웠으면 앞 장).
  */
-export function remapIndex(old: number, targets: readonly number[], n: number): number {
+export function remapIndex(old: number, targets: readonly number[], n: number, total = Infinity): number {
   const before = targets.filter((t) => t < old).length
-  return old + before * (n - 1)
+  return Math.max(0, Math.min(old + before * (n - 1), total - 1))
 }
 
 /**
@@ -43,5 +47,6 @@ export function patchSongSlides(song: readonly string[], j: number, oldText: str
   if (!hits.length) return null
   const targets = all ? hits : song[j] === oldText ? [j] : hits.length === 1 ? hits : null
   if (!targets) return null
-  return replaceSlides(song, targets, pieces)
+  const next = replaceSlides(song, targets, pieces)
+  return next.length ? next : null // 지워서 원본이 비면 원본은 건드리지 않음
 }

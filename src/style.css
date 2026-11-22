@@ -110,8 +110,13 @@ input[type='range']::-moz-range-thumb {
 input[type='range']:disabled { opacity: .45; cursor: default; }
 
 /*
- * 폰 전체 화면 팝업(사용자 결정 2026-11-19): 내용이 많은 작업 화면(곡 목록·곡 편집기·서버 올리기·슬라이드 수정·선곡·출력 설정)은
- * ≤768px 에서 화면 전체. 짧은 확인·입력(로그인·인터넷 송출 전환 등)은 작은 창/아래 시트 그대로.
+ * 폰 팝업 = 전체 화면 또는 아래 시트만(사용자 결정 2026-11-19, 2026-11-22 확대). 가운데 작은 창은 쓰지 않는다.
+ *  - 전체 화면(class="m-full"): 작업 화면(곡 목록·곡 편집기·서버 올리기·슬라이드 수정·선곡·출력 설정) + **입력칸이 있는 팝업**
+ *    (로그인·새 채널·번호로 입장·인터넷 송출 전환·📡 채널 관리) — 내용이 위에 있어 화면 키패드가 올라와도 가리지 않는다
+ *    (아래 시트는 키패드에 가리거나 화면 중간으로 밀려 올라감).
+ *  - 아래 시트: 입력 없이 고르기만 하는 짧은 팝업.
+ *  - 각 팝업은 위·아래 여백을 --m-pad-top / --m-pad-bottom 으로 더한다(안전 영역 위에).
+ *  - 컨트롤러 위에 뜨면 머리 아래 OnAirStrip — 전체 화면이 송출 모니터를 가리므로.
  * 팝업 바깥 상자에 class="m-full" — 각 컴포넌트의 scoped 크기 규칙보다 이겨야 해서 !important.
  * 머리 아래엔 OnAirStrip(송출 중 한 줄)을 둔다 — 전체 화면은 송출 모니터를 완전히 가리므로.
  */
@@ -119,6 +124,6 @@ input[type='range']:disabled { opacity: .45; cursor: default; }
   .m-full {
     position: fixed !important; inset: 0 !important; width: auto !important; height: 100dvh !important; max-height: none !important;
     margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
-    padding-top: env(safe-area-inset-top) !important; padding-bottom: env(safe-area-inset-bottom) !important;
+    padding-top: calc(env(safe-area-inset-top) + var(--m-pad-top, 0px)) !important; padding-bottom: calc(env(safe-area-inset-bottom) + var(--m-pad-bottom, 0px)) !important;
   }
 }

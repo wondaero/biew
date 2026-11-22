@@ -5,7 +5,9 @@
  *  - '곡 원본에도 저장'(기본 켜짐): 원본의 그 글만 바꿔 곡 저장 규칙대로(온라인+로그인 = 서버, 아니면 PC). 실제 저장은 부모(SlideGrid).
  *  - 같은 글이 여러 장(후렴 반복)이면 '같은 글 N장 모두'(기본 켜짐).
  *  - 빈 줄 = 그 자리에서 장 나누기(2026-11-19 — 현장에서 한 장을 둘로 쪼개기·뒤에 장 추가). 나뉜 장마다 미리보기.
- *    송출·미리보기 위치는 같은 글을 가리키도록 liveStore.editSlides 가 옮긴다. 장 삭제는 없음(요청 범위 밖).
+ *    송출·미리보기 위치는 같은 글을 가리키도록 liveStore.editSlides 가 옮긴다.
+ *  - [삭제](2026-11-22 사용자 요청): 그 장(같은 글 모두가 켜져 있으면 그 N장)을 지운다 — 확인창에 몇 장인지. 곡 원본에도(체크 따라).
+ *    송출 중인 장이면 BLANK. 곡의 마지막 한 장은 못 지운다(곡을 빼려면 선곡에서).
  *  - Ctrl/⌘+Enter 저장 · Esc 닫기. 열린 동안 송출 단축키 막음, 뒤로가기 = 닫기.
  */
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
@@ -43,6 +45,21 @@ const onAirNote = computed(() => {
   return a.frozen ? 'FREEZE 중 — 저장해도 송출은 그대로, FREEZE 를 풀면 새 글이 나갑니다' : '송출 중인 장 — 저장하면 바로 바뀝니다'
 })
 
+/** 지울 장들(같은 글 모두가 켜져 있으면 그 장 전부) */
+const delTargets = computed(() => (sameAll.value && same.value.length > 1 ? same.value : [props.slideIndex]))
+const canDelete = computed(() => !!item.value && item.value.slides.length > delTargets.value.length)
+const deleteTitle = computed(() => (canDelete.value ? '이 장 지우기' : '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서'))
+function remove() {
+  if (!canDelete.value || !item.value) return
+  const n = delTargets.value.length
+  // 컨트롤러가 가리키는 장을 지우면 BLANK(liveStore.editSlides)
+  const onAirHit = live.state.itemIndex === itemIndex.value && delTargets.value.includes(live.state.slideIndex)
+  const msg = (n > 1 ? `같은 글 ${n}장을 모두 지울까요?` : `${props.slideIndex + 1}장을 지울까요?`)
+    + (toSong.value ? '\n곡 원본에서도 지웁니다.' : '\n오늘 선곡에서만 지웁니다(곡 원본은 그대로).')
+    + (onAirHit ? '\n\n송출 중인 장입니다 — 지우면 BLANK 가 됩니다.' : '')
+  if (!confirm(msg)) return
+  emit('save', { pieces: [], indexes: delTargets.value, toSong: toSong.value, all: sameAll.value && same.value.length > 1 })
+}
 function save() {
   if (!changed.value || !item.value) return
   emit('save', { pieces: pieces.value!, indexes: sameAll.value ? same.value : [props.slideIndex], toSong: toSong.value, all: sameAll.value })
@@ -93,6 +110,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <p v-if="onAirNote" class="air">{{ onAirNote }}</p>
       </div>
       <footer>
+        <button class="danger-line del" :disabled="!canDelete" :title="deleteTitle" @click="remove">삭제{{ sameAll && same.length > 1 ? ` (${same.length}장)` : '' }}</button>
         <small class="keys">Ctrl+Enter 저장 · Esc 닫기</small>
         <button @click="close()">취소</button>
         <button class="primary" :disabled="!changed" @click="save">저장</button>

@@ -81,9 +81,10 @@ async function saveEdit(p: { pieces: string[]; indexes: number[]; toSong: boolea
   const it = e && live.state.setlist.find((x) => x.key === e.key)
   if (!e || !it) return
   const oldText = it.slides[e.j]!
-  live.setlist.editSlides(e.key, p.indexes, p.pieces)
+  const removing = p.pieces.length === 0
+  if (!live.setlist.editSlides(e.key, p.indexes, p.pieces)) return say('곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서', true)
   editing.value = null
-  const split = p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다 — ` : ''
+  const split = removing ? `${p.indexes.length}장 지웠습니다 — ` : p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다 — ` : ''
   if (!p.toSong) return say(`${split}선곡만 고쳤습니다(곡 원본은 그대로)`)
   await loadCache()
   const song = lib.byId.value.get(it.songId)

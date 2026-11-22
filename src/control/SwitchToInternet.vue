@@ -15,6 +15,7 @@ import { retargetOutputWindow } from './outputWindow'
 import { requireLogin } from '@/lib/loginPrompt'
 import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
+import OnAirStrip from './OnAirStrip.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
@@ -73,12 +74,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div class="backdrop" @mousedown.self="step !== 'working' && emit('close')">
-    <div class="dialog" role="dialog" aria-modal="true">
+    <div class="dialog m-full" role="dialog" aria-modal="true">
       <header>
         <h2>인터넷 송출로 전환</h2>
         <span class="spacer" />
         <button v-if="step !== 'working'" class="x" title="닫기" @click="emit('close')">✕</button>
       </header>
+      <OnAirStrip class="strip" />
       <p class="muted">지금 송출(선곡·위치·FREEZE·출력 설정)을 그대로 새 인터넷 송출 채널로 옮깁니다. 프로젝터 화면은 끊기지 않습니다. 옮긴 뒤 폰 리모컨·보기를 쓸 수 있습니다.</p>
 
       <form v-if="step === 'form'" class="form" @submit.prevent="next">
@@ -111,4 +113,9 @@ h2 { margin: 0; font-size: 16px; }
 label { display: grid; gap: 4px; font-size: 13px; }
 label small { color: var(--muted); font-weight: normal; }
 button { padding: 10px; }
+/* 폰: 전체 화면(입력칸 — 키패드에 가리지 않게), 내용은 위에서부터 */
+@media (max-width: 768px) {
+  .dialog { --m-pad-top: 12px; --m-pad-bottom: 16px; align-content: start; overflow-y: auto; }
+  .strip { margin: 0 -16px; }
+}
 </style>

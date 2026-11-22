@@ -11,6 +11,7 @@ import { LOGIN_DOMAIN } from '@shared/loginId'
 import { useBackClose } from '@/lib/backClose'
 import LoginForm from './LoginForm.vue'
 import { useLive } from '@/live/liveStore'
+import OnAirStrip from '@/control/OnAirStrip.vue'
 
 useBackClose(() => true, cancelLogin)
 const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelLogin() } }
@@ -37,11 +38,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="login-backdrop" @mousedown.self="cancelLogin">
-    <div class="login-dlg" role="dialog" aria-modal="true" :aria-label="reauth ? '비밀번호 확인' : '로그인'">
+    <div class="login-dlg m-full" role="dialog" aria-modal="true" :aria-label="reauth ? '비밀번호 확인' : '로그인'">
       <header>
         <h2>{{ reauth ? '비밀번호 확인' : '로그인' }}</h2>
         <button class="x" title="닫기 (Esc)" @click="cancelLogin">✕</button>
       </header>
+      <OnAirStrip v-if="live.channelCode.value" class="strip" />
       <p class="reason">{{ loginRequest?.reason }}</p>
       <LoginForm :preset-id="reauth ? presetId : undefined" @done="loginSucceeded" />
       <p class="note">{{ reauth ? 'DB 와 주고받는 작업이라 한 번 더 확인합니다. 5분 동안은 다시 묻지 않습니다.' : '로그인은 이 기기에 저장됩니다(로그아웃할 때까지).' }}</p>
@@ -62,9 +64,9 @@ h2 { flex: 1; margin: 0; font-size: 16px; }
 .note { margin: 0; font-size: 11px; color: var(--muted); }
 .login-dlg :deep(.login) { padding: 0; border: 0; background: none; }
 .login-dlg :deep(.login button) { padding: 10px; }
-/* 모바일: 아래에서 올라오는 시트 */
+/* 폰: 전체 화면(입력칸이 있으므로 — 아래 시트는 화면 키패드에 가림). 내용은 위에서부터 */
 @media (max-width: 768px) {
-  .login-backdrop { place-items: end stretch; }
-  .login-dlg { width: auto; border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .login-dlg { --m-pad-top: 12px; --m-pad-bottom: 16px; align-content: start; overflow-y: auto; }
+  .strip { margin: 0 -16px; }
 }
 </style>

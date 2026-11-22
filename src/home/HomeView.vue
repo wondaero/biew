@@ -228,7 +228,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
 
     <!-- 대화창 -->
     <div v-if="creatingOpen || joinOpen" class="hd-modal" @click.self="closeDialogs" @keydown.esc="closeDialogs">
-      <form v-if="creatingOpen" class="hd-dlg" @submit.prevent="create">
+      <form v-if="creatingOpen" class="hd-dlg m-full" @submit.prevent="create">
         <h3>새 채널 <button type="button" class="x" aria-label="닫기" :disabled="creating" @click="creatingOpen = false">✕</button></h3>
         <input ref="firstInput" v-model="title" placeholder="채널 제목 (예: 주일 2부)" maxlength="60" />
         <input v-model="controlPw" type="password" placeholder="컨트롤 비밀번호 (필수, 4자 이상)" autocomplete="new-password" />
@@ -237,7 +237,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
         <p v-if="createErr" class="err">{{ createErr }}</p>
         <button class="primary" :disabled="creating">{{ creating ? '만드는 중…' : '채널 만들기' }}</button>
       </form>
-      <form v-else class="hd-dlg" @submit.prevent="go('view')">
+      <form v-else class="hd-dlg m-full" @submit.prevent="go('view')">
         <h3>번호로 입장 <button type="button" class="x" aria-label="닫기" @click="joinOpen = false">✕</button></h3>
         <input
           ref="firstInput"
@@ -322,7 +322,8 @@ h2 { margin: 0; font-size: 15px; }
 .ver button { font-size: 12px; color: var(--accent); border-color: var(--accent); }
 
 .hd-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgb(0 0 0 / .55); }
-.hd-dlg { width: min(440px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 20px 60px rgb(0 0 0 / .5); }
+/* minmax(0,1fr): 넓은 숫자칸·버튼 줄이 칸을 넓혀 좁은 폰(280px)에서 가로로 넘치지 않게 */
+.hd-dlg { width: min(440px, calc(100vw - 32px)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 20px 60px rgb(0 0 0 / .5); }
 .hd-dlg h3 { margin: 0 0 4px; display: flex; align-items: center; font-size: 16px; }
 .hd-dlg .x { margin-left: auto; padding: 2px 8px; }
 .hd-dlg > button { padding: 10px; }
@@ -356,5 +357,12 @@ h2 { margin: 0; font-size: 15px; }
   /* 빈 상태 버튼: 한 줄에 하나씩, 폭 꽉 채워(사용자 요청 2026-11-21) */
   .empty-go { flex-direction: column; justify-self: stretch; }
   .empty-go button { width: 100%; }
+}
+/* 폰·좁은 창: 대화창은 전체 화면(입력칸 — 화면 키패드에 가리지 않게), 내용은 위에서부터 */
+@media (max-width: 768px) {
+  .hd-dlg { --m-pad-top: 12px; --m-pad-bottom: 16px; align-content: start; overflow-y: auto; }
+  .hd-dlg .code { width: 100%; min-width: 0; letter-spacing: 4px; }
+  .hd-dlg .row { flex-wrap: wrap; }
+  .hd-dlg .row button { flex: 1 1 110px; min-width: 0; }
 }
 </style>

@@ -55,3 +55,21 @@ describe('patchSongSlides', () => {
     expect(sameTextIndexes(song, 'B')).toEqual([1, 3])
   })
 })
+
+describe('장 삭제(pieces = [])', () => {
+  it('지우면 목록에서 빠짐(후렴 여러 곳도)', () => {
+    expect(replaceSlides(['A', 'B', 'C'], [1], [])).toEqual(['A', 'C'])
+    expect(replaceSlides(['V', 'C', 'V2', 'C'], [1, 3], [])).toEqual(['V', 'V2'])
+  })
+  it('위치: 앞을 지우면 당겨짐, 뒤를 지우면 그대로, 그 장이면 당겨진 다음 장, 마지막이면 앞 장', () => {
+    expect(remapIndex(2, [0], 0, 2)).toBe(1) // C(3번째) → 2번째
+    expect(remapIndex(0, [2], 0, 2)).toBe(0)
+    expect(remapIndex(1, [1], 0, 2)).toBe(1) // B 를 지움 → 그 자리의 C
+    expect(remapIndex(2, [2], 0, 2)).toBe(1) // 마지막 C 를 지움 → 앞 장 B
+    expect(remapIndex(3, [1, 3], 0, 2)).toBe(1) // 둘째 후렴(마지막) 지움 → 앞 장
+  })
+  it('곡 원본: 그 장만 지움, 다 지워지면 원본은 건드리지 않음(null)', () => {
+    expect(patchSongSlides(['A', 'B', 'C'], 1, 'B', [], false)).toEqual(['A', 'C'])
+    expect(patchSongSlides(['B', 'B'], 0, 'B', [], true)).toBeNull()
+  })
+})
