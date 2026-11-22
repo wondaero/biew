@@ -110,6 +110,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 
 ## 작업 방식
 - 새 컴퓨터에서 이어서 할 때는 PROGRESS.md "새 컴퓨터에서 이어서 작업하기" 순서대로(.env → link → 확인 명령).
+- **"이전 커밋 내용 뭐지?"·"지난번에 뭐 했지?"** 같은 질문엔 PROGRESS.md 맨 위 **"최근 작업 (세션 인계)"** 표와 `git log --oneline -20`(자세히는 `git show <해시>` 본문)을 보고 한국어로 요약해 답한다. 사용자는 여러 컴퓨터를 오가므로 대화 기록·Claude 메모(이 PC 에만 저장)가 아니라 저장소 문서가 기준. 작업을 마칠 때마다 그 표에 커밋 한 줄을 추가하고, 결정 대기 중인 것은 표 위에 적어 둔다.
 - 배포 확인: 홈 하단 "버전 (빌드 시각) · (커밋)". 브라우저는 앱 파일을 저장(PWA)해서 새로고침만으론 새 버전이 안 열린다 — "새 버전 있음 — 적용" 또는 모든 Biew 탭을 닫고 다시 열기.
 - 변경 후 `npm run typecheck && npm test && npm run build` 통과 확인.
 - UI 확인은 브라우저 E2E(`scripts/e2e/`, `npm run e2e` 또는 `e2e:<이름>`). 새 확인이 필요하면 같은 방식으로 스크립트를 추가: Lorem 선곡을 localStorage `biew.live.v1:<코드>`(로컬은 `:LOCAL`)에 심고, 로그인 필요 기능은 service_role 로 임시 스태프 계정 생성 → 테스트 → 삭제. 공용 도우미 `scripts/e2e/_lib.mjs`(경로·Chrome·서버 자동).
