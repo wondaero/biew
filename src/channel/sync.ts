@@ -207,9 +207,34 @@ export function publishHost(s: LiveState) {
   void push(s, false)
 }
 
+/**
+ * 출력 설정 '바로 적용' 임시 설정을 보기 기기에(인터넷, 서버 DB 를 거치지 않는 실시간 알림만).
+ * 슬라이더를 끄는 동안 수십 번 오므로 0.3초에 한 번으로 묶는다(마지막 것은 반드시 보냄). 리모컨 주소엔 안 보냄(리모컨 화면은 설정을 안 그림).
+ */
+const PREVIEW_GAP_MS = 300
+let previewLast = 0
+let previewTimer: number | undefined
+let previewPending: SyncMessage | null = null
+export function publishStylePreview(m: Extract<SyncMessage, { type: 'style-preview' }>) {
+  if (!hostCode) return
+  previewPending = m
+  const wait = PREVIEW_GAP_MS - (Date.now() - previewLast)
+  if (wait <= 0) flushPreview()
+  else if (previewTimer === undefined) previewTimer = window.setTimeout(flushPreview, wait)
+}
+function flushPreview() {
+  clearTimeout(previewTimer); previewTimer = undefined
+  const m = previewPending
+  previewPending = null
+  if (!m) return
+  previewLast = Date.now()
+  view?.send(m)
+}
+
 export function stopHostSync() {
   gen++
   clearInterval(retryTimer); clearInterval(checkTimer); clearTimeout(fetchTimer)
+  clearTimeout(previewTimer); previewTimer = undefined; previewPending = null
   curCtl = null; curView = null
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)

@@ -1,4 +1,4 @@
-import type { LiveState } from '@shared/types'
+import type { LiveState, OutputStyle } from '@shared/types'
 
 /**
  * 송출 조작 명령. 상태를 통째로 보내지 않고 '조작'만 보낸다.
@@ -18,6 +18,12 @@ export type SyncMessage =
   | { type: 'output-alive'; from: string }
   /** 로컬 송출 → 인터넷 송출 전환: 출력 창에게 '화면은 그대로 두고 이 채널로 갈아타라' (같은 PC, BroadcastChannel) */
   | { type: 'switch-channel'; code: string }
+  /**
+   * 출력 설정 '바로 적용' 중인 임시 설정(src/live/styleDraft.ts). 상태(localStorage·서버)에 남기지 않고 화면에만 덮어 그린다.
+   * style = null 이면 덮어쓰기 끝. until(state version)이 있으면 '저장'한 것 — 그 version 이상 상태를 받은 뒤에 끝(옛 설정으로 깜빡이지 않게).
+   * 보내는 쪽은 2초마다 다시 보낸다 — 받는 쪽은 6초 동안 안 오면 스스로 끝(컨트롤러가 꺼지거나 끊겨도 임시 설정이 남지 않게).
+   */
+  | { type: 'style-preview'; style: OutputStyle | null; until?: number }
 
 /**
  * 동기화 경로 추상화.

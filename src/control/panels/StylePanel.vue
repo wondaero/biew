@@ -54,7 +54,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointercancel', onGuardUp)
 })
 /**
- * 설정을 바꾸면 수정본(적용 전)만 바뀐다 — 송출엔 '적용'을 눌러야 나간다(src/live/styleDraft.ts).
+ * 설정을 바꾸면 수정본(저장 전)만 바뀐다 — [저장]을 눌러야 확정. '바로 적용' 모드면 바꾸는 즉시 송출 화면에 임시로 보인다(src/live/styleDraft.ts).
  * st = 화면에 보이는 설정(수정본이 있으면 수정본, 없으면 송출 중 설정)
  */
 const draft = useStyleDraft()
@@ -105,7 +105,7 @@ const DIRS: { v: BgDirection; label: string; title: string }[] = [
   { v: 'to bottom left', label: '↙', title: '오른쪽 위 → 왼쪽 아래' },
 ]
 
-// ── 저장된 설정(이 PC 에만 — src/live/stylePresets.ts) ──
+// ── 보관한 설정(이 PC 에만 — src/live/stylePresets.ts). [저장](송출 설정 확정)과 헷갈리지 않게 '보관'이라 부른다 ──
 const presetName = ref('')
 /** 백업·옮기기(파일 내보내기/가져오기)는 가끔 쓰므로 접어 둔다 — 펼쳐 놓으면 '파일로 저장하는 기능'처럼 보였음(사용자 지적) */
 const showBackup = ref(false)
@@ -118,19 +118,19 @@ function save() {
   const err = savePreset(name, st.value)
   if (err) return say(err, true)
   presetName.value = ''
-  say(`"${name}" 저장됨 (이 PC)`)
+  say(`"${name}" 목록에 보관함 (이 PC)`)
 }
-/** 불러오기 = 수정본으로 통째로(송출엔 아직 안 나감 — 미리보기로 확인 후 적용) */
+/** 불러오기 = 수정본으로 통째로(미리보기 모드면 송출엔 아직 안 나감, 바로 적용 모드면 송출 화면에 바로 — 둘 다 [저장]해야 확정) */
 function apply(p: StylePreset) {
   if (sameStyle(p.style, applied.value)) { draft.revert(); say(`"${p.name}" — 이미 송출 중인 설정입니다`); return }
   draft.replace(normalizeStyle(p.style))
-  say(`"${p.name}" 불러옴 — 미리보기 확인 후 [적용]을 누르면 송출됩니다`)
+  say(draft.instant.value ? `"${p.name}" 불러옴 — 송출 화면에 보이는 중, [저장]해야 유지됩니다` : `"${p.name}" 불러옴 — 미리보기 확인 후 [저장]을 누르면 송출됩니다`)
 }
-/** 저장된 설정 표시: 송출 중과 같으면 '송출 중', 적용 전 수정본과 같으면 '미리보기' */
+/** 보관한 설정 표시: 저장된 송출 설정과 같으면 '송출 중', 저장 전 수정본과 같으면 '미리보기'(바로 적용 모드면 '저장 전') */
 const presetTag = (p: StylePreset) =>
-  sameStyle(p.style, applied.value) ? '송출 중' : draft.dirty.value && sameStyle(p.style, st.value) ? '미리보기' : null
+  sameStyle(p.style, applied.value) ? '송출 중' : draft.dirty.value && sameStyle(p.style, st.value) ? (draft.instant.value ? '저장 전' : '미리보기') : null
 function remove(p: StylePreset) {
-  if (!confirm(`저장된 설정 "${p.name}" 을(를) 지울까요?`)) return
+  if (!confirm(`보관한 설정 "${p.name}" 을(를) 지울까요?`)) return
   deletePreset(p.id)
   presetMsg.value = null
 }
@@ -156,16 +156,22 @@ async function importFile(e: Event) {
 
 <template>
   <section ref="rootEl" class="style" :class="{ guard: touchGuard }" @pointerdown.capture="onGuardDown" @click.capture="onGuardClick">
-    <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag">적용 안 된 변경</span></h2>
+    <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag" :class="{ inst: draft.instant.value }">{{ draft.instant.value ? '저장 전 — 송출 화면에 보이는 중' : '저장 안 된 변경' }}</span></h2>
+
+    <!-- 모드(기기마다 기억): 미리보기 후 저장(기본) / 바로 적용 -->
+    <label class="instant full" :class="{ on: draft.instant.value }">
+      <input v-model="draft.instant.value" type="checkbox" />
+      <span><b>바로 적용</b> — 바꾸는 즉시 송출 화면(출력 창·넓은 화면 보기)에 보입니다. <b>[저장]</b>해야 유지되고, 저장 안 하고 닫으면 원래대로 돌아갑니다.</span>
+    </label>
     <p v-if="touchGuard" class="guard-hint">슬라이더는 <b>한 번 눌러 켠 뒤</b> 움직이세요 — 스크롤하다 값이 바뀌지 않게</p>
 
     <!-- 저장된 설정: 이 PC 에만(서버로 안 보냄) -->
     <div class="presets full">
-      <div class="p-head"><span>저장된 설정</span><small>이 PC 에만 저장</small></div>
+      <div class="p-head"><span>보관한 설정</span><small>이 PC 에만 보관</small></div>
       <!-- 목록 자리는 비어 있어도 상자로 항상 보인다 — 저장하면 여기에 쌓인다는 게 보이게 -->
       <ul v-if="presets.length" class="p-list p-box">
         <li v-for="p in presets" :key="p.id" :class="{ on: p.id === activeId }">
-          <button class="p-apply" :title="`'${p.name}' 불러오기 — 미리보기로 확인 후 [적용]을 눌러 송출`" @click="apply(p)">
+          <button class="p-apply" :title="`'${p.name}' 불러오기 — [저장]을 눌러야 확정`" @click="apply(p)">
             <span class="p-swatch" :style="{ background: backdropCss(p.style.backdrop), color: p.style.color }">가</span>
             <span class="p-name">{{ p.name }}</span>
             <span v-if="presetTag(p)" class="p-cur" :class="{ pv: presetTag(p) === '미리보기' }">{{ presetTag(p) }}</span>
@@ -173,10 +179,10 @@ async function importFile(e: Event) {
           <button class="p-del" title="지우기" @click="remove(p)">✕</button>
         </li>
       </ul>
-      <p v-else class="p-box p-empty">아직 없음 — 아래에 이름을 쓰고 <b>현재 설정 저장</b>을 누르면 여기에 쌓입니다. 누르면 한 번에 불러옵니다.</p>
+      <p v-else class="p-box p-empty">아직 없음 — 아래에 이름을 쓰고 <b>목록에 보관</b>을 누르면 여기에 쌓입니다. 누르면 한 번에 불러옵니다.</p>
       <form class="p-save" @submit.prevent="save">
         <input v-model="presetName" :maxlength="NAME_MAX" placeholder="이름 (예: 본당 프로젝터)" />
-        <button class="primary" :disabled="!presetName.trim()">현재 설정 저장</button>
+        <button class="primary" :disabled="!presetName.trim()" title="지금 보이는 설정을 이름 붙여 이 PC 목록에 보관(송출은 안 바뀜)">목록에 보관</button>
       </form>
       <button type="button" class="p-more" :aria-expanded="showBackup" @click="showBackup = !showBackup">{{ showBackup ? '▾' : '▸' }} 백업·다른 PC 로 옮기기 <small>(JSON 파일)</small></button>
       <div v-if="showBackup" class="p-file">
@@ -262,7 +268,7 @@ async function importFile(e: Event) {
       <input type="range" min="100" max="1000" step="50" :value="st.fadeMs" :style="fill(st.fadeMs, 100, 1000)" @input="set('fadeMs', num($event))" />
     </label>
 
-    <button class="reset full danger-line" title="수정본을 기본값으로(적용을 눌러야 송출)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
+    <button class="reset full danger-line" title="기본값으로 바꾸기([저장]해야 확정)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
   </section>
 </template>
 
@@ -359,4 +365,9 @@ input[type='color']::-moz-color-swatch { border: 0; border-radius: 4px; }
   .style { grid-template-columns: minmax(0, 1fr); font-size: 13px; }
   label.check { white-space: nowrap; }
 }
+.instant { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: 12px; line-height: 1.5; cursor: pointer; }
+.instant input { margin-top: 2px; flex: none; }
+.instant b { color: var(--text); }
+.instant.on { border-color: var(--live); background: var(--live-bg, rgba(46, 204, 113, .08)); }
+.dirty-tag.inst { color: #c9f5d9; background: rgba(46, 204, 113, .22); }
 </style>

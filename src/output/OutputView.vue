@@ -15,17 +15,21 @@ import { onAir } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
 import { useWakeLock } from './useWakeLock'
 import { uid } from '@/lib/uid'
+import { useStylePreview } from '@/live/stylePreview'
 
 // 채널별 출력: 같은 PC 의 해당 채널 컨트롤러와만 BroadcastChannel 로 연결된다(네트워크 불필요 → 인터넷이 끊겨도 동작)
 let code = String(useRoute().params.code ?? '').toUpperCase()
 const ID = `out-${uid().slice(0, 8)}`
 const state = ref<LiveState | null>(loadLive(code))
+// 출력 설정 '바로 적용' 중인 임시 설정(저장 전) — 있으면 이걸로 그린다(src/live/styleDraft.ts)
+const preview = useStylePreview(() => state.value?.version)
 let hub = connect(code)
 if (state.value) hub.mark(state.value)
 
 function connect(c: string): SyncHub {
-  return new SyncHub([new BroadcastChannelTransport(`biew-live:${c}`)], (s) => { state.value = s }, (m) => {
+  return new SyncHub([new BroadcastChannelTransport(`biew-live:${c}`)], (s) => { state.value = s; preview.onState(s) }, (m) => {
     if (m.type === 'switch-channel' && m.code !== code) switchTo(m.code)
+    else preview.onMessage(m)
   })
 }
 /** 화면은 그대로, 연결만 새 채널로(주소도 바꿔 두어 새로고침해도 새 채널로 복구) */
@@ -85,7 +89,7 @@ onBeforeUnmount(() => {
       v-if="state"
       :text="text"
       :blank="air?.blank ?? false"
-      :style-cfg="state.style"
+      :style-cfg="preview.style.value ?? state.style"
       :layer-key="layerKey"
       :animate="visible"
     />

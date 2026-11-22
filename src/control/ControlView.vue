@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLive } from '@/live/liveStore'
 import { hostLink, hostNeedsLogin, hostDeleted, remoteLink } from '@/channel/sync'
@@ -120,6 +120,8 @@ narrowMq.addEventListener('change', onNarrow)
 onBeforeUnmount(() => narrowMq.removeEventListener('change', onNarrow))
 // 뒤로가기 = 열린 바텀시트·단축키 도움말 닫기(페이지를 나가지 않게)
 useBackClose(() => !!sheet.value, () => { sheet.value = null })
+// 출력 설정 시트를 닫으면: 바로 적용 모드면 저장 안 한 변경을 버린다(송출 화면도 원래대로). 미리보기 모드는 수정본 유지
+watch(sheet, (v, old) => { if (old === 'style' && v !== 'style') styleDraft.closed() })
 useBackClose(() => showHelp.value, () => { showHelp.value = false })
 function openSheet(kind: 'set' | 'style') { sheet.value = kind }
 function onJump(i: number) {
@@ -255,7 +257,7 @@ onBeforeUnmount(() => {
     <nav v-if="isHost" class="dock">
       <button @click="openSearch()">🔍 곡 목록<b v-if="lib.remoteCount.value" class="badge down">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge">⬆{{ lib.pendingCount.value }}</b></button>
       <button @click="openSheet('set')">☰ 선곡 {{ live.state.setlist.length }}</button>
-      <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 변경 있음" /></button>
+      <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="저장 안 된 변경 있음" /></button>
     </nav>
     <TransportBar v-if="narrow" class="transport" bottom :host="isHost" />
   </div>

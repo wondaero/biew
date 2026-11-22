@@ -35,25 +35,26 @@ const view = ref<'draft' | 'air'>('draft')
 watch(() => draft.dirty.value, (d) => { if (!d) view.value = 'draft' })
 const showAir = computed(() => props.toggle && draft.dirty.value && view.value === 'air')
 const styleCfg = computed(() => (showAir.value ? s.style : draft.shown.value))
-const label = computed(() => (showAir.value ? '지금 송출 중' : draft.dirty.value ? '적용 전 미리보기 — 송출엔 아직 안 나감' : '송출 화면'))
+const label = computed(() => (showAir.value ? (draft.instant.value ? '저장된 설정 — 저장 안 하면 이걸로 돌아감' : '지금 송출 중')
+  : draft.dirty.value ? (draft.instant.value ? '송출 화면에 보이는 중 — [저장]해야 유지' : '저장 전 미리보기 — 송출엔 아직 안 나감') : '송출 화면'))
 </script>
 
 <template>
-  <div class="style-pv" :class="{ dirty: draft.dirty.value && !showAir, air: showAir, compact }">
+  <div class="style-pv" :class="{ dirty: draft.dirty.value && !showAir, inst: draft.instant.value, air: showAir, compact }">
     <div v-if="toggle && draft.dirty.value" class="pv-tabs" role="tablist" aria-label="비교">
-      <button role="tab" :aria-selected="view === 'draft'" :class="{ on: view === 'draft' }" @click="view = 'draft'">적용 전</button>
-      <button role="tab" :aria-selected="view === 'air'" :class="{ on: view === 'air' }" @click="view = 'air'">송출 중</button>
+      <button role="tab" :aria-selected="view === 'draft'" :class="{ on: view === 'draft' }" @click="view = 'draft'">저장 전</button>
+      <button role="tab" :aria-selected="view === 'air'" :class="{ on: view === 'air' }" @click="view = 'air'">{{ draft.instant.value ? '저장된 설정' : '송출 중' }}</button>
     </div>
     <div v-if="!compact || draft.dirty.value" class="pv-bar">{{ label }}<small>{{ text.note }}</small></div>
     <div v-if="!compact || draft.dirty.value" class="pv-screen">
       <SlideRender :text="text.text" :style-cfg="styleCfg" :animate="false" />
     </div>
     <div v-if="actions && draft.dirty.value" class="pv-actions">
-      <button title="수정본을 버리고 지금 송출 중인 설정으로" @click="draft.revert()">되돌리기</button>
-      <button class="apply" title="수정본을 송출(프로젝터)에 반영" @click="draft.apply()">적용</button>
+      <button title="고친 것을 버리고 저장된 설정으로" @click="draft.revert()">되돌리기</button>
+      <button class="apply" title="이 설정으로 송출 확정" @click="draft.apply()">저장</button>
     </div>
     <div v-else-if="actions && draft.canUndo.value" class="pv-actions">
-      <button class="undo" title="방금 적용한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 적용 취소 (이전 설정으로)</button>
+      <button class="undo" title="방금 저장한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 저장 취소 (이전 설정으로)</button>
     </div>
   </div>
 </template>
@@ -67,6 +68,9 @@ const label = computed(() => (showAir.value ? '지금 송출 중' : draft.dirty.
 .pv-screen { aspect-ratio: 16 / 9; width: min(100%, calc(26dvh * 16 / 9)); margin: 0 auto; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 /* 수정본 = 미리보기 색(파랑 점선) — 송출 화면(초록)과 구분 */
 .style-pv.dirty .pv-screen { border: 2px dashed var(--preview-soft); }
+/* 바로 적용: 저장 전이지만 실제로 송출 화면에 보이는 중 → 송출 색(초록 점선 — 저장 전이라 점선) */
+.style-pv.dirty.inst .pv-bar { color: var(--live); }
+.style-pv.dirty.inst .pv-screen { border-color: var(--live); }
 /* PC(compact): 위에 송출 모니터가 따로 있으므로 미리보기는 작게 — 설정 영역을 덜 가리게 */
 .style-pv.compact .pv-screen { width: min(100%, 260px); }
 /* 비교 전환: 고른 쪽은 눌린 모양(세그먼트 규칙) — 적용 전 = 파랑, 송출 중 = 초록 */

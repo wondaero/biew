@@ -3,11 +3,14 @@ import { computed } from 'vue'
 import { useLive } from '@/live/liveStore'
 import { onAir, textAt } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
+import { useStyleDraft } from '@/live/styleDraft'
 
 const live = useLive()
 /** 송출 화면을 누르면 목록에서 송출 중인 장으로 스크롤(ControlView → SlideGrid.scrollToLive) */
 const emit = defineEmits<{ jump: [] }>()
 const s = live.state
+/** 송출 화면에 실제로 보이는 설정 — 출력 설정 '바로 적용' 중이면 저장 전 설정(styleDraft) */
+const airStyle = useStyleDraft().onAirStyle
 /** 실제 송출 화면(FREEZE 중이면 고정된 화면) */
 const air = computed(() => onAir(s))
 const pgmText = computed(() => air.value.text)
@@ -24,7 +27,7 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
         <em v-if="air.frozen" class="frz">FREEZE</em>
         <em v-if="air.blank">BLANK</em>
       </div>
-      <div class="screen jump" title="누르면 목록에서 송출 중인 장으로" @click="emit('jump')"><SlideRender :text="pgmText" :blank="air.blank" :style-cfg="s.style" :layer-key="`${air.itemIndex}:${air.slideIndex}`" /></div>
+      <div class="screen jump" title="누르면 목록에서 송출 중인 장으로" @click="emit('jump')"><SlideRender :text="pgmText" :blank="air.blank" :style-cfg="airStyle" :layer-key="`${air.itemIndex}:${air.slideIndex}`" /></div>
     </div>
     <!-- 즉시 모드에선 PGM 하나만. PVW 모드에서만 'TAKE 하면 나갈 화면' 표시 -->
     <div v-if="live.pvwMode.value" class="mon">
@@ -32,7 +35,7 @@ const label = (c: { itemIndex: number; slideIndex: number } | null) =>
         <b>미리보기</b> <span>{{ label(live.upcoming.value) }}</span>
         <button class="take" :disabled="!live.upcoming.value" title="미리보기를 송출 (Enter)" @click="live.actions.take()">송출<span class="take-key"> ⏎</span></button>
       </div>
-      <div class="screen"><SlideRender :text="nextText" :style-cfg="s.style" :animate="false" /></div>
+      <div class="screen"><SlideRender :text="nextText" :style-cfg="airStyle" :animate="false" /></div>
     </div>
   </section>
 </template>

@@ -14,6 +14,7 @@ import { saveVisit } from '@/live/persistence'
 import { SyncHub } from '@/sync/SyncHub'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import { onAir } from '@/live/nav'
+import { useStylePreview } from '@/live/stylePreview'
 import SlideRender from '@/components/SlideRender.vue'
 import { useWakeLock } from '@/output/useWakeLock'
 import { onStage } from '@/lib/stage'
@@ -53,6 +54,7 @@ const visible = ref(document.visibilityState === 'visible')
 const route = useRoute()
 const code = computed(() => api.normalizeCode(String(route.params.code ?? '')))
 const state = ref<LiveState | null>(null)
+const preview = useStylePreview(() => state.value?.version)
 const title = ref('')
 const pw = ref('')
 const pwErr = ref<string | null>(null)
@@ -110,7 +112,8 @@ async function enter(password?: string) {
       else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') status.value = 'reconnecting'
     },
   })
-  hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live' })
+  // 출력 설정 '바로 적용' 임시 설정도 받는다(넓은 화면 = 송출 화면만 그린다. 폰 가사 목록은 설정을 안 씀)
+  hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live'; preview.onState(s) }, (m) => preview.onMessage(m))
   if (j.state) hub.receive(j.state)
   document.addEventListener('visibilitychange', onVis)
   timer = window.setInterval(() => void catchUp(), 30000)
@@ -173,7 +176,7 @@ onBeforeUnmount(() => {
 
   <!-- 넓은 화면: 송출 화면(출력과 같은 렌더러)만 전체로 -->
   <div v-else-if="wide" class="stage" @click="goFullscreen" @dblclick="goFullscreen">
-    <SlideRender v-if="state" :text="text" :blank="air?.blank ?? false" :style-cfg="state.style" :layer-key="layerKey" :animate="visible" />
+    <SlideRender v-if="state" :text="text" :blank="air?.blank ?? false" :style-cfg="preview.style.value ?? state.style" :layer-key="layerKey" :animate="visible" />
     <p v-if="status === 'notfound'" class="wmsg">채널을 찾을 수 없습니다 — 번호 <b>{{ code }}</b> 가 삭제되었거나 잘못되었습니다.</p>
     <p v-else-if="!state" class="wmsg">{{ waitText }}</p>
     <!-- 연결 점은 문제가 있을 때만(정상일 땐 송출 화면에 아무것도 안 보이게) -->

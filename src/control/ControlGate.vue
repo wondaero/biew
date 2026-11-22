@@ -13,7 +13,7 @@ import { useRoute } from 'vue-router'
 import { session, authReady } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import * as api from '@/channel/api'
-import { startHostSync, stopHostSync, publishHost, startRemote, stopRemote, sendRemote, remoteRejected } from '@/channel/sync'
+import { startHostSync, stopHostSync, publishHost, publishStylePreview, startRemote, stopRemote, sendRemote, remoteRejected } from '@/channel/sync'
 import { openHost, openRemote, closeChannel, adoptState, useLive } from '@/live/liveStore'
 import { loadHost, saveHost, saveVisit } from '@/live/persistence'
 import ControlView from './ControlView.vue'
@@ -86,7 +86,7 @@ const chooseRemote = () => { phase.value = 'loading'; void enterRemote(code.valu
 /** serverState: 처음 등록할 때 받은 서버 상태(다른 PC·리모컨이 쓰던 것) — 더 새로우면 이어받는다 */
 function enterHost(c: string, t: string, serverState: unknown) {
   title.value = t
-  openHost(c, { publish: publishHost })
+  openHost(c, { publish: publishHost, publishPreview: publishStylePreview })
   adoptState(serverState)
   startHostSync(c, { getState: () => JSON.parse(JSON.stringify(live.state)), adopt: adoptState })
   phase.value = 'ready'

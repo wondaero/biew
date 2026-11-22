@@ -32,6 +32,7 @@
     "e2e:sync": "node scripts/e2e/sync.e2e.mjs",
     "e2e:bg": "node scripts/e2e/bg.e2e.mjs",
     "e2e:presets": "node scripts/e2e/presets.e2e.mjs",
+    "e2e:instant": "node scripts/e2e/instant.e2e.mjs",
     "e2e:ime": "node scripts/e2e/ime.e2e.mjs",
     "e2e:offline": "npm run build && node scripts/e2e/offline.e2e.mjs",
     "e2e:upgrade": "npm run build && node scripts/e2e/upgrade.e2e.mjs",

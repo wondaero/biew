@@ -12,7 +12,7 @@ import { reactive, ref, computed, readonly } from 'vue'
 import { emptyLiveState, nextVersion, type LiveState, type OutputStyle, type SetlistItem } from '@shared/types'
 import { BroadcastChannelTransport } from '@/sync/BroadcastChannelTransport'
 import { SyncHub } from '@/sync/SyncHub'
-import type { Command } from '@/sync/SyncTransport'
+import type { Command, SyncMessage } from '@/sync/SyncTransport'
 import { loadLive, saveLive, isLiveState, normalizeLive } from './persistence'
 import * as nav from './nav'
 import { uid } from '@/lib/uid'
@@ -38,14 +38,16 @@ const snapshot = (): LiveState => JSON.parse(JSON.stringify(state))
 let hub: SyncHub | null = null
 let remoteSend: ((c: Command) => void) | null = null
 let publishHook: ((s: LiveState) => void) | null = null
+let previewHook: ((m: Extract<SyncMessage, { type: 'style-preview' }>) => void) | null = null
 
 /** 호스트로 채널 열기. 같은 PC 의 출력 창과는 BroadcastChannel(채널별 이름)로 */
-export function openHost(code: string, hooks: { publish: (s: LiveState) => void }) {
+export function openHost(code: string, hooks: { publish: (s: LiveState) => void; publishPreview?: (m: Extract<SyncMessage, { type: 'style-preview' }>) => void }) {
   closeChannel()
   role.value = 'host'
   channelCode.value = code
   Object.assign(state, loadLive(code) ?? emptyLiveState(ORIGIN))
   publishHook = hooks.publish
+  previewHook = hooks.publishPreview ?? null
   hub = new SyncHub(
     [new BroadcastChannelTransport(`biew-live:${code}`)],
     // 같은 채널의 다른 호스트 탭이 더 새 상태를 보냈으면 따라간다
@@ -72,7 +74,7 @@ export function openRemote(code: string, send: (c: Command) => void) {
 
 export function closeChannel() {
   hub?.close()
-  hub = null; remoteSend = null; publishHook = null
+  hub = null; remoteSend = null; publishHook = null; previewHook = null
   channelCode.value = null
   preview.value = null
   pvwMode.value = false
@@ -99,6 +101,19 @@ function commit(mutate: (s: LiveState) => void) {
   saveLive(code, snap)
   hub.send({ type: 'state', state: snap })
   publishHook?.(snap) // 채널 서버(보는 기기·리모컨)로도. 실패해도 로컬 송출엔 영향 없음
+}
+
+/**
+ * 출력 설정 '바로 적용' 임시 설정 보내기(src/live/styleDraft.ts 가 부른다). 상태는 안 바꾼다.
+ * 같은 PC 출력 창 = BroadcastChannel 즉시, 인터넷 송출이면 보기 기기에도(publishPreview — 묶어서 보냄).
+ */
+export function sendStylePreview(style: OutputStyle | null, until?: number) {
+  if (role.value !== 'host' || !hub) return
+  // 수정본은 Vue 반응형(Proxy) — BroadcastChannel(postMessage)은 Proxy 를 복사하지 못해 조용히 실패하므로 일반 객체로
+  const plain = style ? (JSON.parse(JSON.stringify(style)) as OutputStyle) : null
+  const m = { type: 'style-preview' as const, style: plain, ...(until !== undefined ? { until } : {}) }
+  hub.send(m)
+  previewHook?.(m)
 }
 
 // ── 송출 ────────────────────────────────────────────
