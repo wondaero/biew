@@ -47,16 +47,20 @@ const onAirNote = computed(() => {
 
 /** 지울 장들(같은 글 모두가 켜져 있으면 그 장 전부) */
 const delTargets = computed(() => (sameAll.value && same.value.length > 1 ? same.value : [props.slideIndex]))
-const canDelete = computed(() => !!item.value && item.value.slides.length > delTargets.value.length)
-const deleteTitle = computed(() => (canDelete.value ? '이 장 지우기' : '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서'))
+/** FREEZE 중인 장은 못 지운다(송출은 고정 글인데 목록의 '송출 중' 표시가 옆 장으로 옮겨 가 헷갈림 — liveStore.editSlides) */
+const frozenHit = computed(() => live.state.frozen?.itemIndex === itemIndex.value && delTargets.value.includes(live.state.frozen.slideIndex))
+const canDelete = computed(() => !!item.value && item.value.slides.length > delTargets.value.length && !frozenHit.value)
+const deleteTitle = computed(() => (frozenHit.value ? 'FREEZE 중인 장은 지울 수 없습니다 — FREEZE 를 풀고 지우세요'
+  : canDelete.value ? '이 장 지우기' : '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서'))
 function remove() {
   if (!canDelete.value || !item.value) return
   const n = delTargets.value.length
-  // 컨트롤러가 가리키는 장을 지우면 BLANK(liveStore.editSlides)
-  const onAirHit = live.state.itemIndex === itemIndex.value && delTargets.value.includes(live.state.slideIndex)
+  // 컨트롤러가 가리키는 장을 지우면 BLANK(liveStore.editSlides). FREEZE 중이면 송출은 고정 화면 그대로 — 풀 때 BLANK
+  const ctlHit = live.state.itemIndex === itemIndex.value && delTargets.value.includes(live.state.slideIndex)
   const msg = (n > 1 ? `같은 글 ${n}장을 모두 지울까요?` : `${props.slideIndex + 1}장을 지울까요?`)
     + (toSong.value ? '\n곡 원본에서도 지웁니다.' : '\n오늘 선곡에서만 지웁니다(곡 원본은 그대로).')
-    + (onAirHit ? '\n\n송출 중인 장입니다 — 지우면 BLANK 가 됩니다.' : '')
+    + (changed.value ? '\n위에서 고친 글은 버려집니다.' : '')
+    + (ctlHit ? (live.state.frozen ? '\n\n지금 가리키는 장입니다 — FREEZE 를 풀면 BLANK 가 됩니다.' : '\n\n송출 중인 장입니다 — 지우면 BLANK 가 됩니다.') : '')
   if (!confirm(msg)) return
   emit('save', { pieces: [], indexes: delTargets.value, toSong: toSong.value, all: sameAll.value && same.value.length > 1 })
 }

@@ -128,17 +128,24 @@ async function connectHost(retried = false) {
 /** 읽는 중(시작 시각, 0 = 아님). 응답이 안 오는 요청(인터넷이 순간 끊김)이 다음 읽기를 영영 막지 않게 5초 지나면 무시 */
 let fetchingSince = 0
 let fetchAgain = false
+/** 올리는 중이라 미룬 읽기 — 올리기가 끝나면 바로(타이머 없이) */
+let fetchAfterPush = false
 const FETCH_STUCK_MS = 5000
 function scheduleFetch(delay = 0) {
   clearTimeout(fetchTimer)
   fetchTimer = window.setTimeout(() => void fetchNow(), delay)
 }
 async function fetchNow() {
-  if (fetchingSince && Date.now() - fetchingSince < FETCH_STUCK_MS) { fetchAgain = true; return }
+  if (fetchingSince && Date.now() - fetchingSince < FETCH_STUCK_MS) {
+    fetchAgain = true
+    // 읽던 요청이 응답 없이 멈추면 finally 가 안 와서 '한 번 더'가 영영 안 될 수 있다 → 멈춤 시한이 지나면 다시 시도
+    scheduleFetch(FETCH_STUCK_MS - (Date.now() - fetchingSince) + 20)
+    return
+  }
   const code = hostCode
   const token = code ? loadHost(code)?.token : null
   if (!code || !token) return
-  if (pushing || queued) { scheduleFetch(30); return } // 올리는 중이면 끝난 뒤에
+  if (pushing || queued) { fetchAfterPush = true; return } // 올리는 중이면 끝난 뒤 바로(push 의 finally)
   const started = Date.now()
   fetchingSince = started
   try {
@@ -153,7 +160,8 @@ async function fetchNow() {
     // 늦게 끝난 옛 요청(5초 넘어 무시된 것)이 새 요청의 표시를 지우지 않게
     if (fetchingSince === started) {
       fetchingSince = 0
-      if (fetchAgain) { fetchAgain = false; void fetchNow() }
+      // 그 사이 다른 채널로 갔으면(code 가 바뀜) 옛 채널의 '한 번 더'는 버린다
+      if (fetchAgain && code === hostCode) { fetchAgain = false; clearTimeout(fetchTimer); void fetchNow() }
     }
   }
 }
@@ -190,6 +198,7 @@ async function push(s: LiveState, force: boolean) {
     const q = queued
     queued = null
     if (q) void push(q.s, q.force)
+    else if (fetchAfterPush) { fetchAfterPush = false; void fetchNow() }
   }
 }
 
@@ -253,6 +262,7 @@ export function stopHostSync() {
   gen++
   clearInterval(retryTimer); clearInterval(checkTimer); clearTimeout(fetchTimer)
   if (previewPending) flushPreview() // 묶여 기다리던 마지막 것(보통 '끝' 신호)은 보내고 닫는다
+  fetchingSince = 0; fetchAgain = false; fetchAfterPush = false // 옛 채널의 읽기가 새 채널을 막지 않게
   clearTimeout(previewTimer); previewTimer = undefined; previewPending = null
   curCtl = null; curView = null
   window.removeEventListener('online', onOnline)

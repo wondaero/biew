@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLive } from '@/live/liveStore'
 import { hostLink, hostNeedsLogin, hostDeleted, remoteLink } from '@/channel/sync'
@@ -121,7 +121,15 @@ onBeforeUnmount(() => narrowMq.removeEventListener('change', onNarrow))
 // 뒤로가기 = 열린 바텀시트·단축키 도움말 닫기(페이지를 나가지 않게)
 useBackClose(() => !!sheet.value, () => { sheet.value = null })
 // 출력 설정 시트를 닫으면: 바로 적용 모드면 저장 안 한 변경을 버린다(송출 화면도 원래대로). 미리보기 모드는 수정본 유지
-watch(sheet, (v, old) => { if (old === 'style' && v !== 'style') styleDraft.closed() })
+let layoutSwitch = false
+watch(sheet, (v, old) => { if (old === 'style' && v !== 'style' && !layoutSwitch) styleDraft.closed() })
+// 출력 설정을 연 채 창 폭이 바뀌면(≤768px 경계) 팝업 ↔ 시트로 이어서 연다 — 안 그러면 설정 화면이 사라진 채
+// 바로 적용 중인 임시 설정이 송출에 계속 나가고 되돌릴 곳이 없다. 이건 닫기가 아니므로 변경은 버리지 않는다
+watch(narrow, (v) => {
+  if (!isHost.value) return
+  if (v && showStyle.value) { showStyle.value = false; sheet.value = 'style' }
+  else if (!v && sheet.value === 'style') { layoutSwitch = true; sheet.value = null; showStyle.value = true; void nextTick(() => { layoutSwitch = false }) }
+})
 useBackClose(() => showHelp.value, () => { showHelp.value = false })
 function openSheet(kind: 'set' | 'style') { sheet.value = kind }
 function onJump(i: number) {

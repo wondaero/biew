@@ -82,13 +82,20 @@ async function saveEdit(p: { pieces: string[]; indexes: number[]; toSong: boolea
   if (!e || !it) return
   const oldText = it.slides[e.j]!
   const removing = p.pieces.length === 0
-  if (!live.setlist.editSlides(e.key, p.indexes, p.pieces)) return say('곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서', true)
+  const r = live.setlist.editSlides(e.key, p.indexes, p.pieces)
+  if (r !== 'ok') {
+    editing.value = null
+    return say(r === 'last' ? '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서'
+      : r === 'frozen' ? 'FREEZE 중인 장은 지울 수 없습니다 — FREEZE 를 풀고 지우세요'
+      : '그 사이 선곡이 바뀌어 저장하지 못했습니다 — 다시 열어 주세요', true)
+  }
   editing.value = null
   const split = removing ? `${p.indexes.length}장 지웠습니다 — ` : p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다 — ` : ''
   if (!p.toSong) return say(`${split}선곡만 고쳤습니다(곡 원본은 그대로)`)
   await loadCache()
   const song = lib.byId.value.get(it.songId)
   const slides = song && patchSongSlides(song.slides, e.j, oldText, p.pieces, p.all)
+  if (slides && !slides.length) return say(`${split}곡 원본은 장이 하나도 안 남게 되어 그대로 두었습니다`, true)
   if (!song || !slides) return say(song ? '선곡은 고쳤지만 곡 원본은 그 사이 바뀌어 저장하지 않았습니다 — 곡 목록에서 그 곡을 눌러 확인하세요' : '선곡은 고쳤지만 곡 원본을 찾을 수 없습니다', true)
   try {
     // base = 고친 기준(이 기기가 받아 둔 버전) — 업로드 때 그 사이 DB 가 바뀌었는지 판정

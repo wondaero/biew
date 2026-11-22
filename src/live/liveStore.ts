@@ -234,15 +234,19 @@ const setlist = {
    * 슬라이드 글만 고치기(카드의 ✎). 장 수·순서·송출 위치는 그대로 → 송출 중인 장이면 저장 즉시 새 글이 나간다.
    * FREEZE 중이면 고정 화면은 텍스트 스냅샷이라 그대로(풀면 반영).
    */
-  /** pieces = [] 이면 그 장들 삭제(곡의 장이 하나도 안 남으면 하지 않음 — false) */
-  editSlides(key: string, indexes: number[], pieces: string[]): boolean {
+  /**
+   * pieces = [] 이면 그 장들 삭제. 결과: 'ok' · 'last'(곡의 장이 하나도 안 남음) · 'frozen'(FREEZE 중인 장 삭제 —
+   * 송출은 고정 글 그대로인데 번호만 옆 장으로 옮겨 목록의 '송출 중' 표시가 엉뚱한 장에 붙으므로 막는다) · 'stale'(그 사이 선곡이 바뀜)
+   */
+  editSlides(key: string, indexes: number[], pieces: string[]): 'ok' | 'last' | 'frozen' | 'stale' {
     const i = state.setlist.findIndex((x) => x.key === key)
-    if (i < 0) return false
+    if (i < 0) return 'stale'
     const it0 = state.setlist[i]!
     const targets = [...new Set(indexes)].filter((j) => j >= 0 && j < it0.slides.length).sort((a, b) => a - b)
-    if (!targets.length) return false
+    if (!targets.length) return 'stale'
+    if (pieces.length === 0 && state.frozen?.itemIndex === i && targets.includes(state.frozen.slideIndex)) return 'frozen'
     const next = replaceSlides(it0.slides, targets, pieces)
-    if (!next.length) return false
+    if (!next.length) return 'last'
     // 나누기(2026-11-19)·삭제(2026-11-22): 장 수가 바뀌면 송출·FREEZE·미리보기 위치를 '같은 글'로 옮긴다.
     // 송출 중인 장이나 그 뒤를 바꾸면 번호 그대로, 앞을 바꾸면 늘거나 준 만큼(번호를 그대로 두면 화면이 다른 장으로 튐)
     const n = pieces.length
@@ -256,7 +260,7 @@ const setlist = {
       if (s.frozen && s.frozen.itemIndex === i) s.frozen = { ...s.frozen, slideIndex: remap(s.frozen.slideIndex) }
     })
     if (preview.value?.itemIndex === i) preview.value = { itemIndex: i, slideIndex: remap(preview.value.slideIndex) }
-    return true
+    return 'ok'
   },
 }
 

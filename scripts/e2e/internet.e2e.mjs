@@ -211,9 +211,12 @@ try {
     console.log('  · 방송실 PC 탭 보임 상태:', await host.evaluate(() => document.visibilityState))
     const t0 = Date.now()
     let followed = false
+    // 다음·이전을 번갈아 — '다음'만 누르면 선곡 끝에 닿아 더 안 바뀌고(noop), PC 가 따라왔어도 실패로 보였다(2026-11-23 원인 확인:
+    // 예전 '가끔 40초 안에 안 따라옴' 기존 문제는 앱이 아니라 이 테스트 문제)
+    let turn = 0
     while (Date.now() - t0 < 40000 && !followed) {
       const b = await pgm()
-      await remote.evaluate(() => document.querySelector('button[title^="다음"]')?.click())
+      await remote.evaluate((sel) => document.querySelector(sel)?.click(), turn++ % 2 ? 'button[title^="이전"]' : 'button[title^="다음"]')
       followed = await until(async () => (await pgm()) !== b, 3000)
       if (!followed) await sleep(2000)
     }

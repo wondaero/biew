@@ -38,6 +38,7 @@ export function remapIndex(old: number, targets: readonly number[], n: number, t
 
 /**
  * 곡 원본에 같은 수정을 적용한 새 슬라이드 목록. 어느 장인지 확실하지 않으면 null(원본은 건드리지 않음).
+ * 지워서 장이 하나도 안 남으면 빈 목록(부르는 쪽이 원본을 그대로 둔다).
  *  - all: 원본에서 oldText 와 같은 장 전부
  *  - 아니면: 같은 번호(j)의 글이 oldText 면 그 장, 아니면 oldText 가 딱 한 장일 때만 그 장
  * pieces 가 여러 장이면 그 자리에 나눠 넣는다.
@@ -47,6 +48,5 @@ export function patchSongSlides(song: readonly string[], j: number, oldText: str
   if (!hits.length) return null
   const targets = all ? hits : song[j] === oldText ? [j] : hits.length === 1 ? hits : null
   if (!targets) return null
-  const next = replaceSlides(song, targets, pieces)
-  return next.length ? next : null // 지워서 원본이 비면 원본은 건드리지 않음
+  return replaceSlides(song, targets, pieces) // 빈 목록 = 지워서 원본이 비게 됨(부르는 쪽이 원본을 건드리지 않음)
 }

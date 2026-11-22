@@ -68,8 +68,8 @@ describe('장 삭제(pieces = [])', () => {
     expect(remapIndex(2, [2], 0, 2)).toBe(1) // 마지막 C 를 지움 → 앞 장 B
     expect(remapIndex(3, [1, 3], 0, 2)).toBe(1) // 둘째 후렴(마지막) 지움 → 앞 장
   })
-  it('곡 원본: 그 장만 지움, 다 지워지면 원본은 건드리지 않음(null)', () => {
+  it('곡 원본: 그 장만 지움, 다 지워지면 빈 목록(부르는 쪽이 원본을 그대로 둠)', () => {
     expect(patchSongSlides(['A', 'B', 'C'], 1, 'B', [], false)).toEqual(['A', 'C'])
-    expect(patchSongSlides(['B', 'B'], 0, 'B', [], true)).toBeNull()
+    expect(patchSongSlides(['B', 'B'], 0, 'B', [], true)).toEqual([])
   })
 })

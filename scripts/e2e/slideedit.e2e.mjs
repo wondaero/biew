@@ -143,6 +143,14 @@ try {
   await del(0, 3) // 송출 중인 장
   s = await state(p)
   check('송출 중인 장 삭제 → BLANK, 위치는 그 자리로 당겨진 다음 장', s.setlist[0].slides.length === 5 && s.blank === true && s.slideIndex === 3, JSON.stringify({ n: s.setlist[0].slides.length, i: s.slideIndex, b: s.blank }))
+  // FREEZE 중인 장은 못 지움(송출은 고정 글, 목록의 '송출 중' 표시가 옆 장으로 옮겨 가 헷갈리므로)
+  await p.$$eval('button', (bs) => bs.find((b) => b.textContent?.includes('BLANK') && b.className.includes('on'))?.click()) // BLANK 풀기
+  await sleep(200)
+  await p.keyboard.press('f'); await sleep(300)
+  s = await state(p)
+  await cellEdit(p, 0, s.frozen?.slideIndex ?? 0); await p.waitForSelector('.se')
+  check('FREEZE 중인 장은 삭제 버튼 꺼짐', !!s.frozen && await p.$eval('.se footer .del', (b) => b.disabled), JSON.stringify({ frozen: !!s.frozen }))
+  await p.click('.se footer button:not(.primary):not(.del)'); await sleep(200)
   await cellEdit(p, 1, 0); await p.waitForSelector('.se')
   check('곡의 마지막 한 장은 삭제 버튼 꺼짐', await p.$eval('.se footer .del', (b) => b.disabled))
   await p.click('.se footer button:not(.primary):not(.del)'); await sleep(200)

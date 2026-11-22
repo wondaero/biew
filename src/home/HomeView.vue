@@ -99,8 +99,12 @@ const showCode = (c: string) => (api.isNumericCode(c) ? `${c.slice(0, 3)} ${c.sl
 /** 컨트롤 버튼: 이 PC 가 호스트면 바로 송출 화면, 내 계정 채널이면 이 PC 를 호스트로 등록해 연다(폰 화면 '내 계정의 채널'과 같은 규칙), 그 밖엔 리모컨(비밀번호) */
 const isHost = (c: Card) => c.roles.includes('host')
 /** 버튼 이름은 [보기]·[제어] 두 가지로 통일(2026-11-22 사용자 결정 — 송출 열기/이 PC 로 열기/컨트롤이 헷갈림). 어떤 역할로 열리는지는 배지·툴팁으로 */
-const ctlTitle = (c: Card) => (isHost(c) ? '이 PC 에서 송출 조작(호스트)' : c.mine ? '이 PC 를 이 채널의 송출 PC(호스트)로 등록하고 조작합니다' : '리모컨으로 조작(컨트롤 비밀번호)')
-const openCtl = (c: Card) => router.push(api.controlPath(c.code) + (!isHost(c) && c.mine ? '?as=host' : ''))
+const ctlTitle = (c: Card) => (isHost(c) ? '이 PC 에서 송출 조작(호스트)' : c.mine ? (mobile ? '호스트(송출 기기)로 쓸지 리모컨으로 쓸지 고릅니다' : '이 PC 를 이 채널의 송출 PC(호스트)로 등록하고 조작합니다') : '리모컨으로 조작(컨트롤 비밀번호)')
+/**
+ * 내 계정 채널은 PC 에선 바로 호스트(?as=host — 예전 '내 계정의 채널' 규칙). 폰·태블릿은 묻는다(ControlGate 의 호스트/리모컨 고르기) —
+ * 버튼 설명(title)이 터치에선 안 보여, 리모컨으로 쓰려던 폰이 모르는 새 두 번째 호스트가 되지 않게.
+ */
+const openCtl = (c: Card) => router.push(api.controlPath(c.code) + (!isHost(c) && c.mine && !mobile ? '?as=host' : ''))
 const recent = (c: Card) => !!c.at && Date.now() - new Date(c.at).getTime() < RECENT_MS
 
 // ── 대화창: 새 채널 · 번호로 입장 ──
