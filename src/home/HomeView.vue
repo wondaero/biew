@@ -98,7 +98,8 @@ const ROLE_TEXT: Record<Role, string> = { host: mobile ? '이 기기 호스트' 
 const showCode = (c: string) => (api.isNumericCode(c) ? `${c.slice(0, 3)} ${c.slice(3)}` : c)
 /** 컨트롤 버튼: 이 PC 가 호스트면 바로 송출 화면, 내 계정 채널이면 이 PC 를 호스트로 등록해 연다(폰 화면 '내 계정의 채널'과 같은 규칙), 그 밖엔 리모컨(비밀번호) */
 const isHost = (c: Card) => c.roles.includes('host')
-const ctlLabel = (c: Card) => (isHost(c) ? '송출 열기' : c.mine ? '이 PC 로 열기' : '컨트롤')
+/** 버튼 이름은 [보기]·[제어] 두 가지로 통일(2026-11-22 사용자 결정 — 송출 열기/이 PC 로 열기/컨트롤이 헷갈림). 어떤 역할로 열리는지는 배지·툴팁으로 */
+const ctlTitle = (c: Card) => (isHost(c) ? '이 PC 에서 송출 조작(호스트)' : c.mine ? '이 PC 를 이 채널의 송출 PC(호스트)로 등록하고 조작합니다' : '리모컨으로 조작(컨트롤 비밀번호)')
 const openCtl = (c: Card) => router.push(api.controlPath(c.code) + (!isHost(c) && c.mine ? '?as=host' : ''))
 const recent = (c: Card) => !!c.at && Date.now() - new Date(c.at).getTime() < RECENT_MS
 
@@ -152,7 +153,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
       />
       <div class="row">
         <button type="submit" :disabled="!joinOk">보기</button>
-        <button type="button" :disabled="!joinOk" @click="go('control')">컨트롤 (리모컨)</button>
+        <button type="button" :disabled="!joinOk" @click="go('control')">제어 (리모컨)</button>
       </div>
     </form>
 
@@ -209,7 +210,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
           </div>
           <div class="ch-go">
             <button @click="router.push(api.viewPath(c.code))">보기</button>
-            <button class="ctl" :class="{ primary: isHost(c) }" :title="!isHost(c) && c.mine ? '이 PC 를 이 채널의 송출 PC(호스트)로 등록하고 엽니다' : undefined" @click="openCtl(c)">{{ ctlLabel(c) }}</button>
+            <button class="ctl" :class="{ primary: isHost(c) }" :title="ctlTitle(c)" @click="openCtl(c)">제어</button>
           </div>
           <div v-if="c.roles.length || (c.mine && session)" class="ch-more">
             <!-- 보통 크기 버튼(14px — 작은 버튼 없애기 규칙). 삭제는 확인창을 거치는 위험 동작이라 danger-line -->
@@ -252,7 +253,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
         />
         <div class="row">
           <button type="submit" :disabled="!joinOk">보기</button>
-          <button type="button" :disabled="!joinOk" @click="go('control')">컨트롤 (리모컨)</button>
+          <button type="button" :disabled="!joinOk" @click="go('control')">제어 (리모컨)</button>
         </div>
       </form>
     </div>

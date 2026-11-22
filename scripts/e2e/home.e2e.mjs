@@ -53,8 +53,8 @@ try {
   check('검색: 공개 아닌 B 는 공개 탭에 안 나옴', await until(async () => (await listText()).includes('조건에 맞는 채널이 없습니다')))
   await typeSearch('')
 
-  check('공개 채널 카드: 입장 버튼 2개(보기·컨트롤)', (await p.$$eval('li.ch', (lis, t) => [...(lis.find((x) => x.textContent?.includes(t))?.querySelectorAll('.ch-go button') ?? [])].map((b) => b.textContent?.trim()).join('|'), A_T)) === '보기|컨트롤')
-  check('"컨트롤" → 컨트롤 비밀번호 화면', (await cardBtn(A_T, '.ch-go button', '컨트롤')) && !!(await p.waitForSelector('input[placeholder="컨트롤 비밀번호"]', { timeout: 8000 }).catch(() => null)))
+  check('공개 채널 카드: 입장 버튼 2개(보기·제어)', (await p.$$eval('li.ch', (lis, t) => [...(lis.find((x) => x.textContent?.includes(t))?.querySelectorAll('.ch-go button') ?? [])].map((b) => b.textContent?.trim()).join('|'), A_T)) === '보기|제어')
+  check('"제어" → 컨트롤 비밀번호 화면', (await cardBtn(A_T, '.ch-go button', '제어')) && !!(await p.waitForSelector('input[placeholder="컨트롤 비밀번호"]', { timeout: 8000 }).catch(() => null)))
   await p.goto(BASE + '/', { waitUntil: 'networkidle0' })
   await until(async () => (await listText()).includes(A_T))
   await cardBtn(A_T, '.ch-go button', '보기')

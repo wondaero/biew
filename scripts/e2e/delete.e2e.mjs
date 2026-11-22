@@ -68,8 +68,8 @@ try {
   // 로그인은 이 기기에 저장 → 새로고침해도 유지, 머리에 아이디 표시
   await host.reload({ waitUntil: 'networkidle0' })
   check('새로고침해도 로그인 유지 + 머리에 "아이디 로그인됨"', await until(async () => (await host.$eval('.who', (e) => e.textContent ?? '').catch(() => '')) === `${me.email.split('@')[0]} 로그인됨`) && (await mineText(host)).includes(`Lorem 삭제 ${tag}`))
-  // 넓은 PC: 내 계정 카드의 [이 PC 로 열기] → 이 PC 가 호스트(역할 고르기 없이)
-  check('넓은 PC: 내 계정 카드 버튼 = "이 PC 로 열기"', (await host.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('button.ctl')?.textContent?.trim(), `Lorem 삭제 ${tag}`)) === '이 PC 로 열기')
+  // 넓은 PC: 내 계정 카드의 [제어] → 이 PC 가 호스트(역할 고르기 없이, ?as=host)
+  check('넓은 PC: 내 계정 카드 버튼 = "제어"', (await host.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('button.ctl')?.textContent?.trim(), `Lorem 삭제 ${tag}`)) === '제어')
   await host.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('button.ctl')?.click(), `Lorem 삭제 ${tag}`)
   await host.waitForSelector('.control', { timeout: 10000 })
   check('호스트 PC: A 연결됨(경고 없음)', await until(async () => !(await host.$('.netwarn')) && (await host.$eval('.share', (e) => e.className)).includes('live'), 15000))
