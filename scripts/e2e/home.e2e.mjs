@@ -87,7 +87,7 @@ try {
   check('이 기기 A [보기] → 비밀번호 없이 바로', await until(async () => (await p.$eval('body', (b) => b.textContent ?? '')).includes('송출 대기 중')) && !(await p.$('input[type=password]')))
   await p.goto(BASE + '/', { waitUntil: 'networkidle0' })
   await tab('이 기기')
-  await cardBtn(B_T, '.ch-more .link', '이 기기 목록에서 지우기')
+  await cardBtn(B_T, '.ch-more .forget', '목록에서 지우기')
   check('이 기기 목록에서 B 지움', await until(async () => !(await listText()).includes(B_T)))
 } catch (e) { fail++; console.error('✖ 중단:', e.message) } finally {
   for (const c of codes) if (c) await admin.from('channels').delete().eq('code', c)

@@ -89,7 +89,7 @@ try {
     && !(await phone.evaluate((c) => !!localStorage.getItem('biew.host.' + c), A)))
   await phone.goto(BASE + '/', { waitUntil: 'networkidle0' })
   await until(async () => (await mineText(phone)).includes(`Lorem 삭제 ${tag}`))
-  await phone.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('.ch-more .link.del')?.click(), `Lorem 삭제 ${tag}`)
+  await phone.$$eval('li.ch', (lis, t) => lis.find((li) => li.textContent?.includes(t))?.querySelector('.ch-more .del')?.click(), `Lorem 삭제 ${tag}`)
   check('삭제 확인창: 최근 사용 → "지금 예배 중일 수 있습니다" 경고', await until(async () => dialogMsg.includes('지금 예배 중일 수 있습니다')), dialogMsg.slice(0, 40))
   check('삭제 후 목록에서 사라짐', await until(async () => !(await mineText(phone)).includes(`Lorem 삭제 ${tag}`)))
   check('서버에서도 삭제됨', !(await admin.from('channels').select('code').eq('code', A).maybeSingle()).data)

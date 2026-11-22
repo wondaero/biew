@@ -161,7 +161,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
       <input v-model="q" class="search" type="search" placeholder="🔍 채널 제목·번호 검색" />
       <button v-if="!mobile" @click="openJoin">번호로 입장</button>
       <button class="create-open" @click="openCreate">＋ 새 채널</button>
-      <button v-if="!mobile" class="primary local-open" title="이 PC 하나에서만 송출(컨트롤러 + 출력 창). 인터넷·로그인·서버가 필요 없습니다" @click="router.push('/local')">▶ 로컬 송출 열기</button>
+      <button v-if="!mobile" class="primary local-open" title="이 PC 하나에서만 송출(컨트롤러 + 출력 창). 인터넷·로그인·서버가 필요 없습니다" @click="router.push('/local')">▶&#xFE0E; 로컬 송출 열기</button>
     </div>
 
     <p v-if="!supabase" class="warn">Supabase 설정(.env)이 없어 서버 기능(채널 만들기·리모컨·보기)을 쓸 수 없습니다.</p>
@@ -184,7 +184,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
         <p v-if="mobile" class="muted">받은 번호를 위에 입력해 들어가세요. 이 기기에서 들어간 채널, 보기 비밀번호가 있는 공개 채널(최근 7일)<template v-if="session">, 내 계정의 채널</template>이 여기에 모입니다.</p>
         <p v-else class="muted">예배는 보통 <b>로컬 송출</b>(이 PC 하나, 인터넷 불필요)로 합니다. 폰 리모컨·보기 기기가 필요할 때만 채널을 만드세요.<br />이 PC 에서 만들었거나 들어간 채널, 보기 비밀번호가 있는 공개 채널(최근 7일)<template v-if="session">, 내 계정의 채널</template>이 여기에 모입니다.</p>
         <div v-if="!mobile" class="empty-go">
-          <button class="primary" @click="router.push('/local')">▶ 로컬 송출 열기</button>
+          <button class="primary" @click="router.push('/local')">▶&#xFE0E; 로컬 송출 열기</button>
           <button @click="openCreate">＋ 새 채널</button>
           <button @click="openJoin">번호로 입장</button>
         </div>
@@ -212,8 +212,9 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
             <button class="ctl" :class="{ primary: isHost(c) }" :title="!isHost(c) && c.mine ? '이 PC 를 이 채널의 송출 PC(호스트)로 등록하고 엽니다' : undefined" @click="openCtl(c)">{{ ctlLabel(c) }}</button>
           </div>
           <div v-if="c.roles.length || (c.mine && session)" class="ch-more">
-            <button v-if="c.roles.length" class="link" title="이 기기에 남은 기록(선곡·입장 정보)만 지웁니다. 서버의 채널은 그대로" @click="forgetAll(c.code, c.title)">{{ mobile ? '이 기기' : '이 PC' }} 목록에서 지우기</button>
-            <button v-if="c.mine && session" class="link del" title="서버에서 채널 삭제(되돌릴 수 없음)" @click="removeRow(c.mine!)">채널 삭제</button>
+            <!-- 보통 크기 버튼(14px — 작은 버튼 없애기 규칙). 삭제는 확인창을 거치는 위험 동작이라 danger-line -->
+            <button v-if="c.roles.length" class="quiet forget" :title="`${mobile ? '이 기기' : '이 PC'}에 남은 기록(선곡·입장 정보)만 지웁니다. 서버의 채널은 그대로`" @click="forgetAll(c.code, c.title)">목록에서 지우기</button>
+            <button v-if="c.mine && session" class="danger-line del" title="서버에서 채널 삭제(되돌릴 수 없음)" @click="removeRow(c.mine!)">채널 삭제</button>
           </div>
         </li>
       </ul>
@@ -281,7 +282,7 @@ button { white-space: nowrap; }
 .hd-head { display: flex; align-items: center; gap: 16px; }
 h2 { margin: 0; font-size: 15px; }
 .tabs { display: flex; gap: 4px; padding: 3px; background: var(--panel-2); border-radius: 8px; }
-.tabs button { padding: 5px 14px; font-size: 13px; border-color: transparent; background: none; box-shadow: none; }
+.tabs button { padding: 5px 14px; font-size: 14px; border-color: transparent; background: none; box-shadow: none; }
 .tabs button.on { background: var(--bg); border-color: var(--line); font-weight: 600; }
 .tabs small { color: var(--muted); margin-left: 2px; }
 
@@ -304,9 +305,7 @@ h2 { margin: 0; font-size: 15px; }
 .ch-go { display: flex; gap: 6px; margin-top: auto; }
 .ch-go button { flex: 1; min-width: 0; padding: 8px; }
 .ch-more { display: flex; justify-content: space-between; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
-.link { padding: 2px 4px; font-size: 11px; color: var(--muted); background: none; border: none; box-shadow: none; }
-.link:hover { color: var(--text); }
-.link.del:hover { color: var(--pgm); }
+.ch-more button { flex: 1; min-width: 0; font-size: 14px; padding: 6px 8px; margin-bottom: 0; white-space: nowrap; }
 
 .empty { display: grid; justify-items: center; gap: 10px; padding: 48px 16px; text-align: center; }
 .empty .big { margin: 0; font-size: 17px; font-weight: 700; }

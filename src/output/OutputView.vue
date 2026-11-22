@@ -35,6 +35,7 @@ function connect(c: string): SyncHub {
 /** 화면은 그대로, 연결만 새 채널로(주소도 바꿔 두어 새로고침해도 새 채널로 복구) */
 function switchTo(next: string) {
   hub.close()
+  preview.clear() // 옛 채널의 임시 설정(바로 적용)은 끝
   code = next
   history.replaceState(history.state, '', `/output/${next}`)
   hub = connect(next)

@@ -39,6 +39,8 @@ let hub: SyncHub | null = null
 let remoteSend: ((c: Command) => void) | null = null
 let publishHook: ((s: LiveState) => void) | null = null
 let previewHook: ((m: Extract<SyncMessage, { type: 'style-preview' }>) => void) | null = null
+/** '바로 적용' 임시 설정을 보내는 중인지(닫을 때 끝 신호를 보내야 하는지) */
+let previewActive = false
 
 /** 호스트로 채널 열기. 같은 PC 의 출력 창과는 BroadcastChannel(채널별 이름)로 */
 export function openHost(code: string, hooks: { publish: (s: LiveState) => void; publishPreview?: (m: Extract<SyncMessage, { type: 'style-preview' }>) => void }) {
@@ -73,6 +75,9 @@ export function openRemote(code: string, send: (c: Command) => void) {
 }
 
 export function closeChannel() {
+  // 바로 적용 중이었으면 연결을 끊기 전에 '임시 설정 끝'을 보낸다 — 끊은 뒤엔 보낼 길이 없어 송출 화면에 저장 안 한 설정이 시한(6초)까지 남는다
+  if (previewActive) sendStylePreview(null)
+  previewActive = false
   hub?.close()
   hub = null; remoteSend = null; publishHook = null; previewHook = null
   channelCode.value = null
@@ -112,6 +117,7 @@ export function sendStylePreview(style: OutputStyle | null, until?: number) {
   // 수정본은 Vue 반응형(Proxy) — BroadcastChannel(postMessage)은 Proxy 를 복사하지 못해 조용히 실패하므로 일반 객체로
   const plain = style ? (JSON.parse(JSON.stringify(style)) as OutputStyle) : null
   const m = { type: 'style-preview' as const, style: plain, ...(until !== undefined ? { until } : {}) }
+  previewActive = style !== null
   hub.send(m)
   previewHook?.(m)
 }

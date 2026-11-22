@@ -22,29 +22,34 @@ import StylePanel from './panels/StylePanel.vue'
 import StylePreview from './panels/StylePreview.vue'
 
 const emit = defineEmits<{ close: [] }>()
+/**
+ * 사용자가 닫을 때만(✕·Esc·바깥 클릭·뒤로가기) — 바로 적용 모드면 저장 안 한 변경을 버린다.
+ * 언마운트에서 하지 않는 이유: 창 폭을 줄이면(≤768px) 이 팝업이 저절로 사라지고 모바일 시트로 바뀌는데, 그때 고친 것을 버리면 안 된다.
+ */
+function close() { draft.closed(); emit('close') }
 const live = useLive()
 const draft = useStyleDraft()
 const air = computed(() => onAir(live.state))
 
-useBackClose(() => true, () => emit('close'))
+useBackClose(() => true, close)
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') { e.preventDefault(); emit('close') }
+  if (e.key === 'Escape') { e.preventDefault(); close() }
   else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); draft.apply() }
 }
 usePauseHotkeys()
 onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); draft.closed() })
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <div class="sd-backdrop" @mousedown.self="emit('close')">
+  <div class="sd-backdrop" @mousedown.self="close">
     <div class="sd" role="dialog" aria-modal="true" aria-label="출력 설정">
       <header>
         <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag" :class="{ inst: draft.instant.value }">{{ draft.instant.value ? '저장 전 — 송출 화면에 보이는 중' : '저장 안 된 변경' }}</span></h2>
         <small class="keys">Ctrl+Enter 저장 · Esc 닫기{{ draft.instant.value ? '(저장 안 한 변경은 되돌아감)' : '(고친 내용은 남음)' }}</small>
         <span class="spacer" />
-        <button class="quiet" :title="draft.instant.value ? '닫기 (Esc) — 저장 안 한 변경은 되돌아갑니다' : '닫기 (Esc) — 고친 내용은 남습니다'" @click="emit('close')">✕</button>
+        <button class="quiet" :title="draft.instant.value ? '닫기 (Esc) — 저장 안 한 변경은 되돌아갑니다' : '닫기 (Esc) — 고친 내용은 남습니다'" @click="close">✕</button>
       </header>
       <div class="sd-body">
         <section class="sd-left">

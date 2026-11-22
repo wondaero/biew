@@ -36,5 +36,7 @@ export function useStylePreview(currentVersion: () => number | undefined) {
     if (style.value && Date.now() - lastAt > PREVIEW_TTL_MS) { style.value = null; clearAt = null }
   }, 1000)
   onBeforeUnmount(() => clearInterval(timer))
-  return { style, onMessage, onState }
+  /** 채널을 갈아탈 때 등 — 임시 설정을 바로 끝 */
+  function clear() { style.value = null; clearAt = null }
+  return { style, onMessage, onState, clear }
 }

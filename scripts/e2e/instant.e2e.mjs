@@ -90,7 +90,24 @@ try {
   const c2 = await ctx.newPage()
   await c2.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
   check('모드는 이 기기에 기억(localStorage)', (await c2.evaluate(() => localStorage.getItem('biew.styleInstant.v1'))) === '1')
-  await c2.close(); await out.close()
+  await c2.close()
+  // 창 폭을 줄여(≤768px) 팝업이 저절로 사라져도 저장 안 한 변경은 남는다(버리는 건 사용자가 닫을 때만) — 리뷰에서 찾은 버그
+  const c3 = await ctx.newPage()
+  c3.on('dialog', (d) => d.accept())
+  await c3.setViewport({ width: 1400, height: 900 })
+  await c3.goto(BASE + '/local', { waitUntil: 'networkidle0' })
+  await openDialog(c3)
+  await setColor(c3, '#ff00ff')
+  check('(다시) 바로 적용 → 출력 창 자홍', await until(async () => (await txtColor(out)) === 'rgb(255, 0, 255)', 3000), await txtColor(out))
+  await c3.setViewport({ width: 700, height: 900 })
+  await sleep(1000)
+  check('창 폭을 줄여 팝업이 사라져도 변경 유지(출력 창 자홍)', !(await c3.$('.sd')) && (await txtColor(out)) === 'rgb(255, 0, 255)', await txtColor(out))
+  // 앱 안에서 컨트롤러를 나가면(로고 → 채널 목록) '끝' 신호가 연결을 끊기 전에 나가 바로 되돌아간다(6초 시한까지 기다리지 않음)
+  const t0 = Date.now()
+  await c3.$eval('button.brand', (b) => b.click())
+  const back = await until(async () => (await txtColor(out)) === BLUE, 2500)
+  check('컨트롤러를 나가면 2.5초 안에 출력 창 원래대로(파랑)', back, `${await txtColor(out)} ${Date.now() - t0}ms`)
+  await c3.close(); await out.close()
 
   // ── 2. 인터넷 송출: 넓은 화면 보기 기기 ──
   userId = (await admin.auth.admin.createUser({ email, password, email_confirm: true, app_metadata: { role: 'staff' } })).data.user.id

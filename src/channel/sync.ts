@@ -234,6 +234,7 @@ function flushPreview() {
 export function stopHostSync() {
   gen++
   clearInterval(retryTimer); clearInterval(checkTimer); clearTimeout(fetchTimer)
+  if (previewPending) flushPreview() // 묶여 기다리던 마지막 것(보통 '끝' 신호)은 보내고 닫는다
   clearTimeout(previewTimer); previewTimer = undefined; previewPending = null
   curCtl = null; curView = null
   window.removeEventListener('online', onOnline)

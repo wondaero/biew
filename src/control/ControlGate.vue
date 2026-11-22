@@ -32,7 +32,8 @@ const busy = ref(false)
 let ticket = 0 // 진입이 겹칠 때 늦게 끝난 쪽을 버린다
 
 function teardown() {
-  stopHostSync(); stopRemote(); closeChannel()
+  // closeChannel 먼저: 바로 적용 중이던 임시 설정의 '끝' 신호가 아직 열린 인터넷 연결로 나가도록
+  closeChannel(); stopHostSync(); stopRemote()
 }
 function fail(m: string) { msg.value = m; phase.value = 'error' }
 
