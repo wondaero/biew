@@ -144,18 +144,25 @@ try {
 
   // ── 리모컨 → 프로젝터(PGM) 반영 시간(실제 브라우저) ──
   {
+    // 바뀐 순간을 PC 페이지 안에서 기록(MutationObserver, 같은 PC 시계) — 바깥에서 주기적으로 확인하면 확인 간격만큼 오차가 붙어
+    // 실제 0.2초대가 0.26/0.52초 두 값으로만 찍혔다(2026-11-22 성능 점검)
+    await host.evaluate(() => {
+      window.__pgmAt = []
+      const el = document.querySelector('.bar.pgm span')
+      new MutationObserver(() => window.__pgmAt.push(Date.now())).observe(el, { childList: true, characterData: true, subtree: true })
+    })
     await remote.bringToFront()
     const times = []
-    for (let i = 0; i < 6; i++) {
-      const before = await pgm()
+    for (let i = 0; i < 8; i++) {
       const t0 = Date.now()
       await remote.click(i % 2 ? 'button[title^="이전"]' : 'button[title^="다음"]')
-      if (await until(async () => (await pgm()) !== before, 5000)) times.push(Date.now() - t0)
-      await sleep(400)
+      const at = await until(async () => (await host.evaluate((t) => window.__pgmAt.find((x) => x >= t) ?? 0, t0)) > 0, 5000)
+      if (at) times.push((await host.evaluate((t) => window.__pgmAt.find((x) => x >= t), t0)) - t0)
+      await sleep(600)
     }
     times.sort((a, b) => a - b)
     console.log(`  · 리모컨 누름 → PC 송출(PGM) 반영: 중앙값 ${times[Math.floor(times.length / 2)]}ms, 최악 ${times.at(-1)}ms (${times.length}회)`)
-    check('리모컨 → PC 송출 반영이 0.5초 이내(중앙값)', times.length === 6 && times[3] <= 500, JSON.stringify(times))
+    check('리모컨 → PC 송출 반영이 0.5초 이내(중앙값)', times.length === 8 && times[4] <= 500, JSON.stringify(times))
   }
 
   // ── 이 PC 에서 리모컨 쫓아내기(그때 로그인) → 리모컨만 막힘, PC·보기 그대로 ──

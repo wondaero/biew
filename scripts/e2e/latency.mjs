@@ -1,6 +1,7 @@
 // 인터넷 송출 지연 측정: 리모컨 명령 왕복, 실시간 전달, 호스트 재조회. 임시 계정·Lorem 채널, 끝나면 삭제.
 import { randomBytes } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import './_lib.mjs' // .env 불러오기(다른 E2E 와 같게)
 const url = process.env.SUPABASE_URL, anon = process.env.VITE_SUPABASE_ANON_KEY
 const opts = { auth: { persistSession: false, autoRefreshToken: false } }
 const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY, opts)

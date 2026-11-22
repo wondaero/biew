@@ -119,6 +119,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 ## 함정
 - **pull 뒤에는 `npm install`** — 새 의존성(예: 송출 글꼴 `pretendard`)이 없으면 빌드가 에러 없이 글꼴을 빼먹는다(겪음 — 오프라인 E2E 글꼴 확인 실패). 운영(Vercel)은 매번 새로 설치하므로 영향 없음.
 - **Vue scoped 스타일은 자식 컴포넌트의 최상위 요소에도 걸린다.** 부모에 `.backdrop { display:none }` 같은 범용 이름을 두면 같은 이름의 자식 대화창이 통째로 숨는다(겪음 — 인터넷 송출 전환 창). 부모 쪽은 접두사(`sheet-`)를 붙일 것.
+- **지연 측정은 바뀐 순간을 그 페이지 안에서 기록**(MutationObserver) — 바깥에서 주기적으로 확인하면 확인 간격만큼 오차(겪음: 실제 0.2초가 0.52초로). 리모컨→PC 지연은 `node scripts/e2e/latency-browser.mjs 30`. 호스트 PC 는 알림을 받으면 타이머 없이 바로 서버를 읽는다(`fetchNow`).
 - 가려진(백그라운드) 탭은 브라우저가 타이머를 늦춘다 → 주기 확인(호스트 10초 주소 확인 등)이 늦어질 수 있음. E2E 에서 해당 탭을 `bringToFront()` 할 것.
 - 송출 배경은 `style.backdrop`(shared/backdrop.ts). 예전 `style.background` 는 normalizeLive 가 이전하고 지운다. ATEM 키잉은 검정·초록 단색만 가능.
 - 서비스 워커는 **배포용 빌드에서만** 동작(dev 서버는 꺼져 있음). 오프라인 확인은 `npm run build` 후 `vite preview` 로, 서버를 실제로 꺼서.

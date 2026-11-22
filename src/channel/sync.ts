@@ -107,7 +107,7 @@ async function connectHost(retried = false) {
     },
   })
   // 알림은 '바뀌었다'는 신호로만 — 실제 상태는 서버에서 읽는다
-  ctl.subscribe((m) => { if (m.type === 'state') scheduleFetch() })
+  ctl.subscribe((m) => { if (m.type === 'state') void fetchNow() })
 
   // 상태 맞추기: 끊긴 동안 PC 혼자 송출했다면 PC 기준(force), 아니면 더 새로운 쪽
   const local = getState?.()
@@ -120,16 +120,28 @@ async function connectHost(retried = false) {
 }
 
 /**
- * 서버의 현재 상태를 읽어 반영(리모컨이 바꿨을 때). 짧은 시간의 여러 알림은 한 번으로(0.03초 — 리모컨→프로젝터 0.5초 이내 목표).
+ * 서버의 현재 상태를 읽어 반영(리모컨이 바꿨을 때). 알림을 받으면 기다리지 않고 바로 읽는다(2026-11-22 성능 점검 —
+ * 예전엔 0.03초 모아서 읽었다). 알림이 몰리면: 읽는 중엔 새로 읽지 않고, 끝난 뒤 한 번만 더 읽는다(마지막 변경을 놓치지 않게).
+ * 타이머를 거치지 않는 이유: 가려진 창은 브라우저가 타이머를 늦춘다.
  * 주소가 바뀌었으면(다른 기기에서 쫓아내기·보기 비밀번호 변경) 다시 연결한다.
  */
-function scheduleFetch(delay = 30) {
+/** 읽는 중(시작 시각, 0 = 아님). 응답이 안 오는 요청(인터넷이 순간 끊김)이 다음 읽기를 영영 막지 않게 5초 지나면 무시 */
+let fetchingSince = 0
+let fetchAgain = false
+const FETCH_STUCK_MS = 5000
+function scheduleFetch(delay = 0) {
   clearTimeout(fetchTimer)
-  fetchTimer = window.setTimeout(async () => {
-    const code = hostCode
-    const token = code ? loadHost(code)?.token : null
-    if (!code || !token) return
-    if (pushing || queued) { scheduleFetch(); return } // 올리는 중이면 끝난 뒤에
+  fetchTimer = window.setTimeout(() => void fetchNow(), delay)
+}
+async function fetchNow() {
+  if (fetchingSince && Date.now() - fetchingSince < FETCH_STUCK_MS) { fetchAgain = true; return }
+  const code = hostCode
+  const token = code ? loadHost(code)?.token : null
+  if (!code || !token) return
+  if (pushing || queued) { scheduleFetch(30); return } // 올리는 중이면 끝난 뒤에
+  const started = Date.now()
+  fetchingSince = started
+  try {
     const j = await api.hostJoin(code, token)
     if (code !== hostCode) return
     if (j.status === 'ok') {
@@ -137,7 +149,13 @@ function scheduleFetch(delay = 30) {
       if (j.state) adopt?.(j.state)
     } else if (j.status === 'token_rejected') void onRejected(code)
     else if (j.status === 'not_found') markDeleted()
-  }, delay)
+  } finally {
+    // 늦게 끝난 옛 요청(5초 넘어 무시된 것)이 새 요청의 표시를 지우지 않게
+    if (fetchingSince === started) {
+      fetchingSince = 0
+      if (fetchAgain) { fetchAgain = false; void fetchNow() }
+    }
+  }
 }
 
 /** 서버에 올리고, 성공하면 보기 기기·리모컨에 알린다. 동시에 여러 번 오면 마지막 것만 이어서 */
