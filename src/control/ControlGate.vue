@@ -17,6 +17,7 @@ import { startHostSync, stopHostSync, publishHost, publishStylePreview, startRem
 import { openHost, openRemote, closeChannel, adoptState, useLive } from '@/live/liveStore'
 import { loadHost, saveHost, saveVisit } from '@/live/persistence'
 import ControlView from './ControlView.vue'
+import { setMediaSource } from '@/media/media'
 
 const route = useRoute()
 const live = useLive()
@@ -34,6 +35,7 @@ let ticket = 0 // 진입이 겹칠 때 늦게 끝난 쪽을 버린다
 function teardown() {
   // closeChannel 먼저: 바로 적용 중이던 임시 설정의 '끝' 신호가 아직 열린 인터넷 연결로 나가도록
   closeChannel(); stopHostSync(); stopRemote()
+  setMediaSource(null)
 }
 function fail(m: string) { msg.value = m; phase.value = 'error' }
 
@@ -88,6 +90,8 @@ const chooseRemote = () => { phase.value = 'loading'; void enterRemote(code.valu
 function enterHost(c: string, t: string, serverState: unknown) {
   title.value = t
   openHost(c, { publish: publishHost, publishPreview: publishStylePreview })
+  // 이 PC 에 없는 그림(다른 PC 가 넣은 것)은 서버에서 큰 그림으로 받아 이 PC 에 저장(출력 창이 읽음)
+  setMediaSource({ code: c, kind: 'host', variant: 'full', persist: true })
   adoptState(serverState)
   startHostSync(c, { getState: () => JSON.parse(JSON.stringify(live.state)), adopt: adoptState })
   phase.value = 'ready'
@@ -103,6 +107,7 @@ async function enterRemote(c: string, password: string | undefined, my: number) 
       title.value = j.title ?? c
       saveVisit(c, 'control', title.value) // 홈 "이 기기의 채널"
       openRemote(c, sendRemote)
+      setMediaSource({ code: c, kind: 'control', variant: 'thumb', persist: false }) // 리모컨 = 작은 그림, 저장 안 함
       startRemote(c, j, (s) => adoptState(s))
       phase.value = 'ready'
       return

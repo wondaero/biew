@@ -10,12 +10,14 @@ import { useRoute } from 'vue-router'
 import type { LiveState } from '@shared/types'
 import { BroadcastChannelTransport } from '@/sync/BroadcastChannelTransport'
 import { SyncHub } from '@/sync/SyncHub'
-import { loadLive } from '@/live/persistence'
+import { loadLive, loadHost, LOCAL_CODE } from '@/live/persistence'
 import { onAir } from '@/live/nav'
 import SlideRender from '@/components/SlideRender.vue'
 import { useWakeLock } from './useWakeLock'
 import { uid } from '@/lib/uid'
 import { useStylePreview } from '@/live/stylePreview'
+
+import { setMediaSource } from '@/media/media'
 
 // 채널별 출력: 같은 PC 의 해당 채널 컨트롤러와만 BroadcastChannel 로 연결된다(네트워크 불필요 → 인터넷이 끊겨도 동작)
 let code = String(useRoute().params.code ?? '').toUpperCase()
@@ -24,6 +26,14 @@ const state = ref<LiveState | null>(loadLive(code))
 // 출력 설정 '바로 적용' 중인 임시 설정(저장 전) — 있으면 이걸로 그린다(src/live/styleDraft.ts)
 const preview = useStylePreview(() => state.value?.version)
 let hub = connect(code)
+/**
+ * 그림 슬라이드: 이 PC 에 있는 그림으로 그린다(서버 불필요). 인터넷 송출 호스트 PC 인데 이 PC 에 없는 그림
+ * (다른 PC 가 넣은 것)은 같은 PC 의 호스트 토큰으로 서버에서 받아 저장 — 컨트롤러도 같은 일을 하므로 어느 쪽이 먼저든 같다.
+ */
+function mediaSourceFor(c: string) {
+  setMediaSource(c !== LOCAL_CODE && loadHost(c)?.token ? { code: c, kind: 'host', variant: 'full', persist: true } : null)
+}
+mediaSourceFor(code)
 if (state.value) hub.mark(state.value)
 
 function connect(c: string): SyncHub {
@@ -39,6 +49,7 @@ function switchTo(next: string) {
   code = next
   history.replaceState(history.state, '', `/output/${next}`)
   hub = connect(next)
+  mediaSourceFor(next)
   hub.send({ type: 'request-state', from: ID })
   hub.send({ type: 'output-alive', from: ID })
 }

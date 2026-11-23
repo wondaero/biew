@@ -1,30 +1,35 @@
 <script setup lang="ts">
 /**
- * 그림 슬라이드 한 장(shared/media.ts). 이 기기 IndexedDB 에서 꺼내 그린다 — 부모 크기 안에 비율 유지(contain).
- * 이 기기에 없으면(폰 리모컨·보기 — 1단계는 PC 에만 있음) 자리 표시.
+ * 그림 슬라이드 한 장(shared/media.ts). 이 기기 IndexedDB → 없으면(인터넷 송출의 폰·다른 PC) 서버에서 받아 그린다
+ * (src/media/media.ts mediaUrl). 부모 크기 안에 비율 유지(contain), 검정 바탕.
+ * 아직 없으면(PC 가 올리는 중) 자리 표시 — 호스트의 알림(mediaTick)이 오거나 몇 초마다 다시 찾는다.
  */
-import { ref, watch } from 'vue'
-import { mediaUrl } from '@/media/media'
+import { ref, watch, onBeforeUnmount } from 'vue'
+import { mediaUrl, mediaTick } from '@/media/media'
 
 const props = withDefaults(defineProps<{ id: string; compact?: boolean }>(), { compact: false })
-/** undefined = 불러오는 중, null = 이 기기에 없음 */
+/** undefined = 불러오는 중, null = 아직 없음 */
 const url = ref<string | null | undefined>(undefined)
+let retry: ReturnType<typeof setTimeout> | undefined
+let alive = true
 
-watch(
-  () => props.id,
-  async (id) => {
-    url.value = undefined
-    const u = await mediaUrl(id)
-    if (props.id === id) url.value = u
-  },
-  { immediate: true },
-)
+async function find() {
+  clearTimeout(retry)
+  const id = props.id
+  const u = await mediaUrl(id)
+  if (!alive || props.id !== id) return
+  if (u || url.value !== u) url.value = u
+  if (!u) retry = setTimeout(find, 5000)
+}
+watch(() => props.id, () => { url.value = undefined; void find() }, { immediate: true })
+watch(mediaTick, () => { if (!url.value) void find() })
+onBeforeUnmount(() => { alive = false; clearTimeout(retry) })
 </script>
 
 <template>
   <div class="media" :class="{ compact }">
     <img v-if="url" :src="url" alt="" draggable="false" />
-    <span v-else-if="url === null" class="none">🖼 그림<template v-if="!compact"> — 이 기기에는 없음(PC 에서만 보임)</template></span>
+    <span v-else-if="url === null" class="none">🖼 그림<template v-if="!compact"> — 받는 중이거나 아직 없음</template></span>
   </div>
 </template>
 

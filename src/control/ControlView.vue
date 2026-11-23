@@ -24,7 +24,9 @@ import { useStyleDraft } from '@/live/styleDraft'
 import ChannelPopover from './panels/ChannelPopover.vue'
 import SwitchToInternet from './SwitchToInternet.vue'
 import MediaImport from './MediaImport.vue'
-import { cleanupMedia } from '@/media/media'
+import { cleanupMedia, prefetchMedia, mediaFetch, mediaTick } from '@/media/media'
+import { mediaUpload } from '@/channel/mediaSync'
+import { isMediaSlide } from '@shared/media'
 
 defineProps<{ title: string }>()
 const router = useRouter()
@@ -147,6 +149,13 @@ function goHome() {
   router.push('/')
 }
 
+// 그림 슬라이드: 선곡의 그림을 미리 준비(이 기기에 없으면 서버에서 — 인터넷 송출의 리모컨·다른 PC). 로컬 송출은 이 PC 것만
+watch(
+  [() => live.state.setlist.flatMap((it) => it.slides).filter(isMediaSlide).join('|'), mediaTick],
+  () => void prefetchMedia(live.state.setlist.flatMap((it) => it.slides)),
+  { immediate: true },
+)
+
 onMounted(() => {
   document.title = `${isHost.value ? '컨트롤러' : '리모컨'} — Biew`
   if (isHost.value) {
@@ -223,6 +232,9 @@ onBeforeUnmount(() => {
     -->
     <aside class="side">
       <MonitorPanel @jump="gridRef?.scrollToLive()" />
+      <!-- 그림: 호스트 = 폰용으로 서버에 올리는 중, 리모컨 = 받는 중 -->
+      <p v-if="isHost && mediaUpload" class="media-st" :class="{ warn: mediaUpload.error }">🖼 {{ mediaUpload.error ? `폰용 그림 올리기 멈춤 — ${mediaUpload.error} (자동 재시도, 송출은 정상)` : `폰용 그림 올리는 중 ${mediaUpload.done}/${mediaUpload.total}` }}</p>
+      <p v-else-if="!isHost && mediaFetch && mediaFetch.done < mediaFetch.total" class="media-st">🖼 그림 받는 중 {{ mediaFetch.done }}/{{ mediaFetch.total }}<template v-if="mediaFetch.waiting"> · PC 가 올리는 중</template></p>
       <template v-if="isHost">
         <StyleSummary v-if="!narrow" @open="showStyle = true" />
         <div class="side-actions desk-only">
@@ -321,6 +333,8 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
 /* 서버에 올릴 곡 수(곡 검색 팝업 안에 올리기 버튼이 있음) */
 .badge.down { background: rgba(79, 140, 255, .25); color: #dbe7ff; }
 .badge { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; background: #5a4a1e; color: #f5d27a; }
+.media-st { margin: 0; padding: 5px 8px; border-radius: 6px; font-size: 12px; background: #1b2233; color: #cfe0ff; }
+.media-st.warn { background: #2e2614; color: #ffe7a8; }
 .side-hint { margin: 0; font-size: 12px; color: var(--warn); }
 .side-hint b { color: var(--text); }
 /* 선곡: 사이드바의 남는 높이 전부 */

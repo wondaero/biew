@@ -24,6 +24,8 @@ export type SyncMessage =
    * 보내는 쪽은 2초마다 다시 보낸다 — 받는 쪽은 6초 동안 안 오면 스스로 끝(컨트롤러가 꺼지거나 끊겨도 임시 설정이 남지 않게).
    */
   | { type: 'style-preview'; style: OutputStyle | null; until?: number }
+  /** 인터넷 송출: 호스트 PC 가 그림을 서버에 올렸음 → 리모컨·보기는 없던 그림을 다시 받는다(src/channel/mediaSync.ts) */
+  | { type: 'media-ready' }
 
 /**
  * 동기화 경로 추상화.

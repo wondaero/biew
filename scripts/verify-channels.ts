@@ -158,6 +158,29 @@ try {
   // 변경 알림은 변경한 클라이언트가 보낸다(DB 발 공개 알림은 전달되지 않음 — 20261118010000 참고)
   check('호스트는 리모컨이 바꾼 상태를 읽음', ((await hj(hostTok))?.state as LiveState)?.itemIndex === 2)
 
+  // ── 그림 슬라이드(channel_media, 20261123000000) — 더미 바이트(그림 아님) ──
+  const MID = 'abcdef0123456789'
+  const b64 = Buffer.from('Lorem ipsum media').toString('base64')
+  const put = async (a: Record<string, unknown> = {}, c = openCode, tok = hostTok) =>
+    (await rpc(guest, 'host_put_media', { p_code: c, p_token: tok, p_key: 'k9', p_idx: 0, p_variant: 'full', p_media_id: MID, p_data: b64, ...a })).data as string
+  check('그림 올리기: 호스트 토큰 ok', (await put()) === 'ok')
+  check('그림 올리기: 리모컨 토큰 거부', (await put({}, openCode, ctlTok?.token ?? undefined)) === 'token_rejected')
+  check('그림 올리기: 잘못된 id·크기 이름 거부', (await put({ p_media_id: 'Z!' })) === 'invalid' && (await put({ p_variant: 'huge' })) === 'invalid')
+  const gm = async (kind: string, tok: string | null | undefined, c = openCode) =>
+    first<{ status: string; data: string | null }>((await rpc(guest, 'get_media', { p_code: c, p_kind: kind, p_token: tok ?? null, p_media_id: MID, p_variant: 'thumb' })).data)
+  const got = await gm('control', ctlTok?.token)
+  check('받기: 리모컨 토큰 ok(작은 그림이 없으면 큰 그림)', got?.status === 'ok' && Buffer.from(got.data ?? '', 'base64').toString() === 'Lorem ipsum media')
+  check('받기: 보기 비밀번호 없는 채널은 번호만으로', (await gm('view', null))?.status === 'ok')
+  check('받기: 가짜 토큰·없는 역할 거부', (await gm('control', 'deadbeef'))?.status === 'token_rejected' && (await gm('admin', hostTok))?.status === 'token_rejected')
+  const direct = await guest.from('channel_media').select('code').limit(1)
+  const directOwner = await owner.from('channel_media').select('code').limit(1)
+  check('channel_media 직접 읽기 불가(비로그인·소유자 모두)', (!!direct.error || !(direct.data ?? []).length) && (!!directOwner.error || !(directOwner.data ?? []).length))
+  const ml = (await rpc(guest, 'host_media_list', { p_code: openCode, p_token: hostTok })).data as { status: string; item_key: string | null }[] | null
+  check('호스트 목록: 상태 줄 + 올린 것', ml?.[0]?.status === 'ok' && !!ml?.some((x) => x.item_key === 'k9'))
+  check('호스트 목록: 리모컨 토큰 거부', ((await rpc(guest, 'host_media_list', { p_code: openCode, p_token: ctlTok?.token })).data as { status: string }[] | null)?.[0]?.status === 'token_rejected')
+  check('지우기: 리모컨 토큰은 못 지움(-1)', (await rpc(guest, 'host_prune_media', { p_code: openCode, p_token: ctlTok?.token, p_keep: [] })).data === -1)
+  check('지우기: 선곡에 없는 항목 바로 삭제', (await rpc(guest, 'host_prune_media', { p_code: openCode, p_token: hostTok, p_keep: [] })).data === 1 && (await gm('control', ctlTok?.token))?.status === 'missing')
+
   // ── 서버 이동 규칙 = 앱(nav.ts) ──
   let seedN = 7
   const rnd = (n: number) => { seedN = (seedN * 1103515245 + 12345) & 0x7fffffff; return seedN % n }
@@ -205,6 +228,7 @@ try {
   check('보기 비밀번호 변경: 같은 비밀번호 거부', !!(await rpc(owner, 'set_view_password', { p_code: code, p_new_view_password: 'view-pass-2' })).error)
   check('보기 비밀번호 변경: 새 비밀번호 ok', (await v(code, { p_password: 'view-pass-2' }))?.status === 'ok')
   check('보기 비밀번호 변경: 호스트 PC 그대로', (await hj2())?.status === 'ok')
+  check('그림: 보기 비밀번호 있는 채널은 토큰 없이 못 받음', (await put({}, code, hostTok2)) === 'ok' && (await gm('view', null, code))?.status === 'token_rejected')
   check('비로그인은 보기 비밀번호 변경 불가', !!(await rpc(guest, 'set_view_password', { p_code: code, p_new_view_password: null })).error)
   await rpc(owner, 'set_view_password', { p_code: code, p_new_view_password: null })
   check('보기 비밀번호 없애기 → 번호만으로 보기', (await v(code, {}))?.status === 'ok')
@@ -214,6 +238,8 @@ try {
   const del = await owner.from('channels').delete().eq('code', code)
   check('소유자는 채널 삭제', !del.error)
   check('삭제 후 입장 → not_found', (await g({ p_password: 'ctl-pass-9' }))?.status === 'not_found')
+  const left = await admin.from('channel_media').select('code', { count: 'exact', head: true }).eq('code', code)
+  check('채널 삭제 → 그림도 함께 삭제', !left.error && left.count === 0, left.error?.message)
   created.splice(created.indexOf(code), 1)
 } catch (e) {
   fail++

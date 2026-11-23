@@ -19,6 +19,8 @@ import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import type { Command, SyncMessage } from '@/sync/SyncTransport'
 import { isLiveState, normalizeLive, loadHost, saveHost, patchHost, setHostDirty, isHostDirty } from '@/live/persistence'
 import * as api from './api'
+import { hostMediaStart, hostMediaStop, hostMediaKick, hostMediaReconnect } from './mediaSync'
+import { bumpMedia } from '@/media/media'
 
 export type Link = 'off' | 'connecting' | 'live' | 'error'
 export const hostLink = ref<Link>('off')
@@ -108,6 +110,7 @@ async function connectHost(retried = false) {
   })
   // 알림은 '바뀌었다'는 신호로만 — 실제 상태는 서버에서 읽는다
   ctl.subscribe((m) => { if (m.type === 'state') void fetchNow() })
+  hostMediaReconnect() // 그림: 서버 목록부터 다시 읽고 빠진 것 올리기(그림이 없으면 아무것도 안 함)
 
   // 상태 맞추기: 끊긴 동안 PC 혼자 송출했다면 PC 기준(force), 아니면 더 새로운 쪽
   const local = getState?.()
@@ -214,6 +217,8 @@ export function startHostSync(code: string, opts: { getState: () => LiveState; a
   adopt = opts.adopt
   window.addEventListener('online', onOnline)
   window.addEventListener('offline', onOffline)
+  // 그림 올리기 — 다 올리면 리모컨·보기에 알림(그쪽이 받는다)
+  hostMediaStart(code, { getState: opts.getState, notify: () => { const m: SyncMessage = { type: 'media-ready' }; view?.send(m); ctl?.send(m) } })
   retryTimer = window.setInterval(() => {
     if (hostCode && hostLink.value === 'error' && !hostNeedsLogin.value && !hostDeleted.value) void connectHost()
   }, 15000)
@@ -230,6 +235,7 @@ export function reconnectHost() { void connectHost() }
 export function publishHost(s: LiveState) {
   const code = hostCode
   if (!code || hostDeleted.value) return
+  hostMediaKick() // 선곡에 그림을 넣거나 뺐으면 서버에도
   setHostDirty(code, true) // 서버 확인 전까지는 '못 올림'(중간에 새로고침돼도 다시 연결 시 PC 기준)
   void push(s, false)
 }
@@ -267,6 +273,7 @@ export function stopHostSync() {
   curCtl = null; curView = null
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)
+  hostMediaStop()
   closeHostTransports()
   hostCode = null; getState = null; adopt = null; queued = null; pushing = false
   hostLink.value = 'off'
@@ -311,7 +318,10 @@ export function startRemote(code: string, join: api.Join, onState: (s: LiveState
       else if (BAD(st)) remoteLink.value = 'error'
     },
   })
-  rCtl.subscribe((m) => { if (m.type === 'state' && isLiveState(m.state)) onState(normalizeLive(m.state)) })
+  rCtl.subscribe((m) => {
+    if (m.type === 'state' && isLiveState(m.state)) onState(normalizeLive(m.state))
+    else if (m.type === 'media-ready') bumpMedia() // 호스트가 그림을 올림 → 없던 그림 다시 받기
+  })
   if (join.viewTopic) rView = new SupabaseRealtimeTransport(supabase, join.viewTopic, { sendOnly: true })
   catchTimer = window.setInterval(() => void catchUp(), 30000)
   document.addEventListener('visibilitychange', onVisible)

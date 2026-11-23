@@ -16,7 +16,9 @@ import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import { onAir } from '@/live/nav'
 import { useStylePreview } from '@/live/stylePreview'
 import SlideRender from '@/components/SlideRender.vue'
-import { isMediaSlide } from '@shared/media'
+import { isMediaSlide, mediaIdOf } from '@shared/media'
+import MediaImage from '@/components/MediaImage.vue'
+import { setMediaSource, bumpMedia, prefetchMedia, mediaFetch, mediaTick } from '@/media/media'
 import { useWakeLock } from '@/output/useWakeLock'
 import { onStage } from '@/lib/stage'
 
@@ -84,6 +86,7 @@ function teardown() {
   clearInterval(timer)
   hub?.close()
   hub = null
+  setMediaSource(null)
 }
 
 let timer: number | undefined
@@ -114,7 +117,9 @@ async function enter(password?: string) {
     },
   })
   // 출력 설정 '바로 적용' 임시 설정도 받는다(넓은 화면 = 송출 화면만 그린다. 폰 가사 목록은 설정을 안 씀)
-  hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live'; preview.onState(s) }, (m) => preview.onMessage(m))
+  // 그림 슬라이드: 보기 = 큰 그림, 기기에 저장 안 함(열 때마다 받음). 호스트가 다 올리면 media-ready 로 알려 줌
+  setMediaSource({ code: code.value, kind: 'view', variant: 'full', persist: false })
+  hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live'; preview.onState(s) }, (m) => { if (m.type === 'media-ready') bumpMedia(); else preview.onMessage(m) })
   if (j.state) hub.receive(j.state)
   document.addEventListener('visibilitychange', onVis)
   timer = window.setInterval(() => void catchUp(), 30000)
@@ -127,6 +132,11 @@ const waitText = computed(() =>
 
 // 컨트롤러가 FREEZE 중이면 고정된 화면을 따라간다(실제 송출과 같게)
 const air = computed(() => (state.value ? onAir(state.value) : null))
+// 선곡의 그림을 미리 받아 둔다(넘길 때 기다리지 않게). 선곡이 바뀌거나 호스트가 더 올렸다고 알리면 다시
+watch(
+  [() => state.value?.setlist.flatMap((it) => it.slides).filter(isMediaSlide).join('|') ?? '', mediaTick],
+  () => { if (state.value) void prefetchMedia(state.value.setlist.flatMap((it) => it.slides)) },
+)
 const item = computed(() => (state.value && air.value ? state.value.setlist[air.value.itemIndex] : undefined))
 const nextItem = computed(() => (state.value && air.value ? state.value.setlist[air.value.itemIndex + 1] : undefined))
 const text = computed(() => air.value?.text ?? null)
@@ -202,12 +212,13 @@ onBeforeUnmount(() => {
     <main v-else-if="!state" class="msg"><p>{{ waitText }}</p></main>
 
     <main v-else ref="list" class="slides" :class="{ blank: air?.blank }">
+      <p v-if="mediaFetch && mediaFetch.done < mediaFetch.total" class="mfetch">🖼 그림 받는 중 {{ mediaFetch.done }}/{{ mediaFetch.total }}<template v-if="mediaFetch.waiting"> · PC 가 올리는 중</template></p>
       <p
         v-for="(s, j) in item?.slides ?? []"
         :key="`${air?.itemIndex}-${j}`"
         class="slide"
         :class="{ cur: j === air?.slideIndex, past: j < (air?.slideIndex ?? 0) }"
-      >{{ isMediaSlide(s) ? `🖼 그림 ${j + 1}` : s }}</p>
+      ><span v-if="isMediaSlide(s)" class="pic"><MediaImage :id="mediaIdOf(s)" compact /></span><template v-else>{{ s }}</template></p>
       <p v-if="!item" class="msg">대기 중</p>
       <footer v-if="nextItem" class="next">다음 곡 · {{ nextItem.title }}</footer>
     </main>
@@ -249,6 +260,8 @@ header {
 .slide.past { opacity: .5; }
 .slide.cur { color: #fff; background: #23232b; font-weight: 700; font-size: 22px; box-shadow: inset 0 0 0 2px #4f8cff; }
 .slides.blank .slide.cur { box-shadow: inset 0 0 0 2px #555; color: #aaa; font-weight: 400; }
+.slide .pic { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; }
+.mfetch { position: sticky; top: 0; z-index: 1; margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: #1b2233; color: #cfe0ff; font-size: 13px; text-align: center; }
 .next { text-align: center; color: #777; font-size: 14px; margin-top: 24px; }
 .msg { flex: 1; display: grid; place-content: center; text-align: center; color: #aaa; padding: 24px; }
 .msg p { margin: 0 0 6px; font-size: 17px; }
