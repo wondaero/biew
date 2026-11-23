@@ -31,17 +31,22 @@ interface BiewDB extends DBSchema {
   songs: { key: string; value: Song }
   meta: { key: string; value: string }
   pending: { key: string; value: PendingSong }
+  /** 그림 슬라이드(PDF·이미지에서 만든 장) — 이 기기에만. shared/media.ts */
+  media: { key: string; value: MediaBlob }
 }
+
+export interface MediaBlob { id: string; blob: Blob; w: number; h: number; savedAt: string }
 
 let dbp: Promise<IDBPDatabase<BiewDB>> | null = null
 function db() {
-  dbp ??= openDB<BiewDB>('biew', 2, {
+  dbp ??= openDB<BiewDB>('biew', 3, {
     upgrade(d, oldVersion) {
       if (oldVersion < 1) {
         d.createObjectStore('songs', { keyPath: 'id' })
         d.createObjectStore('meta')
       }
       if (oldVersion < 2) d.createObjectStore('pending', { keyPath: 'id' })
+      if (oldVersion < 3) d.createObjectStore('media', { keyPath: 'id' })
     },
     blocked() {
       dbNotice.value = '다른 Biew 창(옛 버전)이 열려 있어 곡 목록을 불러오지 못하고 있습니다. 다른 Biew 창을 닫거나 새로고침하면 바로 이어집니다. (송출은 영향 없음)'
@@ -113,4 +118,23 @@ export async function putPending(p: PendingSong) {
 }
 export async function removePending(id: string) {
   await (await db()).delete('pending', id)
+}
+
+// ── 그림 슬라이드 ──
+export async function putMedia(m: MediaBlob) {
+  await (await db()).put('media', m)
+}
+export async function getMedia(id: string): Promise<MediaBlob | undefined> {
+  return (await db()).get('media', id)
+}
+export async function hasMedia(id: string): Promise<boolean> {
+  return (await (await db()).getKey('media', id)) !== undefined
+}
+export async function allMediaIds(): Promise<string[]> {
+  return (await db()).getAllKeys('media')
+}
+export async function removeMedia(ids: string[]) {
+  const tx = (await db()).transaction('media', 'readwrite')
+  for (const id of ids) void tx.store.delete(id)
+  await tx.done
 }

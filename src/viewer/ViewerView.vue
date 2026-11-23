@@ -16,6 +16,7 @@ import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import { onAir } from '@/live/nav'
 import { useStylePreview } from '@/live/stylePreview'
 import SlideRender from '@/components/SlideRender.vue'
+import { isMediaSlide } from '@shared/media'
 import { useWakeLock } from '@/output/useWakeLock'
 import { onStage } from '@/lib/stage'
 
@@ -206,7 +207,7 @@ onBeforeUnmount(() => {
         :key="`${air?.itemIndex}-${j}`"
         class="slide"
         :class="{ cur: j === air?.slideIndex, past: j < (air?.slideIndex ?? 0) }"
-      >{{ s }}</p>
+      >{{ isMediaSlide(s) ? `🖼 그림 ${j + 1}` : s }}</p>
       <p v-if="!item" class="msg">대기 중</p>
       <footer v-if="nextItem" class="next">다음 곡 · {{ nextItem.title }}</footer>
     </main>

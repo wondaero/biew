@@ -21,8 +21,8 @@ async function open(p, w, h, mobile) {
   await p.evaluate(async (s) => {
     localStorage.setItem('biew.live.v1:LOCAL', JSON.stringify(s))
     await new Promise((res, rej) => {
-      const r = indexedDB.open('biew', 2)
-      r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('songs', { keyPath: 'id' }); d.createObjectStore('meta'); d.createObjectStore('pending', { keyPath: 'id' }) }
+      const r = indexedDB.open('biew', 3)
+      r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('songs', { keyPath: 'id' }); d.createObjectStore('meta'); d.createObjectStore('pending', { keyPath: 'id' }); d.createObjectStore('media', { keyPath: 'id' }) }
       r.onsuccess = () => { const t = r.result.transaction('songs', 'readwrite'); const now = new Date().toISOString(); ['Lorem alpha', 'Ipsum beta'].forEach((x, i) => t.objectStore('songs').put({ id: 'lib-' + i, title: x, slides: ['Lorem ipsum', 'Sed do'], source_file: null, updated_at: now, deleted_at: null })); t.oncomplete = () => { r.result.close(); res() }; t.onerror = rej }
       r.onerror = rej
     })

@@ -44,7 +44,8 @@ export default defineConfig({
       },
       workbox: {
         // woff2 = 송출 글꼴(Pretendard, 앱에 포함) — 오프라인에서도 모든 PC 에 같은 글꼴
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,woff2}'],
+        // mjs = PDF 변환(pdf.js worker) — 오프라인에서도 PDF 를 넣을 수 있게
+        globPatterns: ['**/*.{js,mjs,css,html,png,svg,ico,webmanifest,woff2}'],
         // 기본 한도 2MiB 를 넘는 파일은 조용히 빠진다 — PretendardVariable.woff2(약 2.0MB)가 빠지지 않게
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // SPA: /control/ABC234 같은 주소도 오프라인에서 index.html 로
@@ -54,6 +55,8 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  // 개발 서버: pdf.js 는 처음 PDF 를 넣을 때에야 불러오므로, 그때 의존성 최적화 → 페이지 전체 새로고침이 일어나지 않게 미리
+  optimizeDeps: { include: ['pdfjs-dist'] },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

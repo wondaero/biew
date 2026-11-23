@@ -5,6 +5,7 @@ import type { SetlistItem } from '@shared/types'
 import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
 import { useLibrary } from '@/library/library'
+import { isMediaItem } from '@shared/media'
 
 const live = useLive()
 const lib = useLibrary()
@@ -52,7 +53,7 @@ function clear() {
       >
         <span class="grip" title="드래그해서 순서 변경">⋮⋮</span>
         <span class="no">{{ i + 1 }}</span>
-        <span class="title">{{ it.title }}</span>
+        <span class="title"><span v-if="isMediaItem(it)" class="pic" title="그림(PDF·이미지)">🖼</span>{{ it.title }}</span>
         <button v-if="latest(it)" class="upd" title="라이브러리에서 수정된 최신 가사로 갱신" @click.stop="refresh(it)">↻ 최신</button>
         <span class="n">{{ it.slides.length }}</span>
         <button class="x" title="선곡에서 빼기" @click.stop="remove(it, i)">✕</button>
@@ -80,6 +81,7 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 }
 .no { width: 18px; color: var(--muted); font-size: 12px; text-align: right; }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pic { margin-right: 4px; }
 .n { font-size: 11px; color: var(--muted); }
 .upd { font-size: 14px; color: var(--warn); --edge: #2e260f; border-color: #5a4a1e; background-color: rgba(245, 165, 36, .08); white-space: nowrap; }
 .x { padding: 0 6px; border: none; background: none; color: var(--muted); box-shadow: none; margin: 0; }

@@ -5,6 +5,8 @@ import { onAir } from '@/live/nav'
 import { vFitLines } from '@/components/fitLines'
 import { useLibrary, loadCache, saveSong } from '@/library/library'
 import SlideEditDialog from '../SlideEditDialog.vue'
+import MediaImage from '@/components/MediaImage.vue'
+import { isMediaSlide, mediaIdOf } from '@shared/media'
 import { patchSongSlides } from '../slideEdit'
 
 const live = useLive()
@@ -149,9 +151,11 @@ defineExpose({ scrollToItem, scrollToLive })
           @dblclick="onDbl(i, j)"
         >
           <span class="idx">{{ j + 1 }}</span>
-          <span v-fit-lines="s" class="txt">{{ s }}</span>
+          <span v-if="isMediaSlide(s)" class="thumb"><MediaImage :id="mediaIdOf(s)" compact /></span>
+          <span v-else v-fit-lines="s" class="txt">{{ s }}</span>
         </button>
-        <button v-if="live.role.value === 'host'" class="edit" title="이 슬라이드 글 고치기" aria-label="이 슬라이드 글 고치기" @click="editing = { key: it.key, j }">✎</button>
+        <!-- 그림 장은 글 고치기 없음(그림은 PowerPoint 에서 고쳐 다시 넣기) -->
+        <button v-if="live.role.value === 'host' && !isMediaSlide(s)" class="edit" title="이 슬라이드 글 고치기" aria-label="이 슬라이드 글 고치기" @click="editing = { key: it.key, j }">✎</button>
         </div>
       </div>
     </div>
@@ -197,7 +201,9 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .card.live.frozen { border-color: var(--freeze); background: #0c2430; box-shadow: 0 0 0 2px rgba(56, 189, 248, .35); }
 .card.live.frozen .idx { color: var(--freeze); }
 .card.live .txt { color: #fff; }
-.card.blanked .txt { opacity: .35; }
+.card.blanked .txt, .card.blanked .thumb { opacity: .35; }
+/* 그림 장: 카드 안(번호 자리 아래)을 그림으로 채움 */
+.thumb { position: absolute; inset: 18px 6px 6px; border-radius: 3px; overflow: hidden; }
 .cell { position: relative; min-width: 0; display: grid; }
 /* ✎ = 카드 오른쪽 위 구석(카드 클릭 = 송출이므로 카드 밖 형제 버튼, 누를 자리 충분히). PC 는 마우스를 올렸을 때만 */
 .edit {
@@ -223,6 +229,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   .idx { position: static; min-width: 16px; text-align: center; font-size: 12px; }
   /* .card .txt: 아래 기본 .txt 규칙보다 뒤에 있어도 이기도록(예전엔 순서 때문에 14px 가 안 먹고 12.5px 였음) */
   .card .txt { font-size: 14px; }
+  /* 폰 행 목록: 번호 옆에 작은 16:9 그림 */
+  .thumb { position: relative; inset: auto; flex: none; width: 96px; aspect-ratio: 16 / 9; }
   /* 폰: ✎ 항상 보임(마우스 올리기 없음) — 글이 ✎ 아래로 가지 않게 오른쪽 자리 비움 */
   .card { padding-right: 42px; gap: 8px; padding-left: 8px; }
   .edit { top: 50%; right: 8px; transform: translateY(-50%); width: 32px; height: 34px; }

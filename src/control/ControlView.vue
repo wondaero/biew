@@ -23,6 +23,8 @@ import StyleSummary from './panels/StyleSummary.vue'
 import { useStyleDraft } from '@/live/styleDraft'
 import ChannelPopover from './panels/ChannelPopover.vue'
 import SwitchToInternet from './SwitchToInternet.vue'
+import MediaImport from './MediaImport.vue'
+import { cleanupMedia } from '@/media/media'
 
 defineProps<{ title: string }>()
 const router = useRouter()
@@ -150,6 +152,7 @@ onMounted(() => {
   if (isHost.value) {
     // DB 와 비교만(숫자 배지). 받는 건 곡 목록의 [⬇ 다운로드]로. 처음 쓰는 기기(빈 상태)는 로그인돼 있으면 전체를 바로 받음
     loadCache().then(() => checkRemote())
+    void cleanupMedia().catch(() => {}) // 어느 선곡도 안 쓰는 그림 정리(10분 지난 것만)
     tick = window.setInterval(() => { now.value = Date.now() }, 1000)
     window.addEventListener('beforeunload', onBeforeUnload)
   }
@@ -228,12 +231,14 @@ onBeforeUnmount(() => {
           </button>
           <button title="새 곡 등록(오프라인이면 PC 에 저장)" @click="openSearch(true)">+ 새 곡</button>
         </div>
+        <div class="side-actions desk-only"><MediaImport label="🖼 PDF·그림 추가" /></div>
         <p v-if="!narrow && !lib.count.value" class="side-hint">저장된 곡이 없습니다 — <b>곡 목록</b>에서 로그인해 곡을 받으세요.</p>
         <div class="set-wrap" :class="{ open: sheet === 'set' }">
           <div class="sheet-head">
             <b>선곡</b>
             <span class="spacer" />
             <button @click="openSearch()">🔍 곡 추가</button>
+            <MediaImport label="🖼 그림" />
             <button aria-label="닫기" @click="sheet = null">✕</button>
           </div>
           <OnAirStrip class="sheet-strip" />
@@ -311,7 +316,7 @@ onBeforeUnmount(() => {
 .side { grid-area: side; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-right: 1px solid var(--line); background: var(--panel); overflow: hidden; }
 .side-actions { display: flex; gap: 6px; }
 .side-actions button { padding: 8px 10px; }
-.side-actions .find { flex: 1; }
+.side-actions .find, .side-actions :deep(.mi-open) { flex: 1; }
 kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; }
 /* 서버에 올릴 곡 수(곡 검색 팝업 안에 올리기 버튼이 있음) */
 .badge.down { background: rgba(79, 140, 255, .25); color: #dbe7ff; }

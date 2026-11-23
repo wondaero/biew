@@ -3,6 +3,8 @@
 import { computed } from 'vue'
 import type { OutputStyle } from '@shared/types'
 import FitText from './FitText.vue'
+import MediaImage from './MediaImage.vue'
+import { isMediaSlide, mediaIdOf } from '@shared/media'
 import { backdropCss, toBackdrop } from '@shared/backdrop'
 
 const props = withDefaults(
@@ -14,6 +16,8 @@ const shown = computed(() => (props.blank ? null : props.text))
 // 예전 형식(background: 'black'|'green')이 섞여 들어와도 안전하게
 const bg = computed(() => backdropCss(toBackdrop(props.styleCfg.backdrop, (props.styleCfg as { background?: unknown }).background)))
 const useFade = computed(() => props.animate && props.styleCfg.transition === 'fade')
+/** 그림 슬라이드(PDF·이미지)면 그림 id — 글 대신 그림을 화면 가득(비율 유지) */
+const media = computed(() => (isMediaSlide(shown.value) ? mediaIdOf(shown.value) : null))
 const key = computed(() => (shown.value == null ? 'blank' : `${props.layerKey}`))
 </script>
 
@@ -21,7 +25,8 @@ const key = computed(() => (shown.value == null ? 'blank' : `${props.layerKey}`)
   <div class="stage" :style="{ background: bg, '--fade-ms': `${styleCfg.fadeMs}ms` }">
     <Transition name="xfade" :css="useFade">
       <div v-if="shown != null" :key="key" class="layer">
-        <FitText :text="shown" :style-cfg="styleCfg" />
+        <MediaImage v-if="media" :id="media" />
+        <FitText v-else :text="shown" :style-cfg="styleCfg" />
       </div>
     </Transition>
   </div>
