@@ -74,7 +74,8 @@ async function changeView(remove: boolean) {
 }
 
 async function remove() {
-  if (!confirm(`채널 "${props.title}" 을(를) 삭제할까요?\n폰·보기 연결이 모두 끊기고 되돌릴 수 없습니다.`)) return
+  // 홈 "내 계정의 채널" 삭제 확인과 같은 형식(이름 + 번호) — 2026-11-23 사용자 결정: 삭제 = 로그인 + 확인창 한 번
+  if (!confirm(`채널 "${props.title}" (${props.code}) 을(를) 삭제할까요?\n\n폰 리모컨·보기 연결이 모두 끊기고 되돌릴 수 없습니다.\n이 PC 의 출력 창은 마지막 화면을 유지한 채 계속 송출됩니다.`)) return
   const err = await api.deleteChannel(props.code)
   if (err) { msg.value = err; return }
   forgetChannelLocal(props.code)
