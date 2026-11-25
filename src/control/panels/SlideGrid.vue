@@ -28,6 +28,13 @@ const isPreview = (i: number, j: number) =>
   live.pvwMode.value && live.preview.value?.itemIndex === i && live.preview.value?.slideIndex === j
 
 const isHost = computed(() => live.role.value === 'host')
+/** 곡 박스 테두리 색(2026-11-26 — 곡과 슬라이드를 박스로 묶음): 송출 중인 곡만, 상태별 색(송출 초록·BLANK 노랑·FREEZE 하늘·대기 회색) */
+function songState(i: number): string {
+  if (i !== air.value.itemIndex) return ''
+  if (air.value.frozen) return 'on frz'
+  if (air.value.slideIndex < 0) return 'on idle'
+  return air.value.blank ? 'on blk' : 'on live'
+}
 const textOf = (it: SetlistItem, j: number) => it.slides[j] ?? ''
 
 function onClick(i: number, j: number) {
@@ -213,7 +220,7 @@ defineExpose({ scrollToItem, scrollToLive })
     <div v-if="live.state.setlist.length > 1" class="tools">
       <button @click="toggleAll">{{ allClosed ? '전체 펼치기' : '전체 접기' }}</button>
     </div>
-    <div v-for="(it, i) in live.state.setlist" :key="it.key" class="song" :data-item="i">
+    <div v-for="(it, i) in live.state.setlist" :key="it.key" class="song" :class="songState(i)" :data-item="i">
       <h3
         :class="{ live: i === air.itemIndex, closed: isClosed(it.key) }"
         role="button"
@@ -267,7 +274,7 @@ defineExpose({ scrollToItem, scrollToLive })
           <span v-else v-fit-lines="textOf(it, c.j)" class="txt">{{ textOf(it, c.j) }}</span>
         </button>
         <!-- ⋯ = 카드 밖 형제 버튼(카드 클릭 = 송출). 그림 장은 편집 없이 복사만(그림은 PowerPoint 에서 고쳐 다시 넣기) -->
-        <button v-if="isHost" class="more" :class="{ on: isMenu(it.key, c.j) }" title="더 보기 — 편집·복사" aria-label="이 슬라이드 더 보기" aria-haspopup="menu" @click.stop="toggleMenu(it.key, c.j)">⋯</button>
+        <button v-if="isHost" class="more" :class="{ on: isMenu(it.key, c.j) }" title="더 보기 — 편집·복사·삭제" aria-label="이 슬라이드 더 보기" aria-haspopup="menu" @click.stop="toggleMenu(it.key, c.j)">⋯</button>
         <div v-if="isMenu(it.key, c.j)" class="more-menu" role="menu" @click.stop>
           <button v-if="!isMediaSlide(textOf(it, c.j))" role="menuitem" class="m-edit" @click="menuEdit">✎ 편집</button>
           <button role="menuitem" class="m-copy" @click="menuCopy">⧉ 복사 <small>바로 뒤에</small></button>
@@ -289,15 +296,20 @@ defineExpose({ scrollToItem, scrollToLive })
 /* 아래 여백 작게(예전 40vh = 마지막 곡도 맨 위로 올리려던 것 — 짧은 마지막 곡일수록 크게 비어 보여서 뺌. 마지막 곡은 맨 끝이라 안 올라가도 다 보인다) */
 .grid-wrap { overflow-y: auto; padding: 0 8px 16px; min-height: 0; }
 .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
-.song { margin-bottom: 18px; scroll-margin-top: 4px; }
+ /* 곡 하나 = 박스 하나(제목 줄 + 그 곡의 슬라이드) — 어디까지가 한 곡인지 보이게(2026-11-26 사용자 요청) */
+.song { margin-bottom: 14px; scroll-margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.song.on.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live-glow); }
+.song.on.blk { border-color: var(--warn); }
+.song.on.frz { border-color: var(--freeze); }
+.song.on.idle { border-color: #5a5a68; }
 .tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { font-size: 14px; color: var(--muted); }
 h3 {
-  /* 좌우 -8px: 스크롤 영역 padding 을 뚫고 끝까지 → 옆 틈으로 카드 glow 가 비치지 않게 (글자 위치는 padding 으로 유지) */
-  position: sticky; top: 0; z-index: 2; /* ✎(z-index 1)보다 위 — 스크롤하면 곡 제목 아래로 들어가게 */ margin: 0 -8px 8px; padding: 6px 16px; font-size: 14px; cursor: pointer; user-select: none;
-  background: var(--bg); border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 8px;
+  /* 박스 윗부분. 스크롤하면 화면 위에 붙음(긴 곡을 내려도 어느 곡인지 보이게) — 바탕을 칠해 아래 카드가 비치지 않게 */
+  position: sticky; top: 0; z-index: 2; /* ⋯(z-index 1)보다 위 — 스크롤하면 곡 제목 아래로 들어가게 */ margin: 0; padding: 8px 12px; font-size: 14px; cursor: pointer; user-select: none;
+  background: var(--panel); border-bottom: 1px solid var(--line); border-radius: 10px 10px 0 0; display: flex; align-items: baseline; gap: 8px;
 }
-h3.closed { margin-bottom: 0; }
-h3.live { color: #fff; border-bottom-color: var(--live); }
+h3.closed { border-bottom: 0; border-radius: 10px; }
+h3.live { color: #fff; }
 h3 .chev { width: 10px; color: var(--muted); font-size: 11px; }
 h3 .no { color: var(--muted); font-size: 12px; }
 h3 .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -306,8 +318,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .onair.blanked { color: var(--warn); }
 .onair.frozen { color: var(--freeze); }
 .onair.idle { color: var(--muted); font-weight: 600; }
-.noslide { color: var(--muted); font-size: 12px; margin: 0 8px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.noslide { color: var(--muted); font-size: 12px; margin: 0; padding: 8px 12px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; padding: 10px; }
 .card {
   position: relative; display: flex; align-items: center; justify-content: center;
   /* 위 18px = 카드 번호 자리(글이 길어져도 번호와 겹치지 않게) */
@@ -328,7 +340,7 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .cell { position: relative; min-width: 0; display: grid; }
 /* ⋯ = 카드 오른쪽 위 구석(카드 클릭 = 송출이므로 카드 밖 형제 버튼, 누를 자리 충분히). PC 는 마우스를 올렸을 때(또는 메뉴가 열려 있을 때)만 */
 .more {
-  position: absolute; top: 3px; right: 3px; width: 36px; height: 32px; padding: 0; margin: 0; z-index: 1;
+  position: absolute; top: 8px; right: 8px; /* 카드 테두리에서 띄움(2026-11-26 — 붙어 보였음) */ width: 36px; height: 32px; padding: 0; margin: 0; z-index: 1;
   font-size: 18px; font-weight: 700; line-height: 1; border-radius: 6px; background: rgba(20, 20, 26, .9); box-shadow: none; color: #cfd3dc;
 }
 .more:active { transform: none; }
@@ -336,7 +348,7 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 @media (hover: hover) { .more { opacity: 0; } .cell:hover .more, .more:focus-visible, .more.on { opacity: 1; } }
 /* ⋯ 메뉴: PC = 버튼 아래 작은 목록. 바깥(.more-backdrop, 투명)을 누르면 닫힘 */
 .more-menu {
-  position: absolute; top: 38px; right: 3px; z-index: 31; min-width: 150px; display: grid; gap: 2px; padding: 4px;
+  position: absolute; top: 44px; right: 8px; z-index: 31; min-width: 150px; display: grid; gap: 2px; padding: 4px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
 }
 .more-menu button { margin: 0; box-shadow: none; text-align: left; font-size: 14px; padding: 8px 10px; background: none; border-color: transparent; }
@@ -359,7 +371,7 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }
 .card.live .idx { color: var(--live); font-weight: 700; }
 @media (max-width: 768px) {
-  .grid-wrap { padding: 0 10px 16px; } /* 아래 송출 버튼 줄은 겹쳐 뜨지 않고 자기 자리를 차지하므로 큰 여백 불필요 */
+  .grid-wrap { padding: 0 4px 16px; } /* 아래 송출 버튼 줄은 겹쳐 뜨지 않고 자기 자리를 차지하므로 큰 여백 불필요 */
   .empty { margin-top: 24px; } /* 30vh 면 좁은 폰에서 안내 글이 아래로 밀려 잘림 */
   /* 1열 행 목록: 16:9 고정을 풀고 글자 길이에 맞춰 높이가 정해지게 */
   .cards { grid-template-columns: minmax(0, 1fr); gap: 6px; }
@@ -385,7 +397,9 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   h3 { flex-wrap: wrap; row-gap: 6px; }
   .h-acts { flex-basis: 100%; justify-content: flex-end; margin-left: 0; }
   .se-notice { bottom: 80px; }
-  h3 { margin: 0 -10px 8px; padding: 10px 18px; }
+  h3 { margin: 0; padding: 10px 10px; }
+  /* 폰: 박스 안쪽 여백을 줄여 카드 폭을 지킨다(280px 에서 글자 크기) */
+  .cards { padding: 4px; }
 }
 /*
  * 원래 줄바꿈 그대로(꺾지 않음) — 넘치면 v-fit-lines 가 이 요소의 글자 크기를 줄인다(출력 화면과 같은 규칙).
