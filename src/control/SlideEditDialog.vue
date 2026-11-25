@@ -53,10 +53,8 @@ const deleteTitle = computed(() => (frozenHit.value ? 'FREEZE 중인 장은 지�
   : canDelete.value ? '이 장 지우기' : '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서'))
 function remove() {
   if (!canDelete.value || !item.value) return
-  const n = delTargets.value.length
   // 컨트롤러가 가리키는 장을 지우면 BLANK(liveStore.editSlides). FREEZE 중이면 송출은 고정 화면 그대로 — 풀 때 BLANK
   const ctlHit = live.state.itemIndex === itemIndex.value && delTargets.value.includes(live.state.slideIndex)
-  void n
   const msg = `${props.slideIndex + 1}장을 지울까요?`
     + '\n오늘 선곡에서만 지웁니다(곡 원본은 곡 제목 줄 [저장]으로).'
     + (changed.value ? '\n위에서 고친 글은 버려집니다.' : '')

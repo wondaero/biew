@@ -13,6 +13,7 @@ import { useLive } from '@/live/liveStore'
 import { LOCAL_CODE } from '@/live/persistence'
 import { saveHistory, listHistoryRows, copyHistory, renameHistory, deleteHistory, historyTitleFor, flushPending } from '@/live/history'
 import { useBackClose } from '@/lib/backClose'
+import { resolveChanges } from './setlistChanges'
 import { usePauseHotkeys } from './usePauseHotkeys'
 import OnAirStrip from './OnAirStrip.vue'
 
@@ -57,6 +58,9 @@ async function start(row: HistoryRow) {
   if (busy.value) return
   const note = row.skippedMedia ? `\n그림 ${row.skippedMedia}묶음은 기록에 없어 빠집니다(다시 넣어야 함).` : ''
   if (!confirm(`"${row.title}" 을(를) 복사해서 새 선곡으로 시작할까요?\n지금 선곡은 먼저 기록해 둡니다. 송출 화면은 BLANK 가 됩니다.${note}`)) return
+  // 오늘 고친 곡이 있으면 [저장하고][버리고][취소] — 지금 선곡은 아래에서 기록되지만 곡 원본 저장은 따로 물어야 함
+  const ch = await resolveChanges()
+  if (!ch.go) { if (ch.note) msg.value = ch.note; return }
   busy.value = true
   try {
     const items = await copyHistory(props.code, row)

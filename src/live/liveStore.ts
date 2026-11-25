@@ -199,6 +199,7 @@ function setSetlist(list: SetlistItem[]) {
       s.itemIndex = Math.min(s.itemIndex, Math.max(list.length - 1, 0))
       // 송출 중이던 곡이 없었으면(빈 선곡에 첫 곡) 송출 대기 — 장을 눌러야 나간다(2026-11-25 사용자 결정, nav.isIdle)
       s.slideIndex = key ? 0 : -1
+      if (!key) s.blank = false // 대기 = 빈 화면, BLANK 와 섞이지 않게
     }
   })
   if (preview.value) {
@@ -278,7 +279,7 @@ const setlist = {
       const it = s.setlist[i]!
       // 컨트롤러가 가리키던 장을 지우면 BLANK — FREEZE 중이면 송출은 고정 화면 그대로이고, 풀 때 엉뚱한 장 대신 BLANK
       if (n === 0 && s.itemIndex === i && targets.includes(s.slideIndex)) s.blank = true
-      s.setlist[i] = { ...it, slides: next }
+      s.setlist[i] = { ...it, slides: next, base: it.base ?? itemFingerprint(it) }
       if (s.itemIndex === i) s.slideIndex = remap(s.slideIndex)
       if (s.frozen && s.frozen.itemIndex === i) s.frozen = { ...s.frozen, slideIndex: remap(s.frozen.slideIndex) }
     })
@@ -294,7 +295,9 @@ function reshape(key: string, change: (slides: readonly string[]) => string[] | 
   const next = change(state.setlist[i]!.slides)
   if (!next) return
   commit((s) => {
-    s.setlist[i] = { ...s.setlist[i]!, slides: next }
+    const it = s.setlist[i]!
+    // base 없는 예전 항목: 처음 고치는 지금의 내용을 원본 기준으로(이후 '변경됨' 판단)
+    s.setlist[i] = { ...it, slides: next, base: it.base ?? itemFingerprint(it) }
     if (s.itemIndex === i) s.slideIndex = remap(s.slideIndex)
     if (s.frozen && s.frozen.itemIndex === i) s.frozen = { ...s.frozen, slideIndex: remap(s.frozen.slideIndex) }
   })

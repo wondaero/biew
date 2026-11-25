@@ -16,6 +16,7 @@ import HistoryDialog from './HistoryDialog.vue'
 import ExitChangedDialog from './ExitChangedDialog.vue'
 import { exitRequest } from './setlistChanges'
 import { saveHistory, autoSaveStale, flushPending, historyTitleFor } from '@/live/history'
+import { resolveChanges } from './setlistChanges'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import OnAirStrip from './OnAirStrip.vue'
@@ -109,10 +110,13 @@ watch(hostLink, (v) => { if (v === 'live' && isHost.value && code.value) void fl
 /** 로컬 송출 종료: 선곡을 비우고(출력 설정 유지) 출력 창은 검은 화면으로 남긴다 — 다음 예배를 그대로 이어서 */
 async function endLocal() {
   if (!confirm('이 송출을 끝낼까요?\n선곡은 기록(📜)에 남기고 비웁니다. 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.')) return
-  // 선곡 기록(2026-11-25): 비우기 전에 남긴다. 실패해도 끝내기는 막지 않되 알린다
-  const r = await saveHistory(code.value, historyTitleFor(code.value), live.state.setlist)
+  // 오늘 고친 곡이 있으면 [저장하고][버리고][취소]
+  const c = await resolveChanges()
+  if (!c.go) { if (c.note?.warn) alert(c.note.text); return }
+  // 선곡 기록(2026-11-25): 비우기 전에 남긴다. 저장소가 막혀 있어도(옛 창이 붙잡음) 송출 종료는 멈추지 않게 1.5초까지만 기다림
+  const r = await Promise.race([saveHistory(code.value, historyTitleFor(code.value), live.state.setlist), new Promise<'timeout'>((res) => setTimeout(() => res('timeout'), 1500))])
   live.actions.endSession()
-  if (r === 'error') alert('송출은 끝냈지만 선곡을 기록하지 못했습니다.')
+  if (r === 'error' || r === 'timeout') alert('송출은 끝냈지만 선곡을 기록하지 못했습니다.')
 }
 
 /** 리모컨: 이 기기에 저장된 토큰을 지우고 나간다(다음엔 비밀번호를 다시 입력) */

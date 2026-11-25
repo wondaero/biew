@@ -63,8 +63,16 @@ export async function saveHistory(code: string, title: string, setlist: readonly
   }
 }
 
-/** 이 PC 에 보관해 둔(못 올린) 채널 기록을 서버로. 올린 개수 */
-export async function flushPending(code: string): Promise<number> {
+/** 이 PC 에 보관해 둔(못 올린) 채널 기록을 서버로. 올린 개수. 같은 채널은 한 번에 하나만(동시에 돌면 같은 기록이 두 번 올라감) */
+const flushing = new Map<string, Promise<number>>()
+export function flushPending(code: string): Promise<number> {
+  const cur = flushing.get(code)
+  if (cur) return cur
+  const p = doFlush(code).finally(() => flushing.delete(code))
+  flushing.set(code, p)
+  return p
+}
+async function doFlush(code: string): Promise<number> {
   if (isLocal(code)) return 0
   const token = tokenOf(code)
   if (!token || !navigator.onLine) return 0
@@ -73,7 +81,9 @@ export async function flushPending(code: string): Promise<number> {
     const pend = (await db.listHistory(code)).sort((a, b) => a.savedAt.localeCompare(b.savedAt)) // 오래된 것부터(서버 순서 유지)
     for (const p of pend) {
       const r = await api.historySave(code, token, { title: p.title, setlist: p.setlist, fingerprint: p.fingerprint, skippedMedia: p.skippedMedia, savedAt: p.savedAt })
-      if (r.status !== 'ok' && r.status !== 'dup') break // 다음 연결 때 다시
+      // 서버가 영구히 거부하는 것(너무 큼·채널 없음)은 지운다 — 남겨 두면 뒤의 기록이 영영 못 올라감
+      if (r.status === 'invalid' || r.status === 'not_found') { await db.removeHistory(p.id); continue }
+      if (r.status !== 'ok' && r.status !== 'dup') break // 인터넷·권한 — 다음 연결 때 다시
       await db.removeHistory(p.id)
       n++
     }

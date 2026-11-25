@@ -16,7 +16,8 @@ import { useBackClose } from '@/lib/backClose'
 import { usePauseHotkeys } from './usePauseHotkeys'
 import { canAutoFocus } from '@/lib/device'
 
-const props = defineProps<{ song: Song | null }>() // null = 새 곡
+/** initialSlides: 처음 보여 줄 슬라이드(오늘 선곡에서 고친 내용 — 슬라이드 목록 곡 제목 줄 [편집]). 비교 기준(base)은 song(원본) 그대로 */
+const props = defineProps<{ song: Song | null; initialSlides?: string[] }>() // song null = 새 곡
 const emit = defineEmits<{ close: []; saved: [song: Song] }>()
 
 const live = useLive()
@@ -34,7 +35,7 @@ function duplicateWarning(): string | null {
   return lines.length ? lines.join('\n') : null
 }
 const title = ref(props.song?.title ?? '')
-const text = ref(props.song ? slidesToText(props.song.slides) : '')
+const text = ref(props.initialSlides ? slidesToText(props.initialSlides) : props.song ? slidesToText(props.song.slides) : '')
 const initial = { title: title.value, text: text.value }
 const slides = computed(() => textToSlides(text.value))
 const dirty = computed(() => title.value !== initial.title || text.value !== initial.text)

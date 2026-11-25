@@ -95,6 +95,7 @@ try {
   s = await state(p)
   const saved1 = await pendingSong(p)
   check('임시: 선곡은 바뀜, 곡 원본은 그대로, 변경됨 표시', s.setlist[0].slides[0] === 'Lorem ipsum\ndolor TODAY' && saved1[0] !== 'Lorem ipsum\ndolor TODAY' && !!(await changedMark(p, 0)))
+  check('오늘 고친 곡엔 "↻ 최신" 안 뜸(누르면 오늘 고친 게 사라지므로 — 원본이 바뀐 게 아님)', !(await p.$('.set-wrap .upd')))
   check('선곡 목록에도 변경 표시(•)', !!(await p.$('.set-wrap .chg')))
 
   // 원본 없는 곡 → [저장] 하면 경고(곡 목록에 없음)
@@ -104,8 +105,10 @@ try {
   await p.click('.se footer .primary')
   await sleep(400)
   check('원본 없는 곡: 선곡은 고침', (await state(p)).setlist[1].slides[0] === 'Lorem\nipsum X')
-  // 원본 지문이 없는 예전 저장본 + 곡 목록에도 없는 곡 → 비교할 기준이 없어 "변경됨"·[저장] 없음(새로 넣는 곡엔 모두 지문이 붙는다)
-  check('기준 없는 예전 항목: 변경됨·[저장] 안 보임', !(await changedMark(p, 1)) && !(await p.$('[data-item="1"] h3 .save-item')))
+  // 원본 지문이 없던 예전 저장본도 처음 고치는 순간 기준이 잡혀 "변경됨"으로 추적된다. 곡 목록에 없는 곡이라 [저장] 하면 경고
+  check('예전 항목도 처음 고치면 "변경됨"으로 추적', !!(await changedMark(p, 1)))
+  await headerBtn(p, 1, 'save-item')
+  check('곡 목록에 없는 곡 [저장] → 경고 알림', await until(async () => (await p.$eval('.se-notice.warn', (e) => e.textContent).catch(() => '')).includes('곡 목록에 없어')))
 
   // 고친 뒤 Esc → 확인창(accept) → 닫힘, 변경 없음
   const v = (await state(p)).version
@@ -203,6 +206,21 @@ try {
   s = await state(p)
   check('끌어서 순서 바꾸기: 1번 장이 뒤로(오늘 선곡)', s.setlist[0].slides[0] === before2[1] && s.setlist[0].slides.includes(before2[0]) && s.setlist[0].slides.indexOf(before2[0]) > 0, JSON.stringify(s.setlist[0].slides.map((x) => x.split('\n')[0])))
   check('끌기 = 송출 아님(위치 같은 장 따라감)', `${s.itemIndex}` === v0.split(':')[0])
+
+  // 고친 곡의 [편집] → 그대로 저장 = 오늘 고친 내용이 원본에 저장(되돌아가지 않음 — 리뷰에서 찾은 버그)
+  const today = (await state(p)).setlist[0].slides
+  await headerBtn(p, 0, 'h-btn:not(.save-item):not(.exclude)')
+  await p.waitForSelector('.dialog textarea', { timeout: 5000 })
+  await p.$$eval('.dialog footer button.primary, .dialog button.primary', (bs) => bs.at(-1).click())
+  check('고친 곡 [편집] → 그대로 저장: 오늘 슬라이드 유지 + 원본에 저장', await until(async () => JSON.stringify((await state(p)).setlist[0].slides) === JSON.stringify(today) && JSON.stringify(await pendingSong(p)) === JSON.stringify(today) && !(await changedMark(p, 0))), JSON.stringify({ n: (await state(p)).setlist[0].slides.length }))
+  // 다시 고쳐 두기(아래 선곡 제외·송출 종료 확인용)
+  await cellCopy(p, 0, 0); await sleep(300)
+
+  // 송출 종료 → 고친 곡이 있으면 [저장하고][버리고][취소]
+  await p.click('.endlocal')
+  check('송출 종료 + 고친 곡 → 저장/버리기 묻는 창', !!(await p.waitForSelector('.xc', { timeout: 3000 }).catch(() => null)))
+  await p.click('.xc .cancel'); await sleep(300)
+  check('[취소] → 송출 종료 안 함(선곡 그대로)', (await state(p)).setlist.length === 2)
 
   // 곡 제목 줄 [선곡 제외] — 고친 곡이면 [저장하고 제외][버리고 제외][취소]
   check('고친 곡: 제목 줄에 "변경됨"', !!(await changedMark(p, 0)))

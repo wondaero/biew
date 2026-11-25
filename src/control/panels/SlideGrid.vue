@@ -100,12 +100,13 @@ function menuDelete() {
  * 곡 제목 줄(2026-11-25 사용자 요청): [편집] = 곡 편집기(오늘 고친 게 있으면 그 내용으로 열림) → 저장하면 곡 원본 + 오늘 선곡의 그 곡 함께.
  * 변경됨이면 [저장](지금 슬라이드를 곡 원본에) · [선곡 제외](고친 게 있으면 저장/버리기를 묻는다)
  */
-const songEditing = ref<{ key: string; song: Song } | null>(null)
+const songEditing = ref<{ key: string; song: Song; initialSlides?: string[] } | null>(null)
 async function editSong(it: SetlistItem) {
   await loadCache()
   const song = lib.byId.value.get(it.songId)
   if (!song) return say('이 기기의 곡 목록에 없는 곡이라 편집할 수 없습니다 — 곡 목록에서 받거나 찾아서 고치세요', true)
-  songEditing.value = { key: it.key, song: isChanged(it) ? { ...song, slides: [...it.slides] } : song }
+  // 오늘 고친 게 있으면 그 내용으로 열되, 비교 기준은 원본(같은 내용이라 저장이 건너뛰어지고 오늘 변경이 되돌려지는 일이 없게)
+  songEditing.value = { key: it.key, song, initialSlides: isChanged(it) ? [...it.slides] : undefined }
 }
 const savingKey = ref<string | null>(null)
 async function saveItem(it: SetlistItem) {
@@ -278,7 +279,7 @@ defineExpose({ scrollToItem, scrollToLive })
     <!-- 메뉴 바깥 누르면 닫힘(PC 는 투명, 폰은 어둡게 + 메뉴는 아래 시트) -->
     <div v-if="menu" class="more-backdrop" @click="menu = null" />
     <SlideEditDialog v-if="editing" :item-key="editing.key" :slide-index="editing.j" @close="editing = null" @save="saveEdit" />
-    <SongEditor v-if="songEditing" :song="songEditing.song" @close="songEditing = null" @saved="onSongSaved" />
+    <SongEditor v-if="songEditing" :song="songEditing.song" :initial-slides="songEditing.initialSlides" @close="songEditing = null" @saved="onSongSaved" />
     <p v-if="notice" class="se-notice" :class="{ warn: notice.warn }" role="status">{{ notice.text }}</p>
   </section>
 </template>

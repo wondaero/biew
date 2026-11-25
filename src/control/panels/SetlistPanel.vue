@@ -6,21 +6,20 @@ import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
 import { useLibrary } from '@/library/library'
 import { isMediaItem } from '@shared/media'
-import { removeItemAsk, clearAsk, isChanged } from '../setlistChanges'
+import { removeItemAsk, clearAsk, isChanged, libraryNewer } from '../setlistChanges'
 
 const live = useLive()
 const lib = useLibrary()
 
-/** 라이브러리의 곡이 선곡에 넣은 뒤 수정됐는지 */
+/** 곡 목록의 원본이 선곡에 넣은 뒤 바뀌었는지(오늘 선곡에서 고친 것과는 별개 — setlistChanges.libraryNewer) */
 function latest(it: SetlistItem) {
-  const s = lib.byId.value.get(it.songId)
-  if (!s) return null
-  const changed = s.title !== it.title || s.slides.length !== it.slides.length || s.slides.some((x, i) => x !== it.slides[i])
-  return changed ? s : null
+  return libraryNewer(it) ? (lib.byId.value.get(it.songId) ?? null) : null
 }
 function refresh(it: SetlistItem) {
   const s = latest(it)
-  if (s) live.setlist.refresh(it.key, s)
+  if (!s) return
+  if (isChanged(it) && !confirm(`"${it.title}" 은(는) 오늘 고친 내용이 있습니다.\n곡 목록의 최신 가사로 바꾸면 오늘 고친 내용이 사라집니다. 바꿀까요?`)) return
+  live.setlist.refresh(it.key, s)
 }
 const emit = defineEmits<{ jump: [itemIndex: number]; history: [] }>()
 
