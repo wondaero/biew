@@ -22,8 +22,11 @@ useBackClose(() => true, () => emit('close')) // 뒤로가기 = 닫기
 const viewUrl = computed(() => location.origin + api.viewPath(props.code))
 const controlUrl = computed(() => location.origin + api.controlPath(props.code))
 const isLocal = /^(localhost|127\.|\[::1\])/.test(location.hostname)
+/** QR 탭(2026-11-25 사용자 요청): 보기 / 리모컨. 리모컨 주소는 열면 컨트롤 비밀번호를 묻는다(QR 만으로는 조작 못 함) */
+const qrKind = ref<'view' | 'control'>('view')
+const qrUrl = computed(() => (qrKind.value === 'view' ? viewUrl.value : controlUrl.value))
 const qr = ref<string | null>(null)
-watch(viewUrl, async (u) => { qr.value = await QRCode.toDataURL(u, { margin: 1, width: 200 }) }, { immediate: true })
+watch(qrUrl, async (u) => { qr.value = await QRCode.toDataURL(u, { margin: 1, width: 200 }) }, { immediate: true })
 
 const copied = ref<string | null>(null)
 async function copy(label: string, text: string) {
@@ -92,8 +95,12 @@ async function remove() {
 
     <OnAirStrip class="strip" />
     <div class="code">{{ code }}</div>
-    <img v-if="qr" :src="qr" alt="QR" class="qr" />
-    <p class="muted center">QR/링크는 <b>보기용</b>입니다. 리모컨은 컨트롤 링크로 들어가 컨트롤 비밀번호를 입력합니다.</p>
+    <div class="qr-tabs" role="tablist" aria-label="QR 종류">
+      <button role="tab" :aria-selected="qrKind === 'view'" :class="{ on: qrKind === 'view' }" @click="qrKind = 'view'">보기</button>
+      <button role="tab" :aria-selected="qrKind === 'control'" :class="{ on: qrKind === 'control' }" @click="qrKind = 'control'">리모컨</button>
+    </div>
+    <img v-if="qr" :src="qr" :alt="qrKind === 'view' ? '보기 QR' : '리모컨 QR'" class="qr" />
+    <p class="muted center">{{ qrKind === 'view' ? '보기 QR — 찍으면 가사를 봅니다(보기 비밀번호가 있으면 입력).' : '리모컨 QR — 찍으면 컨트롤 비밀번호를 입력하고 송출을 조작합니다(다음·이전·BLANK).' }}</p>
 
     <div class="url">
       <input :value="viewUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
@@ -165,4 +172,8 @@ h3 { margin: 0; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-o
   .pop { --m-pad-top: 12px; --m-pad-bottom: 14px; align-content: start; z-index: 45; }
   .strip { margin: 0 -14px; }
 }
+.qr-tabs { display: flex; gap: 4px; justify-self: center; }
+.qr-tabs button { min-width: 96px; font-size: 14px; }
+/* 세그먼트 규칙: 고른 쪽은 제자리 + 안쪽 그림자(src/style.css 설명) */
+.qr-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .35); }
 </style>

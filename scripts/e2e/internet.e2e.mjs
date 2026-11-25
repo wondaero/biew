@@ -168,6 +168,12 @@ try {
   // ── 이 PC 에서 리모컨 쫓아내기(그때 로그인) → 리모컨만 막힘, PC·보기 그대로 ──
   await host.bringToFront()
   await host.click('button.share')
+  // QR 탭(2026-11-25): 보기 / 리모컨 — 탭을 바꾸면 QR(주소)이 바뀐다
+  await host.waitForSelector('.pop img.qr')
+  const qrView = await host.$eval('.pop img.qr', (i) => i.src)
+  await host.$$eval('.qr-tabs button', (bs) => bs.find((x) => x.textContent?.trim() === '리모컨')?.click())
+  check('채널 창 QR 탭: [리모컨] 고르면 QR 이 리모컨 주소로 바뀜', await until(async () => (await host.$eval('.pop img.qr', (i) => i.src)) !== qrView) && (await text(host, '.pop p.center')).startsWith('리모컨 QR'))
+  await host.$$eval('.qr-tabs button', (bs) => bs.find((x) => x.textContent?.trim() === '보기')?.click())
   await host.locator('::-p-text(관리 (리모컨 쫓아내기)').click()
   // 공용 로그인 팝업(📡 위에 겹쳐 뜸)
   await host.locator('::-p-text(관리하려면 로그인)').click()
