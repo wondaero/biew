@@ -17,7 +17,8 @@ import { loadLive, saveLive, isLiveState, normalizeLive } from './persistence'
 import * as nav from './nav'
 import { uid } from '@/lib/uid'
 import type { Cursor } from './nav'
-import { remapIndex, replaceSlides } from '@/control/slideEdit'
+import { remapIndex, replaceSlides, duplicateAt, duplicateIndex, moveAt, moveIndex } from '@/control/slideEdit'
+import { itemFingerprint } from '@shared/history'
 
 export type Role = 'host' | 'remote'
 
@@ -207,12 +208,25 @@ function setSetlist(list: SetlistItem[]) {
 
 const setlist = {
   add(song: { id: string; title: string; slides: string[] }) {
-    setSetlist([...state.setlist, { key: uid(), songId: song.id, title: song.title, slides: [...song.slides] }])
+    // base = 넣을 때 원본 지문 — 오늘 고치면 "변경됨"(곡 제목 줄 [저장]으로 원본에)
+    setSetlist([...state.setlist, { key: uid(), songId: song.id, title: song.title, slides: [...song.slides], base: itemFingerprint(song) }])
+  },
+  /** [저장]으로 지금 슬라이드를 곡 원본에 저장했을 때 — 지금 내용이 새 기준(변경됨 표시 끔) */
+  markSaved(key: string) {
+    const i = state.setlist.findIndex((x) => x.key === key)
+    if (i < 0) return
+    commit((s) => { s.setlist[i] = { ...s.setlist[i]!, base: itemFingerprint(s.setlist[i]!) } })
   },
   remove(key: string) {
     setSetlist(state.setlist.filter((x) => x.key !== key))
   },
   replace: setSetlist,
+  /** 장 복사(바로 뒤에) — 오늘 선곡만. 송출·FREEZE·미리보기는 같은 장을 계속 가리킨다 */
+  duplicateSlide(key: string, j: number) { reshape(key, (sl) => (j >= 0 && j < sl.length ? duplicateAt(sl, j) : null), (x) => duplicateIndex(x, j)) },
+  /** 장 순서 바꾸기(끌기) — 오늘 선곡만. 송출·FREEZE·미리보기는 같은 장을 따라간다 */
+  moveSlide(key: string, from: number, to: number) {
+    reshape(key, (sl) => (from !== to && from >= 0 && to >= 0 && from < sl.length && to < sl.length ? moveAt(sl, from, to) : null), (x) => moveIndex(x, from, to))
+  },
   /**
    * 선곡 기록을 복사해 새 선곡으로 시작(src/live/history.ts). 위치는 처음, 송출은 BLANK(엉뚱한 장이 바로 나가지 않게), FREEZE 해제
    * (FREEZE 는 옛 선곡의 위치를 가리키므로).
@@ -227,7 +241,7 @@ const setlist = {
     if (i < 0) return
     commit((s) => {
       const it = s.setlist[i]!
-      s.setlist[i] = { ...it, title: song.title, slides: [...song.slides] }
+      s.setlist[i] = { ...it, title: song.title, slides: [...song.slides], base: itemFingerprint(song) }
       if (s.itemIndex === i) {
         if (!song.slides.length) { s.blank = true; s.slideIndex = 0 }
         else s.slideIndex = Math.min(s.slideIndex, song.slides.length - 1)
@@ -270,6 +284,20 @@ const setlist = {
     if (preview.value?.itemIndex === i) preview.value = { itemIndex: i, slideIndex: remap(preview.value.slideIndex) }
     return 'ok'
   },
+}
+
+/** 한 곡의 장 목록을 바꾸고 그 곡을 가리키는 위치(송출·FREEZE·미리보기)를 remap 으로 옮긴다. change 가 null 이면 아무것도 안 함 */
+function reshape(key: string, change: (slides: readonly string[]) => string[] | null, remap: (j: number) => number) {
+  const i = state.setlist.findIndex((x) => x.key === key)
+  if (i < 0) return
+  const next = change(state.setlist[i]!.slides)
+  if (!next) return
+  commit((s) => {
+    s.setlist[i] = { ...s.setlist[i]!, slides: next }
+    if (s.itemIndex === i) s.slideIndex = remap(s.slideIndex)
+    if (s.frozen && s.frozen.itemIndex === i) s.frozen = { ...s.frozen, slideIndex: remap(s.frozen.slideIndex) }
+  })
+  if (preview.value?.itemIndex === i) preview.value = { itemIndex: i, slideIndex: remap(preview.value.slideIndex) }
 }
 
 function setStyle(patch: Partial<OutputStyle>) {

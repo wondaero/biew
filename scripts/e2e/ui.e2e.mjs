@@ -78,11 +78,11 @@ try {
   // ── 폰 ──
   const m = await (await browser.createBrowserContext()).newPage()
   await open(m, 360, 740, true)
-  // ✎ 는 곡 제목(고정 머리) 아래로
-  const z = await m.evaluate(() => [getComputedStyle(document.querySelector('.song h3')).zIndex, getComputedStyle(document.querySelector('.cell .edit')).zIndex].map(Number))
-  check('폰: 곡 제목이 ✎ 보다 위(스크롤 시 ✎ 가 제목을 가리지 않음)', z[0] > z[1], JSON.stringify(z))
-  const gap = await m.$eval('.cell', (c) => c.getBoundingClientRect().right - c.querySelector('.edit').getBoundingClientRect().right)
-  check('폰: ✎ 오른쪽 여백 ≥ 8px', gap >= 7.5, `${gap}px`)
+  // ⋯ 는 곡 제목(고정 머리) 아래로
+  const z = await m.evaluate(() => [getComputedStyle(document.querySelector('.song h3')).zIndex, getComputedStyle(document.querySelector('.cell .more')).zIndex].map(Number))
+  check('폰: 곡 제목이 ⋯ 보다 위(스크롤 시 ⋯ 가 제목을 가리지 않음)', z[0] > z[1], JSON.stringify(z))
+  const gap = await m.$eval('.cell', (c) => c.getBoundingClientRect().right - c.querySelector('.more').getBoundingClientRect().right)
+  check('폰: ⋯ 오른쪽 여백 ≥ 8px', gap >= 7.5, `${gap}px`)
   // 배치(2026-11-19): 위 = 상단 바 → 준비 버튼 줄 → 송출 화면, 맨 아래 = 송출 버튼 한 줄 [BLANK][FREEZE][◀][▶] 같은 폭, 아이콘만
   const lay = await m.evaluate(() => {
     const r = (s) => document.querySelector(s).getBoundingClientRect()

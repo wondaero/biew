@@ -2,11 +2,11 @@
 /**
  * 슬라이드 한 장 고치기(선곡 카드의 ✎, 사용자 결정 2026-11-18). 예배 중 오타를 바로 고치는 용도.
  *  - 고치는 동안 송출은 그대로. [저장]을 누르면 선곡이 바뀌고, 송출 중인 장이면 바로 새 글이 나간다(FREEZE 중이면 풀 때).
- *  - '곡 원본에도 저장'(기본 켜짐): 원본의 그 글만 바꿔 곡 저장 규칙대로(온라인+로그인 = 서버, 아니면 PC). 실제 저장은 부모(SlideGrid).
+ *  - 오늘 선곡에만(임시, 2026-11-25 사용자 결정) — 곡 원본은 슬라이드 목록의 곡 제목 줄 [저장]으로(src/control/setlistChanges.ts).
  *  - 같은 글이 여러 장(후렴 반복)이면 '같은 글 N장 모두'(기본 켜짐).
  *  - 빈 줄 = 그 자리에서 장 나누기(2026-11-19 — 현장에서 한 장을 둘로 쪼개기·뒤에 장 추가). 나뉜 장마다 미리보기.
  *    송출·미리보기 위치는 같은 글을 가리키도록 liveStore.editSlides 가 옮긴다.
- *  - [삭제](2026-11-22 사용자 요청): 그 장(같은 글 모두가 켜져 있으면 그 N장)을 지운다 — 확인창에 몇 장인지. 곡 원본에도(체크 따라).
+ *  - [삭제](2026-11-22 사용자 요청): 그 장(같은 글 모두가 켜져 있으면 그 N장)을 지운다 — 확인창에 몇 장인지. 오늘 선곡만.
  *    송출 중인 장이면 BLANK. 곡의 마지막 한 장은 못 지운다(곡을 빼려면 선곡에서).
  *  - Ctrl/⌘+Enter 저장 · Esc 닫기. 열린 동안 송출 단축키 막음, 뒤로가기 = 닫기.
  */
@@ -21,14 +21,13 @@ import OnAirStrip from './OnAirStrip.vue'
 import { canAutoFocus } from '@/lib/device'
 
 const props = defineProps<{ itemKey: string; slideIndex: number }>()
-const emit = defineEmits<{ close: []; save: [p: { pieces: string[]; indexes: number[]; toSong: boolean; all: boolean }] }>()
+const emit = defineEmits<{ close: []; save: [p: { pieces: string[]; indexes: number[] }] }>()
 const live = useLive()
 
 const item = computed(() => live.state.setlist.find((x) => x.key === props.itemKey))
 const original = item.value?.slides[props.slideIndex] ?? ''
 const text = ref(original)
 const sameAll = ref(true)
-const toSong = ref(true)
 const box = ref<HTMLTextAreaElement>()
 
 /** 고친 글 → 장들(빈 줄 = 나누기) */
@@ -58,15 +57,15 @@ function remove() {
   // 컨트롤러가 가리키는 장을 지우면 BLANK(liveStore.editSlides). FREEZE 중이면 송출은 고정 화면 그대로 — 풀 때 BLANK
   const ctlHit = live.state.itemIndex === itemIndex.value && delTargets.value.includes(live.state.slideIndex)
   const msg = (n > 1 ? `같은 글 ${n}장을 모두 지울까요?` : `${props.slideIndex + 1}장을 지울까요?`)
-    + (toSong.value ? '\n곡 원본에서도 지웁니다.' : '\n오늘 선곡에서만 지웁니다(곡 원본은 그대로).')
+    + '\n오늘 선곡에서만 지웁니다(곡 원본은 곡 제목 줄 [저장]으로).'
     + (changed.value ? '\n위에서 고친 글은 버려집니다.' : '')
     + (ctlHit ? (live.state.frozen ? '\n\n지금 가리키는 장입니다 — FREEZE 를 풀면 BLANK 가 됩니다.' : '\n\n송출 중인 장입니다 — 지우면 BLANK 가 됩니다.') : '')
   if (!confirm(msg)) return
-  emit('save', { pieces: [], indexes: delTargets.value, toSong: toSong.value, all: sameAll.value && same.value.length > 1 })
+  emit('save', { pieces: [], indexes: delTargets.value })
 }
 function save() {
   if (!changed.value || !item.value) return
-  emit('save', { pieces: pieces.value!, indexes: sameAll.value ? same.value : [props.slideIndex], toSong: toSong.value, all: sameAll.value })
+  emit('save', { pieces: pieces.value!, indexes: sameAll.value ? same.value : [props.slideIndex] })
 }
 function close() {
   if (changed.value && !confirm('고친 내용을 버리고 닫을까요?')) return false
@@ -110,7 +109,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           </div>
         </div>
         <label v-if="same.length > 1" class="chk"><input v-model="sameAll" type="checkbox" /> 이 곡에서 같은 글 {{ same.length }}장 모두 고치기</label>
-        <label class="chk"><input v-model="toSong" type="checkbox" /> 곡 원본에도 저장 <small>(끄면 오늘 선곡만)</small></label>
+        <p class="hint">오늘 선곡에만 바뀝니다. 곡 원본에 남기려면 슬라이드 목록의 곡 제목 줄 <b>[저장]</b>.</p>
         <p v-if="onAirNote" class="air">{{ onAirNote }}</p>
       </div>
       <footer>

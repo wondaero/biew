@@ -3,11 +3,16 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
 import { vFitLines } from '@/components/fitLines'
-import { useLibrary, loadCache, saveSong } from '@/library/library'
+import { useLibrary, loadCache } from '@/library/library'
+import { isChanged, saveItemToSong, removeItemAsk } from '../setlistChanges'
 import SlideEditDialog from '../SlideEditDialog.vue'
 import MediaImage from '@/components/MediaImage.vue'
 import { isMediaSlide, mediaIdOf } from '@shared/media'
-import { patchSongSlides } from '../slideEdit'
+import { VueDraggable } from 'vue-draggable-plus'
+import { useBackClose, backSettled } from '@/lib/backClose'
+import SongEditor from '../SongEditor.vue'
+import { isMediaItem } from '@shared/media'
+import type { SetlistItem, Song } from '@shared/types'
 
 const live = useLive()
 const root = ref<HTMLElement>()
@@ -22,9 +27,83 @@ const isCtl = (i: number, j: number) =>
 const isPreview = (i: number, j: number) =>
   live.pvwMode.value && live.preview.value?.itemIndex === i && live.preview.value?.slideIndex === j
 
+const isHost = computed(() => live.role.value === 'host')
+const textOf = (it: SetlistItem, j: number) => it.slides[j] ?? ''
+
 function onClick(i: number, j: number) {
+  if (Date.now() - dragEndAt < 300) return // 끌기를 막 끝낸 손이 클릭으로 송출하지 않게
   live.actions.pick({ itemIndex: i, slideIndex: j })
 }
+
+/**
+ * 카드를 끌어서 장 순서 바꾸기(2026-11-25 사용자 요청) — 오늘 선곡만(곡 원본 그대로), 위치는 같은 장을 따라감(liveStore.moveSlide).
+ * PC 는 누른 채 움직이면 끌기·그냥 클릭은 송출, 폰은 길게 눌러야 끌기(그냥 밀면 스크롤). 호스트만.
+ * 곡마다 카드 목록(id = 곡 key + 원래 번호)을 두고 끌기 라이브러리가 그 순서를 바꾸면, 끝날 때 선곡에 반영하고 다시 만든다.
+ */
+interface CardRef { id: string; j: number }
+const models = ref<Record<string, CardRef[]>>({})
+watch(() => live.state.setlist, (list) => {
+  models.value = Object.fromEntries(list.map((it) => [it.key, it.slides.map((_, j) => ({ id: `${it.key}:${j}`, j }))]))
+}, { deep: true, immediate: true })
+let dragEndAt = 0
+function onDragStart() { menu.value = null }
+function onDragEnd(key: string, e: { oldIndex?: number; newIndex?: number }) {
+  dragEndAt = Date.now()
+  if (e.oldIndex === undefined || e.newIndex === undefined || e.oldIndex === e.newIndex) return
+  live.setlist.moveSlide(key, e.oldIndex, e.newIndex)
+  say('순서를 바꿨습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)')
+}
+
+/** 카드 ⋯ 메뉴(2026-11-25 사용자 요청 — 예전 ✎ 하나였던 자리, 기능이 늘어날 수 있어 메뉴로): 편집 · 복사(바로 뒤에, 오늘 선곡만) */
+const menu = ref<{ key: string; j: number } | null>(null)
+useBackClose(() => !!menu.value, () => { menu.value = null })
+const isMenu = (key: string, j: number) => menu.value?.key === key && menu.value.j === j
+function toggleMenu(key: string, j: number) { menu.value = isMenu(key, j) ? null : { key, j } }
+async function menuEdit() {
+  const m = menu.value
+  menu.value = null
+  if (!m) return
+  // 메뉴의 뒤로가기 칸이 정리된 뒤에 편집 창을 연다(안 그러면 편집 창의 뒤로가기가 페이지를 나감 — backSettled)
+  await nextTick()
+  await backSettled()
+  editing.value = { key: m.key, j: m.j }
+}
+function menuCopy() {
+  const m = menu.value
+  menu.value = null
+  if (!m) return
+  live.setlist.duplicateSlide(m.key, m.j)
+  say('바로 뒤에 복사했습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)')
+}
+
+/**
+ * 곡 제목 줄(2026-11-25 사용자 요청): [편집] = 곡 편집기(오늘 고친 게 있으면 그 내용으로 열림) → 저장하면 곡 원본 + 오늘 선곡의 그 곡 함께.
+ * 변경됨이면 [저장](지금 슬라이드를 곡 원본에) · [선곡 제외](고친 게 있으면 저장/버리기를 묻는다)
+ */
+const songEditing = ref<{ key: string; song: Song } | null>(null)
+async function editSong(it: SetlistItem) {
+  await loadCache()
+  const song = lib.byId.value.get(it.songId)
+  if (!song) return say('이 기기의 곡 목록에 없는 곡이라 편집할 수 없습니다 — 곡 목록에서 받거나 찾아서 고치세요', true)
+  songEditing.value = { key: it.key, song: isChanged(it) ? { ...song, slides: [...it.slides] } : song }
+}
+const savingKey = ref<string | null>(null)
+async function saveItem(it: SetlistItem) {
+  savingKey.value = it.key
+  const r = await saveItemToSong(it)
+  savingKey.value = null
+  if (!('cancelled' in r && r.cancelled)) say(r.text, !r.ok)
+}
+async function exclude(it: SetlistItem) {
+  const r = await removeItemAsk(it)
+  if (r) say(r.text, r.warn)
+}
+function onSongSaved(song: Song) {
+  const e = songEditing.value
+  if (e) live.setlist.refresh(e.key, song)
+  say('곡을 저장하고 오늘 선곡에도 반영했습니다(이 기기에 저장 — DB 엔 곡 목록의 ⬆ 업로드로)')
+}
+
 function onDbl(i: number, j: number) {
   // PVW 모드에서 더블클릭 = 즉시 송출
   if (live.pvwMode.value) live.actions.go({ itemIndex: i, slideIndex: j })
@@ -78,11 +157,11 @@ function say(text: string, warn = false) {
   clearTimeout(noticeTimer)
   noticeTimer = setTimeout(() => (notice.value = null), warn ? 8000 : 4000)
 }
-async function saveEdit(p: { pieces: string[]; indexes: number[]; toSong: boolean; all: boolean }) {
+/** 한 장 고치기·나누기·삭제 — 오늘 선곡만(임시). 곡 원본은 곡 제목 줄 [저장](src/control/setlistChanges.ts) */
+function saveEdit(p: { pieces: string[]; indexes: number[] }) {
   const e = editing.value
   const it = e && live.state.setlist.find((x) => x.key === e.key)
   if (!e || !it) return
-  const oldText = it.slides[e.j]!
   const removing = p.pieces.length === 0
   const r = live.setlist.editSlides(e.key, p.indexes, p.pieces)
   if (r !== 'ok') {
@@ -92,21 +171,8 @@ async function saveEdit(p: { pieces: string[]; indexes: number[]; toSong: boolea
       : '그 사이 선곡이 바뀌어 저장하지 못했습니다 — 다시 열어 주세요', true)
   }
   editing.value = null
-  const split = removing ? `${p.indexes.length}장 지웠습니다 — ` : p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다 — ` : ''
-  if (!p.toSong) return say(`${split}선곡만 고쳤습니다(곡 원본은 그대로)`)
-  await loadCache()
-  const song = lib.byId.value.get(it.songId)
-  const slides = song && patchSongSlides(song.slides, e.j, oldText, p.pieces, p.all)
-  if (slides && !slides.length) return say(`${split}곡 원본은 장이 하나도 안 남게 되어 그대로 두었습니다`, true)
-  if (!song || !slides) return say(song ? '선곡은 고쳤지만 곡 원본은 그 사이 바뀌어 저장하지 않았습니다 — 곡 목록에서 그 곡을 눌러 확인하세요' : '선곡은 고쳤지만 곡 원본을 찾을 수 없습니다', true)
-  try {
-    // base = 고친 기준(이 기기가 받아 둔 버전) — 업로드 때 그 사이 DB 가 바뀌었는지 판정
-    const r = await saveSong({ id: song.id, title: song.title, slides, base: { updated_at: song.updated_at, title: song.title, slides: [...song.slides] } })
-    void r
-    say(`${split || '고쳤습니다 — '}곡 원본은 이 기기에 저장(DB 에는 곡 목록의 ⬆ 업로드로)`)
-  } catch (err) {
-    say(`선곡은 고쳤지만 곡 원본 저장 실패: ${err instanceof Error ? err.message : err}`, true)
-  }
+  const what = removing ? `${p.indexes.length}장 지웠습니다` : p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다` : '고쳤습니다'
+  say(`${what} — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)`)
 }
 
 /** 송출 중인 장으로(모니터를 누르면) — 접혀 있으면 펼치고 가운데로. FREEZE 중이면 고정된 화면 쪽 */
@@ -140,26 +206,57 @@ defineExpose({ scrollToItem, scrollToLive })
         <span v-if="i === air.itemIndex" class="onair" :class="{ blanked: air.blank, frozen: air.frozen }">
           {{ air.frozen ? '❄ FREEZE' : air.blank ? '● BLANK' : '● 송출 중' }} {{ air.slideIndex + 1 }}/{{ it.slides.length }}
         </span>
+        <span v-if="isHost" class="h-acts" @click.stop>
+          <template v-if="isChanged(it)">
+            <span class="changed" title="오늘 선곡에서 바꾼 슬라이드(순서·가사)가 곡 원본에 저장되지 않음">변경됨</span>
+            <button class="h-btn primary save-item" :disabled="savingKey === it.key" title="지금 슬라이드(순서·가사)를 곡 원본에 저장" @click="saveItem(it)">저장</button>
+          </template>
+          <button v-if="!isMediaItem(it)" class="h-btn" title="곡 편집 — 저장하면 곡 원본과 오늘 선곡이 함께 바뀜" @click="editSong(it)">편집</button>
+          <button class="h-btn danger-line exclude" title="선곡에서 빼기(곡 목록의 곡은 그대로)" @click="exclude(it)">선곡 제외</button>
+        </span>
       </h3>
       <p v-if="!isClosed(it.key) && !it.slides.length" class="noslide">슬라이드 없음</p>
-      <div v-if="!isClosed(it.key)" class="cards">
-        <div v-for="(s, j) in it.slides" :key="j" class="cell">
+      <VueDraggable
+        v-if="!isClosed(it.key)"
+        :model-value="models[it.key] ?? []"
+        @update:model-value="(v: CardRef[]) => (models[it.key] = v)"
+        class="cards"
+        :disabled="!isHost"
+        :animation="150"
+        :delay="300"
+        :delay-on-touch-only="true"
+        :force-fallback="true"
+        :fallback-tolerance="6"
+        filter=".more, .more-menu"
+        :prevent-on-filter="false"
+        ghost-class="drag-ghost"
+        @start="onDragStart"
+        @end="onDragEnd(it.key, $event)"
+      >
+        <div v-for="c in models[it.key] ?? []" :key="c.id" class="cell">
         <button
           class="card"
-          :class="{ live: isLive(i, j), frozen: isLive(i, j) && air.frozen, pvw: isPreview(i, j), ctl: isCtl(i, j), blanked: isLive(i, j) && air.blank }"
-          @click="onClick(i, j)"
-          @dblclick="onDbl(i, j)"
+          :class="{ live: isLive(i, c.j), frozen: isLive(i, c.j) && air.frozen, pvw: isPreview(i, c.j), ctl: isCtl(i, c.j), blanked: isLive(i, c.j) && air.blank }"
+          @click="onClick(i, c.j)"
+          @dblclick="onDbl(i, c.j)"
         >
-          <span class="idx">{{ j + 1 }}</span>
-          <span v-if="isMediaSlide(s)" class="thumb"><MediaImage :id="mediaIdOf(s)" compact /></span>
-          <span v-else v-fit-lines="s" class="txt">{{ s }}</span>
+          <span class="idx">{{ c.j + 1 }}</span>
+          <span v-if="isMediaSlide(textOf(it, c.j))" class="thumb"><MediaImage :id="mediaIdOf(textOf(it, c.j))" compact /></span>
+          <span v-else v-fit-lines="textOf(it, c.j)" class="txt">{{ textOf(it, c.j) }}</span>
         </button>
-        <!-- 그림 장은 글 고치기 없음(그림은 PowerPoint 에서 고쳐 다시 넣기) -->
-        <button v-if="live.role.value === 'host' && !isMediaSlide(s)" class="edit" title="이 슬라이드 글 고치기" aria-label="이 슬라이드 글 고치기" @click="editing = { key: it.key, j }">✎</button>
+        <!-- ⋯ = 카드 밖 형제 버튼(카드 클릭 = 송출). 그림 장은 편집 없이 복사만(그림은 PowerPoint 에서 고쳐 다시 넣기) -->
+        <button v-if="isHost" class="more" :class="{ on: isMenu(it.key, c.j) }" title="더 보기 — 편집·복사" aria-label="이 슬라이드 더 보기" aria-haspopup="menu" @click.stop="toggleMenu(it.key, c.j)">⋯</button>
+        <div v-if="isMenu(it.key, c.j)" class="more-menu" role="menu" @click.stop>
+          <button v-if="!isMediaSlide(textOf(it, c.j))" role="menuitem" class="m-edit" @click="menuEdit">✎ 편집</button>
+          <button role="menuitem" class="m-copy" @click="menuCopy">⧉ 복사 <small>바로 뒤에</small></button>
         </div>
-      </div>
+        </div>
+      </VueDraggable>
     </div>
+    <!-- 메뉴 바깥 누르면 닫힘(PC 는 투명, 폰은 어둡게 + 메뉴는 아래 시트) -->
+    <div v-if="menu" class="more-backdrop" @click="menu = null" />
     <SlideEditDialog v-if="editing" :item-key="editing.key" :slide-index="editing.j" @close="editing = null" @save="saveEdit" />
+    <SongEditor v-if="songEditing" :song="songEditing.song" @close="songEditing = null" @saved="onSongSaved" />
     <p v-if="notice" class="se-notice" :class="{ warn: notice.warn }" role="status">{{ notice.text }}</p>
   </section>
 </template>
@@ -205,14 +302,30 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 /* 그림 장: 카드 안(번호 자리 아래)을 그림으로 채움 */
 .thumb { position: absolute; inset: 18px 6px 6px; border-radius: 3px; overflow: hidden; }
 .cell { position: relative; min-width: 0; display: grid; }
-/* ✎ = 카드 오른쪽 위 구석(카드 클릭 = 송출이므로 카드 밖 형제 버튼, 누를 자리 충분히). PC 는 마우스를 올렸을 때만 */
-.edit {
+/* ⋯ = 카드 오른쪽 위 구석(카드 클릭 = 송출이므로 카드 밖 형제 버튼, 누를 자리 충분히). PC 는 마우스를 올렸을 때(또는 메뉴가 열려 있을 때)만 */
+.more {
   position: absolute; top: 3px; right: 3px; width: 36px; height: 32px; padding: 0; margin: 0; z-index: 1;
-  font-size: 15px; line-height: 1; border-radius: 6px; background: rgba(20, 20, 26, .9); box-shadow: none; color: #cfd3dc;
+  font-size: 18px; font-weight: 700; line-height: 1; border-radius: 6px; background: rgba(20, 20, 26, .9); box-shadow: none; color: #cfd3dc;
 }
-.edit:active { transform: none; }
-.edit:hover { border-color: var(--accent); color: #fff; }
-@media (hover: hover) { .edit { opacity: 0; } .cell:hover .edit, .edit:focus-visible { opacity: 1; } }
+.more:active { transform: none; }
+.more:hover, .more.on { border-color: var(--accent); color: #fff; }
+@media (hover: hover) { .more { opacity: 0; } .cell:hover .more, .more:focus-visible, .more.on { opacity: 1; } }
+/* ⋯ 메뉴: PC = 버튼 아래 작은 목록. 바깥(.more-backdrop, 투명)을 누르면 닫힘 */
+.more-menu {
+  position: absolute; top: 38px; right: 3px; z-index: 31; min-width: 150px; display: grid; gap: 2px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+}
+.more-menu button { margin: 0; box-shadow: none; text-align: left; font-size: 14px; padding: 8px 10px; background: none; border-color: transparent; }
+.more-menu button:hover { background: var(--panel-2); border-color: var(--line); }
+.more-menu small { color: var(--muted); font-size: 12px; margin-left: 4px; }
+.more-backdrop { position: fixed; inset: 0; z-index: 30; }
+/* 끌기 중 자리 표시 */
+.drag-ghost { opacity: .35; }
+.drag-ghost .card { border-style: dashed; border-color: var(--accent); }
+/* 곡 제목 줄 [편집][삭제] — 보통 크기 버튼(14px 규칙), 제목 줄 높이에 맞춰 여백만 줄임 */
+.h-acts { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
+.changed { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; color: var(--warn); border: 1px solid var(--warn); white-space: nowrap; }
+.h-btn { font-size: 14px; padding: 2px 10px; margin: 0; white-space: nowrap; }
 .se-notice {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 47; margin: 0; max-width: calc(100vw - 32px);
   padding: 8px 14px; border-radius: 8px; background: #1d2a22; border: 1px solid var(--live); color: #c9f5d9; font-size: 13px;
@@ -231,10 +344,21 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   .card .txt { font-size: 14px; }
   /* 폰 행 목록: 번호 옆에 작은 16:9 그림 */
   .thumb { position: relative; inset: auto; flex: none; width: 96px; aspect-ratio: 16 / 9; }
-  /* 폰: ✎ 항상 보임(마우스 올리기 없음) — 글이 ✎ 아래로 가지 않게 오른쪽 자리 비움 */
+  /* 폰: ⋯ 항상 보임(마우스 올리기 없음) — 글이 ⋯ 아래로 가지 않게 오른쪽 자리 비움 */
   .card { padding-right: 42px; gap: 8px; padding-left: 8px; }
-  .edit { top: 50%; right: 8px; transform: translateY(-50%); width: 32px; height: 34px; }
-  .edit:active { transform: translateY(-50%); }
+  .more { top: 50%; right: 8px; transform: translateY(-50%); width: 32px; height: 34px; }
+  .more:active { transform: translateY(-50%); }
+  /* 폰: ⋯ 메뉴 = 아래 시트(폰 팝업 규칙 — 가운데·떠 있는 작은 창 대신) */
+  .more-backdrop { background: rgba(0, 0, 0, .5); }
+  .more-menu {
+    position: fixed; top: auto; left: 0; right: 0; bottom: 0; min-width: 0; padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+    border-radius: 14px 14px 0 0; border-bottom: 0; gap: 6px;
+  }
+  .more-menu button { padding: 14px 12px; font-size: 15px; border-color: var(--line); background: var(--panel-2); }
+  .h-btn { padding: 4px 10px; }
+  /* 폰: 제목 줄 버튼은 둘째 줄 오른쪽(한 줄에 두면 곡 제목이 밀려 안 보이고 280px 에서 넘침) */
+  h3 { flex-wrap: wrap; row-gap: 6px; }
+  .h-acts { flex-basis: 100%; justify-content: flex-end; margin-left: 0; }
   .se-notice { bottom: 80px; }
   h3 { margin: 0 -10px 8px; padding: 10px 18px; }
 }

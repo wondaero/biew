@@ -36,17 +36,29 @@ export function remapIndex(old: number, targets: readonly number[], n: number, t
   return Math.max(0, Math.min(old + before * (n - 1), total - 1))
 }
 
+
 /**
- * 곡 원본에 같은 수정을 적용한 새 슬라이드 목록. 어느 장인지 확실하지 않으면 null(원본은 건드리지 않음).
- * 지워서 장이 하나도 안 남으면 빈 목록(부르는 쪽이 원본을 그대로 둔다).
- *  - all: 원본에서 oldText 와 같은 장 전부
- *  - 아니면: 같은 번호(j)의 글이 oldText 면 그 장, 아니면 oldText 가 딱 한 장일 때만 그 장
- * pieces 가 여러 장이면 그 자리에 나눠 넣는다.
+ * 장 복사(2026-11-25 사용자 요청, 카드 ⋯ → 복사): j 장을 바로 뒤에 한 장 더. 오늘 선곡에만(곡 원본은 그대로 —
+ * 인도자 반복 같은 그날 진행용 배치). 위치: j 보다 뒤를 가리키던 것만 한 칸 뒤로(원래 장은 그대로).
  */
-export function patchSongSlides(song: readonly string[], j: number, oldText: string, pieces: readonly string[], all: boolean): string[] | null {
-  const hits = sameTextIndexes(song, oldText)
-  if (!hits.length) return null
-  const targets = all ? hits : song[j] === oldText ? [j] : hits.length === 1 ? hits : null
-  if (!targets) return null
-  return replaceSlides(song, targets, pieces) // 빈 목록 = 지워서 원본이 비게 됨(부르는 쪽이 원본을 건드리지 않음)
+export function duplicateAt(slides: readonly string[], j: number): string[] {
+  return [...slides.slice(0, j + 1), slides[j]!, ...slides.slice(j + 1)]
+}
+export const duplicateIndex = (old: number, j: number): number => (old > j ? old + 1 : old)
+
+/**
+ * 장 순서 바꾸기(2026-11-25 사용자 요청, 카드를 끌어서): from 장을 to 자리로. 오늘 선곡에만.
+ * 위치는 같은 장을 따라간다(옮긴 장을 가리키던 것은 to, 그 사이 장들은 한 칸씩 당겨지거나 밀림).
+ */
+export function moveAt(slides: readonly string[], from: number, to: number): string[] {
+  const next = [...slides]
+  const [x] = next.splice(from, 1)
+  next.splice(to, 0, x!)
+  return next
+}
+export function moveIndex(old: number, from: number, to: number): number {
+  if (old === from) return to
+  if (from < old && old <= to) return old - 1
+  if (to <= old && old < from) return old + 1
+  return old
 }

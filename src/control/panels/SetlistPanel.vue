@@ -6,6 +6,7 @@ import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
 import { useLibrary } from '@/library/library'
 import { isMediaItem } from '@shared/media'
+import { removeItemAsk, clearAsk, isChanged } from '../setlistChanges'
 
 const live = useLive()
 const lib = useLibrary()
@@ -29,12 +30,14 @@ const list = computed<SetlistItem[]>({
   set: (v) => live.setlist.replace(v),
 })
 
-function remove(it: SetlistItem, i: number) {
-  if (i === live.state.itemIndex && !confirm(`송출 중인 "${it.title}"을(를) 선곡에서 뺄까요? 자막이 내려갑니다.`)) return
-  live.setlist.remove(it.key)
+/** 빼기·비우기 — 오늘 고친 곡이 있으면 저장/버리기를 묻는다(src/control/setlistChanges.ts) */
+async function remove(it: SetlistItem) {
+  const r = await removeItemAsk(it)
+  if (r?.warn) alert(r.text)
 }
-function clear() {
-  if (confirm('선곡을 모두 비울까요?')) live.setlist.clear()
+async function clear() {
+  const r = await clearAsk()
+  if (r?.warn) alert(r.text)
 }
 </script>
 
@@ -52,12 +55,12 @@ function clear() {
         :class="{ live: i === onAir(live.state).itemIndex }"
         @click="emit('jump', i)"
       >
-        <span class="grip" title="드래그해서 순서 변경">⋮⋮</span>
+        <span class="grip" title="드래그해서 순서 변경" aria-label="순서 바꾸기"><svg viewBox="0 0 14 10" width="14" height="10" aria-hidden="true"><path d="M1 2.5h12M1 7.5h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></span>
         <span class="no">{{ i + 1 }}</span>
-        <span class="title"><span v-if="isMediaItem(it)" class="pic" title="그림(PDF·이미지)">🖼</span>{{ it.title }}</span>
+        <span class="title"><span v-if="isMediaItem(it)" class="pic" title="그림(PDF·이미지)">🖼</span>{{ it.title }}<span v-if="isChanged(it)" class="chg" title="오늘 바꾼 슬라이드가 곡 원본에 저장되지 않음 — 슬라이드 목록의 곡 제목 줄 [저장]">•</span></span>
         <button v-if="latest(it)" class="upd" title="라이브러리에서 수정된 최신 가사로 갱신" @click.stop="refresh(it)">↻ 최신</button>
         <span class="n">{{ it.slides.length }}</span>
-        <button class="x" title="선곡에서 빼기" @click.stop="remove(it, i)">✕</button>
+        <button class="x" title="선곡에서 빼기" @click.stop="remove(it)">✕</button>
       </li>
     </VueDraggable>
     <p v-if="!list.length" class="empty">검색 결과를 클릭(또는 Enter)해서 곡을 추가하세요.</p>
@@ -89,4 +92,5 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .x:hover { color: var(--pgm); }
 .empty { color: var(--muted); font-size: 12px; margin: 0; }
 .hist { margin-right: 6px; }
+.chg { color: var(--warn); font-weight: 700; margin-left: 4px; }
 </style>

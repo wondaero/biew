@@ -8,6 +8,7 @@ const BASE = 'http://localhost:5179'
 let pass = 0, fail = 0
 const check = (n, ok, d = '') => { ok ? pass++ : fail++; console.log(`${ok ? '✔' : '✖'} ${n}${!ok && d ? `\n    ${d}` : ''}`) }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+async function until(fn, ms = 6000) { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await fn()) return true } catch {} await sleep(150) } return false }
 const SONG = ['Lorem ipsum\ndolor sit', 'Sed do eiusmod\ntempor', 'Ut enim ad\nminim veniam', 'Sed do eiusmod\ntempor']
 const seed = () => ({
   version: Date.now(), origin: 'e2e', itemIndex: 0, slideIndex: 1, blank: false, frozen: null, style: {},
@@ -33,7 +34,12 @@ async function open(p, w, mobile) {
   await p.goto(BASE + '/local', { waitUntil: 'networkidle0' })
   await p.waitForSelector('.cell .card')
 }
-const cellEdit = (p, item, j) => p.$$eval(`[data-item="${item}"] .cell .edit`, (bs, j) => bs[j].click(), j)
+// ⋯ 메뉴 → 편집 / 복사 (2026-11-25 — 예전 ✎ 자리)
+const cellMenu = async (p, item, j) => { await p.$$eval(`[data-item="${item}"] .cell .more`, (bs, j) => bs[j].click(), j); await p.waitForSelector('.more-menu') }
+const cellEdit = async (p, item, j) => { await cellMenu(p, item, j); await p.click('.more-menu .m-edit') }
+const cellCopy = async (p, item, j) => { await cellMenu(p, item, j); await p.click('.more-menu .m-copy') }
+const headerBtn = (p, item, cls) => p.$eval(`[data-item="${item}"] h3 .${cls}`, (b) => b.click())
+const changedMark = (p, item) => p.$(`[data-item="${item}"] h3 .changed`)
 const setText = (p, t) => p.$eval('.se textarea', (e, t) => { e.value = t; e.dispatchEvent(new Event('input', { bubbles: true })) }, t)
 
 let browser
@@ -43,17 +49,21 @@ try {
   const p = await (await browser.createBrowserContext()).newPage()
   p.on('dialog', (d) => d.accept())
   await open(p, 1400, false)
-  const op = await p.$eval('.cell .edit', (e) => getComputedStyle(e).opacity)
-  check('PC: ✎ 는 평소 숨김', op === '0', `opacity=${op}`)
+  const op = await p.$eval('.cell .more', (e) => getComputedStyle(e).opacity)
+  check('PC: ⋯ 는 평소 숨김', op === '0', `opacity=${op}`)
   await p.hover('[data-item="0"] .cell:nth-child(1)')
   await sleep(150)
-  check('PC: 카드에 마우스 올리면 ✎ 보임', (await p.$eval('[data-item="0"] .cell:nth-child(1) .edit', (e) => getComputedStyle(e).opacity)) === '1')
+  check('PC: 카드에 마우스 올리면 ⋯ 보임', (await p.$eval('[data-item="0"] .cell:nth-child(1) .more', (e) => getComputedStyle(e).opacity)) === '1')
+  await cellMenu(p, 0, 0)
+  check('⋯ 메뉴: [편집] [복사]', !!(await p.$('.more-menu .m-edit')) && !!(await p.$('.more-menu .m-copy')))
+  await p.click('.more-backdrop'); await sleep(150)
+  check('메뉴 바깥 누르면 닫힘', !(await p.$('.more-menu')))
 
   // 송출 중인 장(2장) — 같은 글이 4장에도 있음
   const before = await state(p)
   await cellEdit(p, 0, 1)
   await p.waitForSelector('.se')
-  check('✎ = 송출 아님(위치 그대로)', (await state(p)).slideIndex === 1 && (await state(p)).version === before.version)
+  check('⋯ → 편집 = 송출 아님(위치 그대로)', (await state(p)).slideIndex === 1 && (await state(p)).version === before.version)
   check('같은 글 2장 체크 표시', (await p.$$eval('.se .chk', (ls) => ls.map((l) => l.textContent))).some((t) => t.includes('2장')))
   check('송출 중 안내', !!(await p.$('.se .air')))
   check('열린 동안 송출 단축키 막힘', await (async () => { await p.keyboard.press('ArrowRight'); return (await state(p)).slideIndex === 1 })())
@@ -68,31 +78,34 @@ try {
   check('Ctrl+Enter 저장 → 창 닫힘', !(await p.$('.se')))
   check('선곡: 같은 글 2장 모두 고쳐짐(줄 끝 공백 정리)', s.setlist[0].slides[1] === 'Sed do eiusmod\ntempor FIXED' && s.setlist[0].slides[3] === s.setlist[0].slides[1])
   check('선곡: 다른 장·장 수·위치 그대로', s.setlist[0].slides.length === 4 && s.setlist[0].slides[0] === SONG[0] && s.itemIndex === 0 && s.slideIndex === 1 && !s.blank)
-  const orig = await pendingSong(p)
-  check('곡 원본: 그 글만 바뀜', JSON.stringify(orig) === JSON.stringify(s.setlist[0].slides))
+  check('곡 원본은 그대로(오늘 선곡만 — 임시)', JSON.stringify(await pendingSong(p)) === JSON.stringify(SONG))
+  check('곡 제목 줄에 "변경됨" + [저장]', !!(await changedMark(p, 0)) && !!(await p.$('[data-item="0"] h3 .save-item')))
   check('알림 표시', !!(await p.$('.se-notice')))
+  await headerBtn(p, 0, 'save-item')
+  check('[저장] → 곡 원본 = 지금 슬라이드, "변경됨" 사라짐', await until(async () => JSON.stringify(await pendingSong(p)) === JSON.stringify((await state(p)).setlist[0].slides) && !(await changedMark(p, 0))))
   await p.screenshot({ path: path.join(OUT, 'slideedit-pc.png') })
 
-  // 오늘만(원본 그대로)
+  // 저장 안 하면 임시
   await cellEdit(p, 0, 0)
   await p.waitForSelector('.se')
-  check('같은 글 1장이면 "모두" 체크 없음', (await p.$$('.se .chk')).length === 1)
+  check('같은 글 1장이면 "모두" 체크 없음 · 원본 저장 체크박스 없음', (await p.$$('.se .chk')).length === 0)
   await setText(p, 'Lorem ipsum\ndolor TODAY')
-  await p.$eval('.se .chk input', (e) => e.click()) // 곡 원본에도 저장 끄기
   await p.click('.se footer .primary')
   await sleep(400)
   s = await state(p)
-  check('오늘만: 선곡은 바뀜', s.setlist[0].slides[0] === 'Lorem ipsum\ndolor TODAY')
-  check('오늘만: 곡 원본은 그대로', (await pendingSong(p))[0] === SONG[0])
-  check('오늘만: ↻ 최신 버튼 생김(원본과 다름)', !!(await p.$('.set-wrap .upd')))
+  const saved1 = await pendingSong(p)
+  check('임시: 선곡은 바뀜, 곡 원본은 그대로, 변경됨 표시', s.setlist[0].slides[0] === 'Lorem ipsum\ndolor TODAY' && saved1[0] !== 'Lorem ipsum\ndolor TODAY' && !!(await changedMark(p, 0)))
+  check('선곡 목록에도 변경 표시(•)', !!(await p.$('.set-wrap .chg')))
 
-  // 원본 없는 곡 → 선곡만 + 경고
+  // 원본 없는 곡 → [저장] 하면 경고(곡 목록에 없음)
   await cellEdit(p, 1, 0)
   await p.waitForSelector('.se')
   await setText(p, 'Lorem\nipsum X')
   await p.click('.se footer .primary')
   await sleep(400)
-  check('원본 없는 곡: 선곡은 고침 + 경고 알림', (await state(p)).setlist[1].slides[0] === 'Lorem\nipsum X' && !!(await p.$('.se-notice.warn')))
+  check('원본 없는 곡: 선곡은 고침', (await state(p)).setlist[1].slides[0] === 'Lorem\nipsum X')
+  // 원본 지문이 없는 예전 저장본 + 곡 목록에도 없는 곡 → 비교할 기준이 없어 "변경됨"·[저장] 없음(새로 넣는 곡엔 모두 지문이 붙는다)
+  check('기준 없는 예전 항목: 변경됨·[저장] 안 보임', !(await changedMark(p, 1)) && !(await p.$('[data-item="1"] h3 .save-item')))
 
   // 고친 뒤 Esc → 확인창(accept) → 닫힘, 변경 없음
   const v = (await state(p)).version
@@ -127,8 +140,8 @@ try {
   check('카드도 8장으로', (await p.$$('[data-item="0"] .cell')).length === 8)
   check('나누기 알림', (await p.$eval('.se-notice', (e) => e.textContent).catch(() => '')).includes('2장으로 나눴습니다'))
 
-  // 장 삭제(2026-11-22): 앞을 지우면 번호가 당겨지고 송출 글 그대로 · 곡 원본에서도 그 장만 · 송출 중인 장을 지우면 BLANK · 마지막 한 장은 못 지움
-  // (지금 선곡: Lorem A1, Lorem A2, S1, S2, Ut X1(송출 중), Ut X2, S1, S2 — 곡 원본엔 Lorem A1·A2 가 없음: 앞에서 '오늘만'으로 고쳤음)
+  // 장 삭제(2026-11-22): 앞을 지우면 번호가 당겨지고 송출 글 그대로 · 곡 원본은 그대로(임시) · 송출 중인 장을 지우면 BLANK · 마지막 한 장은 못 지움
+  // (지금 선곡: Lorem A1, Lorem A2, S1, S2, Ut X1(송출 중), Ut X2, S1, S2)
   const del = async (item, j) => { await cellEdit(p, item, j); await p.waitForSelector('.se'); await p.click('.se footer .del'); await sleep(600) }
   const air2 = await onAirText()
   await del(0, 0)
@@ -138,7 +151,7 @@ try {
   await del(0, 4) // Ut X2 — 송출 중(3) 뒤, 곡 원본에도 한 장 있음
   s = await state(p)
   check('뒤 장 삭제: 송출 번호 그대로', s.setlist[0].slides.length === 6 && s.slideIndex === 3 && (await onAirText()) === air2)
-  check('삭제: 곡 원본에서도 그 장만 지움', (await pendingSong(p))?.length === songBefore - 1 && !(await pendingSong(p)).includes('Ut X2'), `${songBefore} → ${(await pendingSong(p))?.length}`)
+  check('삭제: 곡 원본은 그대로(임시 — [저장]해야 바뀜)', (await pendingSong(p))?.length === songBefore, `${songBefore} → ${(await pendingSong(p))?.length}`)
   check('삭제 알림', (await p.$eval('.se-notice', (e) => e.textContent).catch(() => '')).includes('1장 지웠습니다'))
   await del(0, 3) // 송출 중인 장
   s = await state(p)
@@ -155,12 +168,46 @@ try {
   check('곡의 마지막 한 장은 삭제 버튼 꺼짐', await p.$eval('.se footer .del', (b) => b.disabled))
   await p.click('.se footer button:not(.primary):not(.del)'); await sleep(200)
 
+  // ⋯ → 복사(2026-11-25): 바로 뒤에 같은 장, 오늘 선곡만
+  let before2 = (await state(p)).setlist[0].slides
+  await cellCopy(p, 0, 1)
+  await sleep(400)
+  s = await state(p)
+  check('⋯ → 복사: 바로 뒤에 같은 장(장 수 +1)', s.setlist[0].slides.length === before2.length + 1 && s.setlist[0].slides[2] === before2[1] && s.setlist[0].slides[1] === before2[1], JSON.stringify(s.setlist[0].slides.length))
+
+  // 끌어서 순서 바꾸기(2026-11-25): 1번 카드를 3번 자리로 — 클릭(송출)로 처리되지 않음
+  before2 = (await state(p)).setlist[0].slides
+  const v0 = (await state(p)).itemIndex + ':' + (await state(p)).slideIndex
+  const cards = await p.$$('[data-item="0"] .cell .card')
+  const a = await cards[0].boundingBox(), b = await cards[2].boundingBox()
+  await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
+  await p.mouse.down()
+  for (let k = 1; k <= 12; k++) { await p.mouse.move(a.x + a.width / 2 + ((b.x - a.x) * k) / 12, a.y + a.height / 2 + ((b.y - a.y) * k) / 12); await sleep(30) }
+  await p.mouse.move(b.x + b.width * 0.75, b.y + b.height / 2); await sleep(100)
+  await p.mouse.up()
+  await sleep(600)
+  s = await state(p)
+  check('끌어서 순서 바꾸기: 1번 장이 뒤로(오늘 선곡)', s.setlist[0].slides[0] === before2[1] && s.setlist[0].slides.includes(before2[0]) && s.setlist[0].slides.indexOf(before2[0]) > 0, JSON.stringify(s.setlist[0].slides.map((x) => x.split('\n')[0])))
+  check('끌기 = 송출 아님(위치 같은 장 따라감)', `${s.itemIndex}` === v0.split(':')[0])
+
+  // 곡 제목 줄 [선곡 제외] — 고친 곡이면 [저장하고 제외][버리고 제외][취소]
+  check('고친 곡: 제목 줄에 "변경됨"', !!(await changedMark(p, 0)))
+  await headerBtn(p, 0, 'exclude')
+  check('[선곡 제외] → 저장/버리기 묻는 창', !!(await p.waitForSelector('.xc', { timeout: 3000 }).catch(() => null)))
+  await p.click('.xc .cancel'); await sleep(200)
+  check('[취소] → 그대로', !(await p.$('.xc')) && (await state(p)).setlist.length === 2)
+  const orig0 = await pendingSong(p)
+  await headerBtn(p, 0, 'exclude')
+  await p.waitForSelector('.xc')
+  await p.click('.xc .discard'); await sleep(400)
+  check('[버리고 제외] → 선곡에서 빠짐, 곡 원본은 그대로', (await state(p)).setlist.length === 1 && JSON.stringify(await pendingSong(p)) === JSON.stringify(orig0))
+
   // ── 폰 280px ──
   const m = await (await browser.createBrowserContext()).newPage()
   await open(m, 280, true)
-  check('폰: ✎ 항상 보임', (await m.$eval('.cell .edit', (e) => getComputedStyle(e).opacity)) === '1')
-  const o = await m.$eval('[data-item="0"] .cell', (c) => { const a = c.getBoundingClientRect(), b = c.querySelector('.edit').getBoundingClientRect(); return b.right <= a.right + 1 && b.left >= a.left })
-  check('폰: ✎ 가 카드 안', o)
+  check('폰: ⋯ 항상 보임', (await m.$eval('.cell .more', (e) => getComputedStyle(e).opacity)) === '1')
+  const o = await m.$eval('[data-item="0"] .cell', (c) => { const a = c.getBoundingClientRect(), b = c.querySelector('.more').getBoundingClientRect(); return b.right <= a.right + 1 && b.left >= a.left })
+  check('폰: ⋯ 가 카드 안', o)
   await cellEdit(m, 0, 0)
   await m.waitForSelector('.se')
   await sleep(300)

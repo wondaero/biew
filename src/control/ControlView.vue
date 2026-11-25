@@ -13,6 +13,8 @@ import { useBackClose } from '@/lib/backClose'
 import SearchDialog from './SearchDialog.vue'
 import SetlistPanel from './panels/SetlistPanel.vue'
 import HistoryDialog from './HistoryDialog.vue'
+import ExitChangedDialog from './ExitChangedDialog.vue'
+import { exitRequest } from './setlistChanges'
 import { saveHistory, autoSaveStale, flushPending, historyTitleFor } from '@/live/history'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
@@ -222,6 +224,8 @@ onBeforeUnmount(() => {
     <ChannelPopover v-if="isHost && !isLocalMode && showChannel" :code="code" :title="title" @close="showChannel = false" />
     <SwitchToInternet v-if="showSwitch" @close="showSwitch = false" />
     <HistoryDialog v-if="isHost && showHistory" :code="code" @close="showHistory = false" />
+    <!-- 오늘 고친 곡을 빼거나 비울 때 [저장하고 제외][버리고 제외][취소] -->
+    <ExitChangedDialog v-if="isHost && exitRequest" />
     <StyleDialog v-if="isHost && showStyle && !narrow" @close="showStyle = false" />
     <div v-if="showHelp" class="help" @click="showHelp = false">
       <table>

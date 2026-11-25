@@ -85,7 +85,14 @@ try {
   const order = []
   for (let j = 1; j <= 3; j++) order.push(await centerColor(p, `[data-item="1"] .cell:nth-child(${j}) img`))
   check('장 순서 = PDF 순서(빨·초·파)', order.join(',') === '100,010,001', order.join(','))
-  check('그림 장에는 ✎ 없음(가사 장엔 있음)', (await p.$$('[data-item="1"] .cell .edit')).length === 0 && (await p.$$('[data-item="0"] .cell .edit')).length === 2)
+  // ⋯ 메뉴(2026-11-25): 그림 장은 [복사]만(편집 없음 — 그림은 PowerPoint 에서 고쳐 다시 넣기), 가사 장은 [편집][복사]
+  await p.$eval('[data-item="1"] .cell .more', (b) => b.click()); await p.waitForSelector('.more-menu')
+  const picMenu = { edit: !!(await p.$('.more-menu .m-edit')), copy: !!(await p.$('.more-menu .m-copy')) }
+  await p.click('.more-backdrop'); await sleep(200)
+  await p.$eval('[data-item="0"] .cell .more', (b) => b.click()); await p.waitForSelector('.more-menu')
+  const txtMenu = { edit: !!(await p.$('.more-menu .m-edit')) }
+  await p.click('.more-backdrop'); await sleep(200)
+  check('그림 장 ⋯ 메뉴엔 [복사]만(편집 없음), 가사 장엔 [편집]', !picMenu.edit && picMenu.copy && txtMenu.edit, JSON.stringify({ picMenu, txtMenu }))
 
   // 출력 창
   const out = await ctx.newPage()

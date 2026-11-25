@@ -20,8 +20,24 @@ function push(e: Entry) {
   history.pushState({ ...(history.state ?? {}), [KEY]: e.id }, '')
 }
 
+/** 우리가 부른 history.back() 이 다 끝났을 때 부를 것들(backSettled) */
+let settleWaiters: (() => void)[] = []
+function settled() { if (skip === 0) { const w = settleWaiters; settleWaiters = []; w.forEach((f) => f()) } }
+
+/**
+ * 팝업을 버튼으로 닫으며 부른 history.back() 이 끝날 때까지 기다린다. 닫자마자 다른 팝업을 열 때 쓴다
+ * (예: ⋯ 메뉴 → [편집] 창). 안 기다리면 늦게 도착한 '뒤로'가 새 팝업의 칸을 지워, 그 팝업에서 뒤로가기가 페이지를 나가 버린다(겪음).
+ */
+export function backSettled(): Promise<void> {
+  if (skip === 0) return Promise.resolve()
+  return new Promise((resolve) => {
+    settleWaiters.push(resolve)
+    setTimeout(() => { settleWaiters = settleWaiters.filter((f) => f !== resolve); resolve() }, 500) // 혹시 popstate 가 안 와도 멈추지 않게
+  })
+}
+
 window.addEventListener('popstate', () => {
-  if (skip > 0) { skip--; return }
+  if (skip > 0) { skip--; settled(); return }
   const top = stack[stack.length - 1]
   if (!top) return
   top.popped = true // 브라우저가 이미 칸을 뺐다

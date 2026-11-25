@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseSlideEdit, sameTextIndexes, patchSongSlides, replaceSlides, remapIndex } from '../src/control/slideEdit'
+import { parseSlideEdit, sameTextIndexes, replaceSlides, remapIndex, duplicateAt, duplicateIndex, moveAt, moveIndex } from '../src/control/slideEdit'
 
 describe('parseSlideEdit', () => {
   it('줄 끝 공백·앞뒤 빈 줄·CRLF 정리 → 한 장', () => {
@@ -31,30 +31,6 @@ describe('replaceSlides · remapIndex', () => {
   })
 })
 
-describe('patchSongSlides', () => {
-  const song = ['A', 'B', 'C', 'B']
-  it('같은 번호가 같은 글이면 그 장만', () => {
-    expect(patchSongSlides(song, 3, 'B', ['X'], false)).toEqual(['A', 'B', 'C', 'X'])
-  })
-  it('all 이면 같은 글 전부', () => {
-    expect(patchSongSlides(song, 1, 'B', ['X'], true)).toEqual(['A', 'X', 'C', 'X'])
-  })
-  it('나누기: 그 자리에 여러 장', () => {
-    expect(patchSongSlides(song, 0, 'A', ['A1', 'A2'], false)).toEqual(['A1', 'A2', 'B', 'C', 'B'])
-  })
-  it('번호가 어긋나도 그 글이 딱 한 장이면 그 장', () => {
-    expect(patchSongSlides(song, 0, 'C', ['X'], false)).toEqual(['A', 'B', 'X', 'B'])
-  })
-  it('번호가 어긋나고 같은 글이 여러 장이면 모름 → null', () => {
-    expect(patchSongSlides(song, 0, 'B', ['X'], false)).toBeNull()
-  })
-  it('원본에 그 글이 없으면(그 사이 바뀜) null', () => {
-    expect(patchSongSlides(song, 0, 'Z', ['X'], true)).toBeNull()
-  })
-  it('sameTextIndexes', () => {
-    expect(sameTextIndexes(song, 'B')).toEqual([1, 3])
-  })
-})
 
 describe('장 삭제(pieces = [])', () => {
   it('지우면 목록에서 빠짐(후렴 여러 곳도)', () => {
@@ -68,8 +44,19 @@ describe('장 삭제(pieces = [])', () => {
     expect(remapIndex(2, [2], 0, 2)).toBe(1) // 마지막 C 를 지움 → 앞 장 B
     expect(remapIndex(3, [1, 3], 0, 2)).toBe(1) // 둘째 후렴(마지막) 지움 → 앞 장
   })
-  it('곡 원본: 그 장만 지움, 다 지워지면 빈 목록(부르는 쪽이 원본을 그대로 둠)', () => {
-    expect(patchSongSlides(['A', 'B', 'C'], 1, 'B', [], false)).toEqual(['A', 'C'])
-    expect(patchSongSlides(['B', 'B'], 0, 'B', [], true)).toEqual([])
+})
+
+describe('장 복사 · 순서 바꾸기', () => {
+  it('복사: 바로 뒤에 같은 장, 뒤쪽 위치만 한 칸 밀림', () => {
+    expect(duplicateAt(['A', 'B', 'C'], 1)).toEqual(['A', 'B', 'B', 'C'])
+    expect([0, 1, 2].map((x) => duplicateIndex(x, 1))).toEqual([0, 1, 3])
+  })
+  it('이동: 앞→뒤, 뒤→앞, 위치는 같은 장을 따라감', () => {
+    expect(moveAt(['A', 'B', 'C', 'D'], 0, 2)).toEqual(['B', 'C', 'A', 'D'])
+    expect(moveAt(['A', 'B', 'C', 'D'], 3, 1)).toEqual(['A', 'D', 'B', 'C'])
+    // A(0)→2: A 를 가리키던 0 → 2, B(1)→0, C(2)→1, D 그대로
+    expect([0, 1, 2, 3].map((x) => moveIndex(x, 0, 2))).toEqual([2, 0, 1, 3])
+    // D(3)→1: D → 1, B(1)→2, C(2)→3, A 그대로
+    expect([0, 1, 2, 3].map((x) => moveIndex(x, 3, 1))).toEqual([0, 2, 3, 1])
   })
 })

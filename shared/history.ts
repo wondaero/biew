@@ -45,6 +45,9 @@ export function historyFingerprint(setlist: readonly Pick<SetlistItem, 'title' |
   return `${s.length.toString(36)}-${a.toString(36)}-${b.toString(36)}`
 }
 
+/** 곡 하나(제목 + 슬라이드)의 지문 — 선곡 항목이 원본과 달라졌는지 비교(SetlistItem.base) */
+export const itemFingerprint = (it: Pick<SetlistItem, 'title' | 'slides'>): string => historyFingerprint([it])
+
 /** 서버에 올릴 선곡: 그림 묶음은 빼고 개수만 */
 export function stripMedia(setlist: readonly SetlistItem[]): { setlist: SetlistItem[]; skippedMedia: number } {
   const kept = setlist.filter((it) => !isMediaItem(it))
