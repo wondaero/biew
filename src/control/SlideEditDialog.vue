@@ -44,8 +44,8 @@ const onAirNote = computed(() => {
   return a.frozen ? 'FREEZE 중 — 저장해도 송출은 그대로, FREEZE 를 풀면 새 글이 나갑니다' : '송출 중인 장 — 저장하면 바로 바뀝니다'
 })
 
-/** 지울 장들(같은 글 모두가 켜져 있으면 그 장 전부) */
-const delTargets = computed(() => (sameAll.value && same.value.length > 1 ? same.value : [props.slideIndex]))
+/** 지울 장 = 이 장 하나(같은 글 모두 체크는 고치기에만 — 삭제까지 묶으면 후렴이 통째로 지워짐, 2026-11-25 사용자 지적) */
+const delTargets = computed(() => [props.slideIndex])
 /** FREEZE 중인 장은 못 지운다(송출은 고정 글인데 목록의 '송출 중' 표시가 옆 장으로 옮겨 가 헷갈림 — liveStore.editSlides) */
 const frozenHit = computed(() => live.state.frozen?.itemIndex === itemIndex.value && delTargets.value.includes(live.state.frozen.slideIndex))
 const canDelete = computed(() => !!item.value && item.value.slides.length > delTargets.value.length && !frozenHit.value)
@@ -56,7 +56,8 @@ function remove() {
   const n = delTargets.value.length
   // 컨트롤러가 가리키는 장을 지우면 BLANK(liveStore.editSlides). FREEZE 중이면 송출은 고정 화면 그대로 — 풀 때 BLANK
   const ctlHit = live.state.itemIndex === itemIndex.value && delTargets.value.includes(live.state.slideIndex)
-  const msg = (n > 1 ? `같은 글 ${n}장을 모두 지울까요?` : `${props.slideIndex + 1}장을 지울까요?`)
+  void n
+  const msg = `${props.slideIndex + 1}장을 지울까요?`
     + '\n오늘 선곡에서만 지웁니다(곡 원본은 곡 제목 줄 [저장]으로).'
     + (changed.value ? '\n위에서 고친 글은 버려집니다.' : '')
     + (ctlHit ? (live.state.frozen ? '\n\n지금 가리키는 장입니다 — FREEZE 를 풀면 BLANK 가 됩니다.' : '\n\n송출 중인 장입니다 — 지우면 BLANK 가 됩니다.') : '')
@@ -113,7 +114,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <p v-if="onAirNote" class="air">{{ onAirNote }}</p>
       </div>
       <footer>
-        <button class="danger-line del" :disabled="!canDelete" :title="deleteTitle" @click="remove">삭제{{ sameAll && same.length > 1 ? ` (${same.length}장)` : '' }}</button>
+        <button class="danger-line del" :disabled="!canDelete" :title="deleteTitle" @click="remove">이 장 삭제</button>
         <small class="keys">Ctrl+Enter 저장 · Esc 닫기</small>
         <button @click="close()">취소</button>
         <button class="primary" :disabled="!changed" @click="save">저장</button>

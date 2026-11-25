@@ -175,6 +175,20 @@ try {
   s = await state(p)
   check('⋯ → 복사: 바로 뒤에 같은 장(장 수 +1)', s.setlist[0].slides.length === before2.length + 1 && s.setlist[0].slides[2] === before2[1] && s.setlist[0].slides[1] === before2[1], JSON.stringify(s.setlist[0].slides.length))
 
+  // ⋯ → 삭제(2026-11-25): 그 장 하나만(같은 가사의 다른 장은 그대로)
+  before2 = (await state(p)).setlist[0].slides
+  await cellMenu(p, 0, 2); await p.click('.more-menu .m-del'); await sleep(400)
+  s = await state(p)
+  check('⋯ → 삭제: 그 장 하나만(같은 가사의 다른 장은 남음)', s.setlist[0].slides.length === before2.length - 1 && s.setlist[0].slides[1] === before2[1], JSON.stringify(s.setlist[0].slides.length))
+  // 편집 창의 삭제도 그 장 하나만("같은 글 모두"가 켜져 있어도 — 예전엔 같은 가사를 모두 지우려 했음)
+  await cellCopy(p, 0, 1); await sleep(300)
+  before2 = (await state(p)).setlist[0].slides
+  await cellEdit(p, 0, 2); await p.waitForSelector('.se')
+  check('편집 창 삭제 버튼 = "이 장 삭제"', (await p.$eval('.se footer .del', (b) => b.textContent?.trim())) === '이 장 삭제')
+  await p.click('.se footer .del'); await sleep(500)
+  s = await state(p)
+  check('편집 창 삭제: 같은 글 모두 체크와 무관하게 그 장 하나만', s.setlist[0].slides.length === before2.length - 1 && s.setlist[0].slides[1] === before2[1])
+
   // 끌어서 순서 바꾸기(2026-11-25): 1번 카드를 3번 자리로 — 클릭(송출)로 처리되지 않음
   before2 = (await state(p)).setlist[0].slides
   const v0 = (await state(p)).itemIndex + ':' + (await state(p)).slideIndex

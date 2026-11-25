@@ -197,7 +197,8 @@ function setSetlist(list: SetlistItem[]) {
       // 송출 중 곡이 삭제됨 → 자막 내리고 안전한 위치로
       if (key) s.blank = true
       s.itemIndex = Math.min(s.itemIndex, Math.max(list.length - 1, 0))
-      s.slideIndex = 0
+      // 송출 중이던 곡이 없었으면(빈 선곡에 첫 곡) 송출 대기 — 장을 눌러야 나간다(2026-11-25 사용자 결정, nav.isIdle)
+      s.slideIndex = key ? 0 : -1
     }
   })
   if (preview.value) {
@@ -228,12 +229,12 @@ const setlist = {
     reshape(key, (sl) => (from !== to && from >= 0 && to >= 0 && from < sl.length && to < sl.length ? moveAt(sl, from, to) : null), (x) => moveIndex(x, from, to))
   },
   /**
-   * 선곡 기록을 복사해 새 선곡으로 시작(src/live/history.ts). 위치는 처음, 송출은 BLANK(엉뚱한 장이 바로 나가지 않게), FREEZE 해제
+   * 선곡 기록을 복사해 새 선곡으로 시작(src/live/history.ts). 송출 대기(빈 화면 — 장을 눌러야 나감), FREEZE 해제
    * (FREEZE 는 옛 선곡의 위치를 가리키므로).
    */
   startFrom(items: SetlistItem[]) {
     preview.value = null
-    commit((s) => { s.setlist = items; s.itemIndex = 0; s.slideIndex = 0; s.blank = true; s.frozen = null })
+    commit((s) => { s.setlist = items; s.itemIndex = 0; s.slideIndex = -1; s.blank = false; s.frozen = null })
   },
   /** 선곡 항목을 라이브러리의 최신 가사로 교체. 송출 중이면 슬라이드 번호를 범위 안으로 보정 */
   refresh(key: string, song: { title: string; slides: string[] }) {

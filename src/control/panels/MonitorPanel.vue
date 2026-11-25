@@ -16,7 +16,7 @@ const air = computed(() => onAir(s))
 const pgmText = computed(() => air.value.text)
 const nextText = computed(() => textAt(s.setlist, live.upcoming.value))
 const label = (c: { itemIndex: number; slideIndex: number } | null) =>
-  c && s.setlist[c.itemIndex] ? `${s.setlist[c.itemIndex]!.title} · ${c.slideIndex + 1}/${s.setlist[c.itemIndex]!.slides.length}` : '—'
+  c && s.setlist[c.itemIndex] ? `${s.setlist[c.itemIndex]!.title} · ${c.slideIndex < 0 ? '대기' : `${c.slideIndex + 1}/${s.setlist[c.itemIndex]!.slides.length}`}` : '—'
 </script>
 
 <template>

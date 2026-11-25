@@ -198,7 +198,8 @@ try {
   let mismatch = ''
   for (let t = 0; t < 120 && !mismatch; t++) {
     const setlist: SetlistItem[] = Array.from({ length: 1 + rnd(4) }, (_, i) => ({ key: 'k' + i, songId: 's' + i, title: 'L' + i, slides: Array.from({ length: rnd(4) }, (_, j) => 'Lorem ' + j) }))
-    const itemIndex = rnd(setlist.length), slideIndex = rnd(Math.max(1, setlist[itemIndex]!.slides.length))
+    // 4번에 1번은 송출 대기(slideIndex -1, 2026-11-25) — 서버는 고치지 않았고 같은 규칙으로 동작해야 한다
+    const itemIndex = rnd(setlist.length), slideIndex = rnd(4) === 0 ? -1 : rnd(Math.max(1, setlist[itemIndex]!.slides.length))
     const st: LiveState = { ...emptyLiveState('pc'), version: 1, setlist, itemIndex, slideIndex, blank: rnd(2) === 1 }
     const cmds: Record<string, unknown>[] = [{ cmd: 'next' }, { cmd: 'prev' }, { cmd: 'nextSong' }, { cmd: 'prevSong' }, { cmd: 'blank' }, { cmd: 'go', itemIndex: rnd(5) - 1, slideIndex: rnd(5) - 1 }]
     const cmd = cmds[rnd(cmds.length)]!
@@ -208,7 +209,7 @@ try {
     const same = exp === null ? act === null : !!act && act.itemIndex === exp.itemIndex && act.slideIndex === exp.slideIndex && act.blank === exp.blank
     if (error || !same) mismatch = `${JSON.stringify(cmd)} @ ${itemIndex}/${slideIndex} lens=${setlist.map((x) => x.slides.length)} → 앱 ${exp ? exp.itemIndex + '/' + exp.slideIndex : 'null'} / 서버 ${act ? act.itemIndex + '/' + act.slideIndex : 'null'} ${error?.message ?? ''}`
   }
-  check('서버 이동 규칙 = 앱 이동 규칙(무작위 120건 대조)', !mismatch, mismatch)
+  check('서버 이동 규칙 = 앱 이동 규칙(무작위 120건 대조, 송출 대기 포함)', !mismatch, mismatch)
 
   // ── 리모컨 쫓아내기(컨트롤 비밀번호 변경) / 보기 비밀번호 변경 — 호스트 PC 는 유지 ──
   const hostTok2 = first<{ token: string }>((await rpc(owner, 'issue_host_token', { p_code: code })).data)?.token

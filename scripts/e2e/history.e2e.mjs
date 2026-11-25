@@ -65,7 +65,7 @@ try {
   await p.$$eval('.hi .list li', (lis, t) => lis.find((li) => li.querySelector('.t')?.textContent?.trim() === t)?.querySelector('.acts .primary')?.click(), `${md(yesterday)} 예배`)
   check('복사해서 시작 → 창 닫힘, 선곡 2곡 복원', await until(async () => !(await p.$('.hi')) && (await state(p)).setlist?.length === 2))
   const s = await state(p)
-  check('복사해서 시작 → 위치 처음, BLANK, 항목 key 는 새로', s.itemIndex === 0 && s.blank === true && s.setlist.every((x) => x.key !== 'k0' && x.key !== 'k1'), JSON.stringify({ i: s.itemIndex, b: s.blank }))
+  check('복사해서 시작 → 송출 대기(빈 화면, BLANK 아님), 항목 key 는 새로', s.itemIndex === 0 && s.slideIndex === -1 && s.blank === false && s.setlist.every((x) => x.key !== 'k0' && x.key !== 'k1'), JSON.stringify({ i: s.itemIndex, j: s.slideIndex, b: s.blank }))
 
   // 새로고침·오프라인에도 유지(IndexedDB)
   await p.setOfflineMode(true)

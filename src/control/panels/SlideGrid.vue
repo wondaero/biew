@@ -77,6 +77,26 @@ function menuCopy() {
 }
 
 /**
+ * ⋯ → 삭제: 그 장 하나만(같은 가사 다른 장은 그대로). 오늘 선곡만(곡 원본은 [저장]으로). 송출 중 장이면 BLANK,
+ * FREEZE 중인 장·곡의 마지막 장은 못 지움(liveStore.editSlides).
+ */
+function menuDelete() {
+  const m = menu.value
+  menu.value = null
+  if (!m) return
+  const i = live.state.setlist.findIndex((x) => x.key === m.key)
+  const it = live.state.setlist[i]
+  if (!it) return
+  const ctlHit = live.state.itemIndex === i && live.state.slideIndex === m.j
+  const msg = `${m.j + 1}장을 지울까요? (오늘 선곡만 — 같은 가사의 다른 장은 그대로)`
+    + (ctlHit ? (live.state.frozen ? '\n\n지금 가리키는 장입니다 — FREEZE 를 풀면 BLANK 가 됩니다.' : '\n\n송출 중인 장입니다 — 지우면 BLANK 가 됩니다.') : '')
+  if (!confirm(msg)) return
+  const r = live.setlist.editSlides(m.key, [m.j], [])
+  if (r === 'ok') say('1장 지웠습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)')
+  else say(r === 'last' ? '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 [선곡 제외]' : r === 'frozen' ? 'FREEZE 중인 장은 지울 수 없습니다 — FREEZE 를 풀고 지우세요' : '그 사이 선곡이 바뀌어 지우지 못했습니다', true)
+}
+
+/**
  * 곡 제목 줄(2026-11-25 사용자 요청): [편집] = 곡 편집기(오늘 고친 게 있으면 그 내용으로 열림) → 저장하면 곡 원본 + 오늘 선곡의 그 곡 함께.
  * 변경됨이면 [저장](지금 슬라이드를 곡 원본에) · [선곡 제외](고친 게 있으면 저장/버리기를 묻는다)
  */
@@ -203,8 +223,9 @@ defineExpose({ scrollToItem, scrollToLive })
         <span class="no">{{ i + 1 }}</span>
         <span class="name">{{ it.title }}</span>
         <small>{{ it.slides.length }}장</small>
-        <span v-if="i === air.itemIndex" class="onair" :class="{ blanked: air.blank, frozen: air.frozen }">
-          {{ air.frozen ? '❄ FREEZE' : air.blank ? '● BLANK' : '● 송출 중' }} {{ air.slideIndex + 1 }}/{{ it.slides.length }}
+        <span v-if="i === air.itemIndex && air.slideIndex < 0 && !air.frozen" class="onair idle" title="선곡은 됐지만 아직 아무 장도 안 나감 — 장을 누르거나 ▶">○ 송출 대기</span>
+        <span v-else-if="i === air.itemIndex" class="onair" :class="{ blanked: air.blank, frozen: air.frozen }">
+          {{ air.frozen ? '❄ FREEZE' : air.blank ? '● BLANK' : '● 송출 중' }} {{ air.slideIndex < 0 ? '' : `${air.slideIndex + 1}/${it.slides.length}` }}
         </span>
         <span v-if="isHost" class="h-acts" @click.stop>
           <template v-if="isChanged(it)">
@@ -249,6 +270,7 @@ defineExpose({ scrollToItem, scrollToLive })
         <div v-if="isMenu(it.key, c.j)" class="more-menu" role="menu" @click.stop>
           <button v-if="!isMediaSlide(textOf(it, c.j))" role="menuitem" class="m-edit" @click="menuEdit">✎ 편집</button>
           <button role="menuitem" class="m-copy" @click="menuCopy">⧉ 복사 <small>바로 뒤에</small></button>
+          <button role="menuitem" class="m-del" @click="menuDelete">🗑 삭제 <small>이 장만</small></button>
         </div>
         </div>
       </VueDraggable>
@@ -282,6 +304,7 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .onair { font-size: 11px; font-weight: 700; color: var(--live); white-space: nowrap; }
 .onair.blanked { color: var(--warn); }
 .onair.frozen { color: var(--freeze); }
+.onair.idle { color: var(--muted); font-weight: 600; }
 .noslide { color: var(--muted); font-size: 12px; margin: 0 8px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .card {
@@ -318,6 +341,7 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .more-menu button { margin: 0; box-shadow: none; text-align: left; font-size: 14px; padding: 8px 10px; background: none; border-color: transparent; }
 .more-menu button:hover { background: var(--panel-2); border-color: var(--line); }
 .more-menu small { color: var(--muted); font-size: 12px; margin-left: 4px; }
+.more-menu .m-del { color: #ff9b9b; }
 .more-backdrop { position: fixed; inset: 0; z-index: 30; }
 /* 끌기 중 자리 표시 */
 .drag-ghost { opacity: .35; }

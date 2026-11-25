@@ -85,7 +85,7 @@ try {
   await until(async () => (await p.$$('.hi .list li')).length >= 1)
   await p.$$eval('.hi .list li', (lis) => lis[0].querySelector('.acts .primary')?.click())
   const st = async () => (await admin.from('channels').select('state').eq('code', code).single()).data?.state
-  check('서버 기록 복사해서 시작 → 선곡 1곡, BLANK(서버 상태에도)', await until(async () => { const s = await st(); return s?.setlist?.length === 1 && s?.blank === true }, 10000))
+  check('서버 기록 복사해서 시작 → 선곡 1곡, 송출 대기(서버 상태에도)', await until(async () => { const s = await st(); return s?.setlist?.length === 1 && s?.slideIndex === -1 && s?.blank === false }, 10000))
 
   // 채널 삭제 → 기록도 삭제
   await admin.from('channels').delete().eq('code', code)

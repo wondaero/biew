@@ -49,6 +49,7 @@ try {
   await m.$eval('.srch ol.hits li .add', (e) => e.click())
   await sleep(300)
   check('폰: [+ 선곡] → 선곡에 추가됨', (await state(m)).setlist.length === 1)
+  check('빈 선곡에 첫 곡 → 송출 대기(아무 장도 안 나감, BLANK 아님)', (await state(m)).slideIndex === -1 && (await state(m)).blank === false, JSON.stringify(await state(m)))
   check('폰: [+ 선곡] 뒤에도 입력칸 포커스 없음(키패드 안 뜸)', (await focused(m)) === null, await focused(m))
   check('폰: 버튼 이름 "+ 선곡"', (await m.$eval('.srch ol.hits li .add', (e) => e.textContent?.trim())) === '+ 선곡')
 

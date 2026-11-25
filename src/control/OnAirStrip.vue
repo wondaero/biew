@@ -12,13 +12,13 @@ const live = useLive()
 const air = computed(() => onAir(live.state))
 const item = computed(() => live.state.setlist[air.value.itemIndex])
 const kind = computed(() => (!item.value ? 'none' : air.value.frozen ? 'frozen' : air.value.blank ? 'blank' : 'live'))
-const tag = computed(() => ({ none: '송출 없음', frozen: '❄ FREEZE', blank: '● BLANK', live: '● 송출 중' })[kind.value])
+const tag = computed(() => (kind.value === 'live' && air.value.slideIndex < 0 ? '○ 송출 대기' : ({ none: '송출 없음', frozen: '❄ FREEZE', blank: '● BLANK', live: '● 송출 중' })[kind.value]))
 </script>
 
 <template>
   <p class="onair-strip" :class="kind" role="status">
     <b>{{ tag }}</b>
-    <span v-if="item">{{ item.title }} · {{ air.slideIndex + 1 }}/{{ item.slides.length }}</span>
+    <span v-if="item">{{ item.title }}{{ air.slideIndex < 0 ? '' : ` · ${air.slideIndex + 1}/${item.slides.length}` }}</span>
   </p>
 </template>
 

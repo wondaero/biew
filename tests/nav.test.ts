@@ -43,3 +43,23 @@ describe('onAir (FREEZE)', () => {
     expect(a).toEqual({ itemIndex: 0, slideIndex: 0, blank: false, text: 'Lorem 0 (snapshot)', frozen: true })
   })
 })
+
+describe('송출 대기(slideIndex -1) — 2026-11-25', () => {
+  const sl = [
+    { key: 'a', songId: 'a', title: 'A', slides: ['a1', 'a2'] },
+    { key: 'b', songId: 'b', title: 'B', slides: ['b1', 'b2'] },
+  ]
+  it('대기 = 빈 화면(글 없음), BLANK 와 별개', async () => {
+    const nav = await import('../src/live/nav')
+    const s = { setlist: sl, itemIndex: 0, slideIndex: -1, blank: false, frozen: null }
+    expect(nav.isIdle(s)).toBe(true)
+    expect(nav.currentText(s)).toBeNull()
+    expect(nav.onAir(s).blank).toBe(false)
+  })
+  it('▶ = 그 곡 첫 장, ◀ = 이전 곡 마지막 장(없으면 그대로)', async () => {
+    const nav = await import('../src/live/nav')
+    expect(nav.next({ setlist: sl, itemIndex: 0, slideIndex: -1 })).toEqual({ itemIndex: 0, slideIndex: 0 })
+    expect(nav.prev({ setlist: sl, itemIndex: 1, slideIndex: -1 })).toEqual({ itemIndex: 0, slideIndex: 1 })
+    expect(nav.prev({ setlist: sl, itemIndex: 0, slideIndex: -1 })).toBeNull()
+  })
+})

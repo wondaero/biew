@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
     <header>
       <div class="t">
         <strong>{{ item?.title ?? (title || '실시간 가사') }}</strong>
-        <small v-if="item && air">{{ air.slideIndex + 1 }} / {{ item.slides.length }}</small>
+        <small v-if="item && air">{{ air.slideIndex < 0 ? '대기' : `${air.slideIndex + 1} / ${item.slides.length}` }}</small>
       </div>
       <span class="dot" :class="status" :title="status" />
     </header>

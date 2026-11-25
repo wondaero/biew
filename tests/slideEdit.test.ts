@@ -60,3 +60,12 @@ describe('장 복사 · 순서 바꾸기', () => {
     expect([0, 1, 2, 3].map((x) => moveIndex(x, 3, 1))).toEqual([0, 2, 3, 1])
   })
 })
+
+describe('송출 대기(-1)는 장을 바꿔도 그대로', () => {
+  it('나누기·삭제·복사·이동 모두 -1 유지(0 이 되면 첫 장이 송출돼 버림)', () => {
+    expect(remapIndex(-1, [0], 0, 2)).toBe(-1)
+    expect(remapIndex(-1, [0], 3)).toBe(-1)
+    expect(duplicateIndex(-1, 0)).toBe(-1)
+    expect(moveIndex(-1, 0, 2)).toBe(-1)
+  })
+})

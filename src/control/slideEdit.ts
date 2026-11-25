@@ -32,6 +32,7 @@ export function replaceSlides(slides: readonly string[], targets: readonly numbe
  * total(바뀐 뒤 장 수)을 주면 범위 안으로(마지막 장을 지웠으면 앞 장).
  */
 export function remapIndex(old: number, targets: readonly number[], n: number, total = Infinity): number {
+  if (old < 0) return old // 송출 대기(-1)는 그대로 — 0 으로 바뀌면 첫 장이 송출돼 버림
   const before = targets.filter((t) => t < old).length
   return Math.max(0, Math.min(old + before * (n - 1), total - 1))
 }
