@@ -33,13 +33,27 @@ interface BiewDB extends DBSchema {
   pending: { key: string; value: PendingSong }
   /** 그림 슬라이드(PDF·이미지에서 만든 장) — 이 기기에만. shared/media.ts */
   media: { key: string; value: MediaBlob }
+  /** 선곡 기록 — 로컬 송출(scope 'LOCAL') 전부 + 인터넷 송출 채널(scope = 번호)은 아직 서버에 못 올린 것만(pending). shared/history.ts */
+  history: { key: string; value: LocalHistory; indexes: { scope: string } }
+}
+
+export interface LocalHistory {
+  id: string
+  scope: string
+  title: string
+  savedAt: string
+  setlist: import('@shared/types').SetlistItem[]
+  skippedMedia: number
+  fingerprint: string
+  /** 인터넷 송출 채널 기록인데 아직 서버에 못 올림(인터넷이 끊겼을 때) */
+  pending: boolean
 }
 
 export interface MediaBlob { id: string; blob: Blob; w: number; h: number; savedAt: string }
 
 let dbp: Promise<IDBPDatabase<BiewDB>> | null = null
 function db() {
-  dbp ??= openDB<BiewDB>('biew', 3, {
+  dbp ??= openDB<BiewDB>('biew', 4, {
     upgrade(d, oldVersion) {
       if (oldVersion < 1) {
         d.createObjectStore('songs', { keyPath: 'id' })
@@ -47,6 +61,7 @@ function db() {
       }
       if (oldVersion < 2) d.createObjectStore('pending', { keyPath: 'id' })
       if (oldVersion < 3) d.createObjectStore('media', { keyPath: 'id' })
+      if (oldVersion < 4) d.createObjectStore('history', { keyPath: 'id' }).createIndex('scope', 'scope')
     },
     blocked() {
       dbNotice.value = '다른 Biew 창(옛 버전)이 열려 있어 곡 목록을 불러오지 못하고 있습니다. 다른 Biew 창을 닫거나 새로고침하면 바로 이어집니다. (송출은 영향 없음)'
@@ -137,4 +152,22 @@ export async function removeMedia(ids: string[]) {
   const tx = (await db()).transaction('media', 'readwrite')
   for (const id of ids) void tx.store.delete(id)
   await tx.done
+}
+
+// ── 선곡 기록(이 기기) ──
+export async function listHistory(scope: string): Promise<LocalHistory[]> {
+  return (await db()).getAllFromIndex('history', 'scope', scope)
+}
+export async function getHistory(id: string): Promise<LocalHistory | undefined> {
+  return (await db()).get('history', id)
+}
+export async function putHistory(h: LocalHistory) {
+  await (await db()).put('history', h)
+}
+export async function removeHistory(id: string) {
+  await (await db()).delete('history', id)
+}
+/** 그림 정리용: 기록이 가리키는 선곡 전부 */
+export async function allHistorySetlists(): Promise<LocalHistory['setlist'][]> {
+  return (await (await db()).getAll('history')).map((h) => h.setlist)
 }

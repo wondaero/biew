@@ -12,6 +12,8 @@ import { useHotkeys } from './useHotkeys'
 import { useBackClose } from '@/lib/backClose'
 import SearchDialog from './SearchDialog.vue'
 import SetlistPanel from './panels/SetlistPanel.vue'
+import HistoryDialog from './HistoryDialog.vue'
+import { saveHistory, autoSaveStale, flushPending, historyTitleFor } from '@/live/history'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
 import OnAirStrip from './OnAirStrip.vue'
@@ -92,11 +94,23 @@ const showHelp = ref(false)
 // 인터넷 송출로 막 전환했으면(?share=1) 📡 창을 바로 열어 폰이 QR·링크로 들어오게
 const showChannel = ref(route.query.share === '1')
 const showSwitch = ref(false)
+/** 선곡 기록 창(📜) */
+const showHistory = ref(false)
+// 선곡 기록 자동: 컨트롤러를 열면 남아 있던 선곡이 지난 날짜의 것이면 기록(인터넷 송출은 서버 상태를 받은 뒤 — 3초),
+// 인터넷이 다시 연결되면 이 PC 에 보관해 둔 기록을 서버로(src/live/history.ts)
+onMounted(() => {
+  if (!isHost.value) return
+  window.setTimeout(() => { if (isHost.value && code.value) void autoSaveStale(code.value, live.state) }, 3000)
+})
+watch(hostLink, (v) => { if (v === 'live' && isHost.value && code.value) void flushPending(code.value) })
 
 /** 로컬 송출 종료: 선곡을 비우고(출력 설정 유지) 출력 창은 검은 화면으로 남긴다 — 다음 예배를 그대로 이어서 */
-function endLocal() {
-  if (!confirm('이 송출을 끝낼까요?\n선곡이 비워지고 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.')) return
+async function endLocal() {
+  if (!confirm('이 송출을 끝낼까요?\n선곡은 기록(📜)에 남기고 비웁니다. 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.')) return
+  // 선곡 기록(2026-11-25): 비우기 전에 남긴다. 실패해도 끝내기는 막지 않되 알린다
+  const r = await saveHistory(code.value, historyTitleFor(code.value), live.state.setlist)
   live.actions.endSession()
+  if (r === 'error') alert('송출은 끝냈지만 선곡을 기록하지 못했습니다.')
 }
 
 /** 리모컨: 이 기기에 저장된 토큰을 지우고 나간다(다음엔 비밀번호를 다시 입력) */
@@ -207,6 +221,7 @@ onBeforeUnmount(() => {
     <div v-if="toast" class="toast" @click="toast = null">{{ toast }}</div>
     <ChannelPopover v-if="isHost && !isLocalMode && showChannel" :code="code" :title="title" @close="showChannel = false" />
     <SwitchToInternet v-if="showSwitch" @close="showSwitch = false" />
+    <HistoryDialog v-if="isHost && showHistory" :code="code" @close="showHistory = false" />
     <StyleDialog v-if="isHost && showStyle && !narrow" @close="showStyle = false" />
     <div v-if="showHelp" class="help" @click="showHelp = false">
       <table>
@@ -254,7 +269,7 @@ onBeforeUnmount(() => {
             <button aria-label="닫기" @click="sheet = null">✕</button>
           </div>
           <OnAirStrip class="sheet-strip" />
-          <SetlistPanel class="set" @jump="onJump" />
+          <SetlistPanel class="set" @jump="onJump" @history="showHistory = true" />
         </div>
       </template>
     </aside>

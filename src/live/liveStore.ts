@@ -213,6 +213,14 @@ const setlist = {
     setSetlist(state.setlist.filter((x) => x.key !== key))
   },
   replace: setSetlist,
+  /**
+   * 선곡 기록을 복사해 새 선곡으로 시작(src/live/history.ts). 위치는 처음, 송출은 BLANK(엉뚱한 장이 바로 나가지 않게), FREEZE 해제
+   * (FREEZE 는 옛 선곡의 위치를 가리키므로).
+   */
+  startFrom(items: SetlistItem[]) {
+    preview.value = null
+    commit((s) => { s.setlist = items; s.itemIndex = 0; s.slideIndex = 0; s.blank = true; s.frozen = null })
+  },
   /** 선곡 항목을 라이브러리의 최신 가사로 교체. 송출 중이면 슬라이드 번호를 범위 안으로 보정 */
   refresh(key: string, song: { title: string; slides: string[] }) {
     const i = state.setlist.findIndex((x) => x.key === key)

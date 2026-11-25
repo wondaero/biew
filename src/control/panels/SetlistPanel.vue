@@ -21,7 +21,7 @@ function refresh(it: SetlistItem) {
   const s = latest(it)
   if (s) live.setlist.refresh(it.key, s)
 }
-const emit = defineEmits<{ jump: [itemIndex: number] }>()
+const emit = defineEmits<{ jump: [itemIndex: number]; history: [] }>()
 
 // 드래그 결과를 그대로 store 에 반영(송출 중 곡 위치는 store 가 key 로 보정)
 const list = computed<SetlistItem[]>({
@@ -42,6 +42,7 @@ function clear() {
   <section class="setlist">
     <header>
       <h2>선곡 <small>{{ list.length }}곡</small></h2>
+      <button v-if="live.role.value === 'host'" class="ghost hist" title="선곡 기록 — 지난 예배 선곡 보기·복사해서 시작, 지금 선곡 기록" @click="emit('history')">📜 기록</button>
       <button v-if="list.length" class="ghost danger-line" @click="clear">비우기</button>
     </header>
     <VueDraggable v-model="list" :animation="150" handle=".grip" tag="ol" class="items">
@@ -87,4 +88,5 @@ header small { color: var(--muted); font-weight: normal; margin-left: 4px; }
 .x { padding: 0 6px; border: none; background: none; color: var(--muted); box-shadow: none; margin: 0; }
 .x:hover { color: var(--pgm); }
 .empty { color: var(--muted); font-size: 12px; margin: 0; }
+.hist { margin-right: 6px; }
 </style>

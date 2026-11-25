@@ -222,3 +222,48 @@ function friendly(msg: string): string {
   if (/same password/.test(msg)) return '지금과 다른 비밀번호를 입력하세요'
   return msg
 }
+
+// ── 선곡 기록(인터넷 송출 채널, 호스트 토큰) — 규칙: shared/history.ts, 서버: 마이그레이션 20261125000000 ──
+export type HistoryStatus = 'ok' | 'dup' | 'not_found' | 'token_rejected' | 'missing' | 'invalid' | 'error'
+const hStatus = (s: unknown): HistoryStatus =>
+  (['ok', 'dup', 'not_found', 'token_rejected', 'missing', 'invalid'] as const).includes(s as never) ? (s as HistoryStatus) : 'error'
+
+export async function historySave(code: string, token: string, r: { title: string; setlist: unknown; fingerprint: string; skippedMedia: number; savedAt?: string }): Promise<{ status: HistoryStatus; id?: string }> {
+  if (!supabase) return { status: 'error' }
+  const { data, error } = await supabase.rpc('host_history_save', {
+    p_code: code, p_token: token, p_title: r.title, p_setlist: r.setlist, p_fingerprint: r.fingerprint, p_skipped: r.skippedMedia, p_saved_at: r.savedAt ?? null,
+  })
+  if (error) return { status: 'error' }
+  const row = (data as { status: string; id: string | null }[] | null)?.[0]
+  return { status: hStatus(row?.status), id: row?.id ?? undefined }
+}
+
+export interface ServerHistoryRow { id: string; title: string; saved_at: string; songs: number; skipped_media: number }
+export async function historyList(code: string, token: string): Promise<{ status: HistoryStatus; rows: ServerHistoryRow[] }> {
+  if (!supabase) return { status: 'error', rows: [] }
+  const { data, error } = await supabase.rpc('host_history_list', { p_code: code, p_token: token })
+  if (error) return { status: 'error', rows: [] }
+  const all = (data ?? []) as (ServerHistoryRow & { status: string })[]
+  const status = hStatus(all[0]?.status)
+  return { status, rows: status === 'ok' ? all.filter((x) => x.id) : [] }
+}
+
+export async function historyGet(code: string, token: string, id: string): Promise<{ status: HistoryStatus; setlist?: unknown }> {
+  if (!supabase) return { status: 'error' }
+  const { data, error } = await supabase.rpc('host_history_get', { p_code: code, p_token: token, p_id: id })
+  if (error) return { status: 'error' }
+  const row = (data as { status: string; setlist: unknown }[] | null)?.[0]
+  return { status: hStatus(row?.status), setlist: row?.setlist }
+}
+
+export async function historyRename(code: string, token: string, id: string, title: string): Promise<HistoryStatus> {
+  if (!supabase) return 'error'
+  const { data, error } = await supabase.rpc('host_history_rename', { p_code: code, p_token: token, p_id: id, p_title: title })
+  return error ? 'error' : hStatus(data)
+}
+
+export async function historyDelete(code: string, token: string, id: string): Promise<HistoryStatus> {
+  if (!supabase) return 'error'
+  const { data, error } = await supabase.rpc('host_history_delete', { p_code: code, p_token: token, p_id: id })
+  return error ? 'error' : hStatus(data)
+}

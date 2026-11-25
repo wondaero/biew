@@ -38,11 +38,11 @@ try {
     return !t.includes('다른 Biew 창') && /\d+곡 저장됨/.test(t) && t.includes('아직 받지 않음')
   }))
 
-  // ── 1-b. 이 창(v3)이 더 새 버전(v4)의 업그레이드를 막지 않고 비켜 줌 ──
+  // ── 1-b. 이 창(앱 저장소 v4)이 더 새 버전(v5)의 업그레이드를 막지 않고 비켜 줌 ──
   const newer = await ctx.newPage()
   await newer.goto(BASE + '/manifest.webmanifest')
   const opened = await newer.evaluate(() => new Promise((res) => {
-    const r = indexedDB.open('biew', 4) // 앱 저장소는 v3(그림 슬라이드) — 그보다 새 버전
+    const r = indexedDB.open('biew', 5) // 앱 저장소는 v4(선곡 기록, src/library/db.ts) — 그보다 새 버전. 앱 저장소 버전을 올리면 여기도 +1
     r.onsuccess = () => { r.result.close(); res('ok') }
     r.onblocked = () => res('blocked')
     r.onerror = () => res('error')

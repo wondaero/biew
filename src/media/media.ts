@@ -5,7 +5,7 @@
  *  - .ppt/.pptx: 브라우저가 정확히 그릴 수 없다(글꼴·도형이 틀어짐) → PowerPoint 에서 PDF 로 저장하라고 안내
  */
 import { ref } from 'vue'
-import { putMedia, getMedia, allMediaIds, removeMedia } from '@/library/db'
+import { putMedia, getMedia, allMediaIds, removeMedia, allHistorySetlists } from '@/library/db'
 import { mediaSlide, naturalCompare, referencedMedia, isMediaSlide, mediaIdOf } from '@shared/media'
 import { uid } from '@/lib/uid'
 import { supabase } from '@/lib/supabase'
@@ -230,7 +230,7 @@ export async function prefetchMedia(slides: readonly string[]) {
 }
 
 /**
- * 안 쓰는 그림 지우기: 이 기기의 모든 선곡 저장본(biew.live.v1:*)이 가리키지 않는 그림.
+ * 안 쓰는 그림 지우기: 이 기기의 모든 선곡 저장본(biew.live.v1:*)과 선곡 기록(로컬 송출 기록은 그림까지 담는다)이 가리키지 않는 그림.
  * 선곡에서 빼거나 [송출 종료]해도 바로 지우지 않고, 컨트롤러를 열 때 정리한다(되돌리기·다른 창 여유).
  * 방금 넣은 그림(10분 안)은 남긴다 — 다른 창에서 넣는 중일 수 있으므로.
  */
@@ -242,6 +242,7 @@ export async function cleanupMedia(): Promise<number> {
       try { states.push(JSON.parse(localStorage.getItem(k) ?? 'null') ?? {}) } catch { /* 깨진 저장본은 무시 */ }
     }
   } catch { return 0 }
+  try { for (const setlist of await allHistorySetlists()) states.push({ setlist }) } catch { return 0 } // 기록을 못 읽으면 지우지 않는다(안전 쪽)
   const used = referencedMedia(states)
   const ids = await allMediaIds()
   const old: string[] = []
