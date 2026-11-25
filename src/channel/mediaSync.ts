@@ -45,11 +45,15 @@ export function hostMediaStop() {
   mediaUpload.value = null
 }
 
-/** 다시 연결됐을 때: 서버 목록부터 다시 읽는다 */
+/** 다시 연결됐을 때: 서버 목록부터 다시 읽는다. 진행 중인 올리기는 gen 으로 멈춘다(have 를 비운 채 이어 쓰다 오류 나지 않게) */
 export function hostMediaReconnect() {
+  gen++
   have = null
+  skipped.clear()
   kick(0)
 }
+/** 이번 연결에서 올릴 수 없는 것(이 PC 에 없음·서버가 거부: 너무 큼·잘못된 그림) — 매번 다시 시도해 뒤 그림을 막지 않게 */
+const skipped = new Set<string>()
 
 /** 상태가 바뀌면(선곡에 그림 추가·빼기) — 잠깐 모아서 한 번 */
 export function hostMediaKick() { kick(400) }
@@ -100,35 +104,45 @@ async function run() {
     for (const variant of ['thumb', 'full'] as const) {
       for (const it of items) it.slides.forEach((s, idx) => { if (isMediaSlide(s)) all.push({ key: it.key, idx, variant, id: mediaIdOf(s) }) })
     }
-    const todo = all.filter((t) => have!.get(`${t.key}:${t.idx}:${t.variant}`) !== t.id)
-    if (!todo.length) { mediaUpload.value = null; return }
+    const haveNow = have
+    const todo = all.filter((t) => haveNow.get(`${t.key}:${t.idx}:${t.variant}`) !== t.id && !skipped.has(`${t.key}:${t.idx}:${t.variant}:${t.id}`))
+    if (!todo.length) { mediaUpload.value = skipped.size ? { done: all.length - skipped.size, total: all.length, error: '일부 그림은 올릴 수 없음(이 PC 에 없거나 너무 큼)' } : null; return }
 
     let done = all.length - todo.length
     let sinceNotify = 0
+    let uploaded = 0
     mediaUpload.value = { done, total: all.length }
     for (const t of todo) {
       if (my !== gen) return
       const m = await getMedia(t.id).catch(() => undefined)
-      if (!m) { done++; continue } // 이 PC 에 없음 — 넣은 PC 가 올린다
+      if (!m) { skipped.add(`${t.key}:${t.idx}:${t.variant}:${t.id}`); done++; continue } // 이 PC 에 없음 — 넣은 PC 가 올린다(다시 시도 안 함)
       const blob = t.variant === 'full' ? m.blob : await makeThumb(m.blob)
       const r = await rpc<string>('host_put_media', {
         p_code: c, p_token: token, p_key: t.key, p_idx: t.idx, p_variant: t.variant, p_media_id: t.id, p_data: await blobToBase64(blob),
       })
       if (my !== gen) return
       if (r.data === 'ok') {
-        have.set(`${t.key}:${t.idx}:${t.variant}`, t.id)
+        haveNow.set(`${t.key}:${t.idx}:${t.variant}`, t.id)
+        uploaded++
         done++
         mediaUpload.value = { done, total: all.length }
         // 작은 그림이 다 올라갔을 때·10장마다 알림 — 리모컨·보기가 기다리지 않게
         if (++sinceNotify >= 10 || (t.variant === 'thumb' && todo[todo.indexOf(t) + 1]?.variant !== 'thumb')) { sinceNotify = 0; notify?.() }
+      } else if (r.data === 'too_big' || r.data === 'invalid') {
+        // 이 장은 다시 보내도 안 된다 — 건너뛰고 다음 장(예전엔 여기서 멈춰 뒤 그림이 전부 못 올라가고 같은 파일을 15초마다 다시 보냈음)
+        skipped.add(`${t.key}:${t.idx}:${t.variant}:${t.id}`)
+        done++
+        mediaUpload.value = { done, total: all.length, error: '그림 한 장이 너무 커서 건너뜀' }
       } else {
-        const why = r.data === 'quota' ? '서버 용량 한도(채널당 200MB)' : r.data === 'too_big' ? '그림 한 장이 너무 큼' : r.data === 'token_rejected' ? '호스트 권한 확인 필요' : '인터넷 연결 대기'
+        const why = r.data === 'quota' ? '서버 용량 한도(채널당 200MB)' : r.data === 'token_rejected' ? '호스트 권한 확인 필요' : '인터넷 연결 대기'
         mediaUpload.value = { done, total: all.length, error: why }
+        if (uploaded) notify?.()
         return // 15초 뒤 다시(인터넷 회복 등)
       }
     }
-    notify?.()
-    mediaUpload.value = null
+    // 실제로 올린 게 있을 때만 알림 — 없는데 알리면 모든 폰이 15초마다 없는 그림을 다시 찾음
+    if (uploaded) notify?.()
+    mediaUpload.value = skipped.size ? { done: all.length - skipped.size, total: all.length, error: '일부 그림은 올릴 수 없음(이 PC 에 없거나 너무 큼)' } : null
   } finally {
     running = false
     if (again) { again = false; kick(0) }

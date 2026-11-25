@@ -92,10 +92,10 @@ async function importPdf(file: File, onProgress: (p: ImportProgress) => void, si
   }
 }
 
-/** 상자보다 크면 줄여서, 아니면 원본 파일 그대로 저장 */
+/** 상자보다 크면 줄여서, 아니면 원본 파일 그대로 저장. 원본이 1MB 를 넘으면 다시 압축(서버 한 장 한도 3MB — 큰 PNG 가 막으면 뒤 그림이 못 올라감) */
 async function store(src: ImageBitmap, w: number, h: number, original: Blob): Promise<string> {
   const s = Math.min(1, BOX_W / w, BOX_H / h)
-  if (s === 1) return save(original, w, h)
+  if (s === 1 && original.size <= 1024 * 1024) return save(original, w, h)
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(w * s)
   canvas.height = Math.round(h * s)
@@ -138,6 +138,8 @@ export const mediaTick = ref(0)
 export const mediaFetch = ref<{ done: number; total: number; waiting: number } | null>(null)
 
 const urls = new Map<string, Promise<string | null>>()
+/** 같은 그림을 연달아 못 찾은 횟수(다시 찾는 간격 늘리기) */
+const missCount = new Map<string, number>()
 const sourceKey = () => (source ? `${source.code}:${source.kind}:${source.variant}` : '')
 
 export function setMediaSource(s: MediaSource | null) {
@@ -145,11 +147,15 @@ export function setMediaSource(s: MediaSource | null) {
   source = s
   // 다른 채널·역할의 '없음' 기억은 버린다(있는 것은 그대로 — 같은 그림이면 같은 그림)
   for (const [k, p] of urls) void p.then((u) => { if (!u && urls.get(k) === p) urls.delete(k) })
+  missCount.clear()
+  // 저장하지 않는 기기(폰)는 다른 채널로 가면 받아 둔 그림을 메모리에서 놓는다
+  if (!s || !s.persist) for (const [k, p] of [...urls]) { urls.delete(k); void p.then((u) => { if (u) URL.revokeObjectURL(u) }) }
   mediaFetch.value = null
   mediaTick.value++
 }
 /** 호스트가 '그림 올렸음'을 알림 → 없던 그림 다시 찾기 */
 export function bumpMedia() {
+  missCount.clear()
   for (const [k, p] of urls) void p.then((u) => { if (!u && urls.get(k) === p) urls.delete(k) })
   mediaTick.value++
 }
@@ -161,8 +167,14 @@ export function mediaUrl(id: string): Promise<string | null> {
   if (!p) {
     p = load(id, want).catch(() => null)
     urls.set(k, p)
-    // 없음(아직 안 올라옴 등)은 잠깐만 기억 — 나중에 생기면 다시 찾게
-    void p.then((u) => { if (!u) setTimeout(() => { if (urls.get(k) === p) urls.delete(k) }, 4000) })
+    // 없음(아직 안 올라옴 등)은 잠깐만 기억 — 나중에 생기면 다시 찾게. 계속 없으면 간격을 늘린다(4초 → 최대 60초).
+    // 호스트가 '다 올렸음'(bumpMedia)을 알리면 바로 다시 찾는다
+    void p.then((u) => {
+      if (u) { missCount.delete(k); return }
+      const n = (missCount.get(k) ?? 0) + 1
+      missCount.set(k, n)
+      setTimeout(() => { if (urls.get(k) === p) urls.delete(k) }, Math.min(60000, 4000 * 2 ** (n - 1)))
+    })
   }
   return p
 }
@@ -235,7 +247,7 @@ export async function prefetchMedia(slides: readonly string[]) {
  * 방금 넣은 그림(10분 안)은 남긴다 — 다른 창에서 넣는 중일 수 있으므로.
  */
 export async function cleanupMedia(): Promise<number> {
-  const states: { setlist?: { slides?: unknown[] }[] }[] = []
+  const states: { setlist?: { slides?: unknown[] }[]; frozen?: { text?: unknown } | null }[] = []
   try {
     for (const k of Object.keys(localStorage)) {
       if (!k.startsWith('biew.live.v1:')) continue

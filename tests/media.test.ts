@@ -33,3 +33,15 @@ describe('그림 슬라이드 표시', () => {
     expect(nav.onAir({ ...s, slideIndex: 1 }).text).toBe(mediaSlide('b'))
   })
 })
+
+import { referencedMedia as refMedia2, mediaSlide as ms2 } from '../shared/media'
+describe('그림 정리: 쓰는 중인 그림', () => {
+  it('선곡의 그림 + FREEZE 로 걸어 둔 그림(선곡에서 빠졌어도)', () => {
+    const used = refMedia2([
+      { setlist: [{ slides: [ms2('aaaaaaaa'), 'Lorem'] }], frozen: { text: ms2('bbbbbbbb') } },
+      { setlist: [], frozen: null },
+      { setlist: [{ slides: [ms2('cccccccc')] }] },
+    ])
+    expect([...used].sort()).toEqual(['aaaaaaaa', 'bbbbbbbb', 'cccccccc'])
+  })
+})

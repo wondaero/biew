@@ -28,7 +28,7 @@ async function onPick() {
   const ctrl = new AbortController()
   job.value = { name: files.length === 1 ? files[0]!.name : `${files[0]!.name} 외 ${files.length - 1}개`, done: 0, total: 0, ctrl }
   try {
-    const r = await importFiles(files, (p) => { if (job.value) { job.value.done = p.done; job.value.total = p.total } }, ctrl.signal)
+    const r = await importFiles(files, (p) => { if (job.value?.ctrl === ctrl) { job.value.done = p.done; job.value.total = p.total } }, ctrl.signal)
     if (ctrl.signal.aborted) return
     live.setlist.add({ id: MEDIA_SONG_ID, title: r.title, slides: r.slides })
     say(`선곡 ${live.state.setlist.length}번째로 추가 — 그림 ${r.slides.length}장`)
@@ -36,7 +36,8 @@ async function onPick() {
     if ((e as Error)?.name === 'AbortError') return say('그림 넣기를 취소했습니다')
     say(e instanceof MediaImportError ? e.message : `그림을 넣지 못했습니다: ${e instanceof Error ? e.message : e}`, true)
   } finally {
-    job.value = null
+    // 취소한 뒤 바로 새로 넣었으면 job 은 새 작업 — 그 창을 닫지 않는다
+    if (job.value?.ctrl === ctrl) job.value = null
   }
 }
 function cancel() {

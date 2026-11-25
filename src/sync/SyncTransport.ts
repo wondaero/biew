@@ -15,7 +15,7 @@ export type SyncMessage =
   /** 출력 창이 열리거나 새로고침될 때 현재 상태 요청 */
   | { type: 'request-state'; from: string }
   /** 출력 창 생존 신호 (컨트롤러에 '출력 연결됨' 표시용) */
-  | { type: 'output-alive'; from: string }
+  | { type: 'output-alive'; from: string; build?: string }
   /** 로컬 송출 → 인터넷 송출 전환: 출력 창에게 '화면은 그대로 두고 이 채널로 갈아타라' (같은 PC, BroadcastChannel) */
   | { type: 'switch-channel'; code: string }
   /**

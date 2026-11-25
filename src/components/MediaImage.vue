@@ -6,6 +6,7 @@
  */
 import { ref, watch, onBeforeUnmount } from 'vue'
 import { mediaUrl, mediaTick } from '@/media/media'
+import { onStage } from '@/lib/stage'
 
 const props = withDefaults(defineProps<{ id: string; compact?: boolean }>(), { compact: false })
 /** undefined = 불러오는 중, null = 아직 없음 */
@@ -29,7 +30,8 @@ onBeforeUnmount(() => { alive = false; clearTimeout(retry) })
 <template>
   <div class="media" :class="{ compact }">
     <img v-if="url" :src="url" alt="" draggable="false" />
-    <span v-else-if="url === null" class="none">🖼 그림<template v-if="!compact"> — 받는 중이거나 아직 없음</template></span>
+    <!-- 송출 화면(출력 창·넓은 /view)엔 안내 문구를 절대 내보내지 않는다 — 검정만(CLAUDE.md: 송출 화면에 UI 금지) -->
+    <span v-else-if="url === null && !onStage" class="none">🖼 그림<template v-if="!compact"> — 받는 중이거나 아직 없음</template></span>
   </div>
 </template>
 

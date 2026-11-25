@@ -16,13 +16,18 @@ import SlideRender from '@/components/SlideRender.vue'
 import { useWakeLock } from './useWakeLock'
 import { uid } from '@/lib/uid'
 import { useStylePreview } from '@/live/stylePreview'
+import { onStage } from '@/lib/stage'
 
 import { setMediaSource } from '@/media/media'
 
 // 채널별 출력: 같은 PC 의 해당 채널 컨트롤러와만 BroadcastChannel 로 연결된다(네트워크 불필요 → 인터넷이 끊겨도 동작)
 let code = String(useRoute().params.code ?? '').toUpperCase()
 const ID = `out-${uid().slice(0, 8)}`
+/** 이 출력 창의 앱 버전 — 컨트롤러가 다르면 '출력 창 새로고침' 경고(옛 창은 그림 장을 글자로 송출함) */
+const BUILD = __APP_BUILD__.commit
 const state = ref<LiveState | null>(loadLive(code))
+// 송출 화면 표시(그림 자리 안내 문구·새 버전 알림 등을 그리지 않게) — 첫 그림부터 적용되도록 setup 에서
+onStage.value = true
 // 출력 설정 '바로 적용' 중인 임시 설정(저장 전) — 있으면 이걸로 그린다(src/live/styleDraft.ts)
 const preview = useStylePreview(() => state.value?.version)
 let hub = connect(code)
@@ -51,7 +56,7 @@ function switchTo(next: string) {
   hub = connect(next)
   mediaSourceFor(next)
   hub.send({ type: 'request-state', from: ID })
-  hub.send({ type: 'output-alive', from: ID })
+  hub.send({ type: 'output-alive', from: ID, build: BUILD })
 }
 
 // FREEZE 중이면 고정된 화면(onAir)을 그린다 — 컨트롤러 조작이 출력에 새지 않게
@@ -81,8 +86,8 @@ onMounted(() => {
   document.documentElement.classList.add('is-output')
   document.addEventListener('fullscreenchange', onFs)
   hub.send({ type: 'request-state', from: ID })
-  hub.send({ type: 'output-alive', from: ID })
-  alive = window.setInterval(() => hub.send({ type: 'output-alive', from: ID }), 2000)
+  hub.send({ type: 'output-alive', from: ID, build: BUILD })
+  alive = window.setInterval(() => hub.send({ type: 'output-alive', from: ID, build: BUILD }), 2000)
   // 안내 문구가 송출 화면에 오래 남지 않도록 자동 숨김
   hintTimer = window.setTimeout(() => { hintVisible.value = false }, 8000)
 })

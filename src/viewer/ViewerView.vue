@@ -25,7 +25,11 @@ import { onStage } from '@/lib/stage'
 // 넓은 화면(PC/태블릿)이면 송출 화면 그대로, 폰이면 가사 목록. 폰 가로(높이 작음)는 목록 유지
 const mq = window.matchMedia('(min-width: 900px) and (min-height: 520px)')
 const wide = ref(mq.matches)
-const onMq = () => { wide.value = mq.matches }
+const onMq = () => {
+  wide.value = mq.matches
+  // 폰을 돌려 넓은 화면(송출 화면)이 되면 큰 그림, 좁아지면 작은 그림으로 — 들어와 있을 때만
+  if (status.value === 'live' || status.value === 'reconnecting') setMediaSource({ code: code.value, kind: 'view', variant: wide.value ? 'full' : 'thumb', persist: false })
+}
 mq.addEventListener('change', onMq)
 
 const status = ref<'loading' | 'live' | 'reconnecting' | 'notfound' | 'error' | 'password'>('loading')
@@ -118,7 +122,8 @@ async function enter(password?: string) {
   })
   // 출력 설정 '바로 적용' 임시 설정도 받는다(넓은 화면 = 송출 화면만 그린다. 폰 가사 목록은 설정을 안 씀)
   // 그림 슬라이드: 보기 = 큰 그림, 기기에 저장 안 함(열 때마다 받음). 호스트가 다 올리면 media-ready 로 알려 줌
-  setMediaSource({ code: code.value, kind: 'view', variant: 'full', persist: false })
+  // 폰 가사 목록 = 작은 그림(원본 크기를 전부 받으면 데이터·메모리 낭비), 넓은 화면(송출 화면) = 큰 그림
+  setMediaSource({ code: code.value, kind: 'view', variant: wide.value ? 'full' : 'thumb', persist: false })
   hub = new SyncHub([rt], (s) => { state.value = s; status.value = 'live'; preview.onState(s) }, (m) => { if (m.type === 'media-ready') bumpMedia(); else preview.onMessage(m) })
   if (j.state) hub.receive(j.state)
   document.addEventListener('visibilitychange', onVis)

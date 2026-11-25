@@ -31,6 +31,8 @@ const channelCode = ref<string | null>(null)
 const pvwMode = ref(false)
 const preview = ref<Cursor | null>(null)
 const outputSeenAt = ref(0)
+/** 출력 창의 앱 버전(옛 창은 안 보냄 = '?') — 컨트롤러와 다르면 경고(ControlView) */
+const outputBuild = ref<string | null>(null)
 /** 편집 창 등 모달이 열려 있으면 송출 단축키 중지 */
 const hotkeysPaused = ref(false)
 
@@ -57,7 +59,7 @@ export function openHost(code: string, hooks: { publish: (s: LiveState) => void;
     (s) => { Object.assign(state, s); saveLive(code, snapshot()) },
     (m) => {
       if (m.type === 'request-state') hub?.send({ type: 'state', state: snapshot() })
-      if (m.type === 'output-alive') outputSeenAt.value = Date.now()
+      if (m.type === 'output-alive') { outputSeenAt.value = Date.now(); outputBuild.value = m.build ?? '?' }
     },
   )
   hub.mark(state)
@@ -317,6 +319,7 @@ export function useLive() {
     preview: readonly(preview),
     upcoming,
     outputSeenAt,
+    outputBuild: readonly(outputBuild),
     hotkeysPaused,
     actions,
     setlist,

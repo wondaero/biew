@@ -20,9 +20,14 @@ export function isMediaItem(it: { songId: string; slides: readonly string[] } | 
 }
 
 /** 상태(여러 채널 저장본)가 가리키는 그림 id 전부 — 안 쓰는 그림 정리용 */
-export function referencedMedia(states: readonly { setlist?: readonly { slides?: readonly unknown[] }[] }[]): Set<string> {
+export function referencedMedia(states: readonly { setlist?: readonly { slides?: readonly unknown[] }[]; frozen?: { text?: unknown } | null }[]): Set<string> {
   const out = new Set<string>()
-  for (const s of states) for (const it of s.setlist ?? []) for (const t of it.slides ?? []) if (typeof t === 'string' && isMediaSlide(t)) out.add(mediaIdOf(t))
+  for (const s of states) {
+    for (const it of s.setlist ?? []) for (const t of it.slides ?? []) if (typeof t === 'string' && isMediaSlide(t)) out.add(mediaIdOf(t))
+    // FREEZE 로 걸어 둔 그림(선곡에서 빠졌어도 송출 중) — 정리하면 출력 창이 복구할 때 그림이 사라짐
+    const ft = s.frozen?.text
+    if (typeof ft === 'string' && isMediaSlide(ft)) out.add(mediaIdOf(ft))
+  }
   return out
 }
 

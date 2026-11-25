@@ -111,7 +111,8 @@ try {
   await viewer.bringToFront()
   check('보기: 송출 중인 그림 목록이 그림으로(3장)', await until(async () => (await loadedImgs(viewer, '.slide .pic img')).length === 3))
   const vw = await loadedImgs(viewer, '.slide .pic img')
-  check('보기 = 큰 그림(폭 > 480)', vw.every((w) => w > 480), vw.join(','))
+  // 폰 보기(좁은 화면 가사 목록) = 작은 그림 — 원본 크기를 전부 받으면 데이터·메모리 낭비(2026-11-26 리뷰). 넓은 화면(송출 화면)일 때만 큰 그림
+  check('보기(폰 목록) = 작은 그림(폭 ≤ 480)', vw.length > 0 && vw.every((w) => w <= 480), vw.join(','))
   await viewer.screenshot({ path: path.join(OUT, 'media-net-view.png') })
 
   // 방송 중 PDF 추가 → 추가분만 올리고 리모컨이 받음

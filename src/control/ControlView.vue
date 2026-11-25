@@ -72,6 +72,8 @@ useHotkeys(live, { focusSearch: () => openSearch() })
 const now = ref(Date.now())
 let tick: number | undefined
 const outputOn = computed(() => live.outputSeenAt.value > 0 && now.value - live.outputSeenAt.value < 5000)
+/** 출력 창이 이 컨트롤러와 다른(옛) 버전인지 — 새 버전 적용은 그 창만 바뀌므로 출력 창은 옛 코드로 남을 수 있다(그림 장을 글자로 송출) */
+const outputStale = computed(() => outputOn.value && !!live.outputBuild.value && live.outputBuild.value !== __APP_BUILD__.commit)
 
 const toast = ref<string | null>(null)
 let toastTimer: number | undefined
@@ -225,6 +227,7 @@ onBeforeUnmount(() => {
     </header>
 
     <div v-if="toast" class="toast" @click="toast = null">{{ toast }}</div>
+    <p v-if="isHost && outputStale" class="out-stale" role="alert">출력 창이 이전 버전입니다 — 출력 창을 한 번 클릭하고 <b>F5(새로고침)</b> 하세요. 그대로 두면 그림 슬라이드가 글자로 나갈 수 있습니다.</p>
     <ChannelPopover v-if="isHost && !isLocalMode && showChannel" :code="code" :title="title" @close="showChannel = false" />
     <SwitchToInternet v-if="showSwitch" @close="showSwitch = false" />
     <HistoryDialog v-if="isHost && showHistory" :code="code" @close="showHistory = false" />
@@ -458,5 +461,9 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   /* 준비용 버튼 줄(위). 예배 전에 한 번 맞추면 거의 안 쓰므로 송출 버튼보다 낮게 */
   .dock { grid-area: dock; display: flex; gap: 6px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
   .dock button { flex: 1; min-width: 0; padding: 8px 4px; font-size: 13px; white-space: nowrap; margin-bottom: var(--lift); }
+}
+.out-stale {
+  position: fixed; left: 50%; top: 56px; transform: translateX(-50%); z-index: 41; max-width: min(640px, calc(100vw - 24px)); margin: 0;
+  padding: 10px 14px; border-radius: 8px; font-size: 13px; background: #3a3014; border: 1px solid var(--warn); color: var(--warn);
 }
 </style>
