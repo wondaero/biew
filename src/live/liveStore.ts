@@ -17,6 +17,7 @@ import { loadLive, saveLive, isLiveState, normalizeLive } from './persistence'
 import * as nav from './nav'
 import { uid } from '@/lib/uid'
 import type { Cursor } from './nav'
+import { ensureEnd, hasProperEnd, isEndSlide, realCount } from '@shared/endSlide'
 import { remapIndex, replaceSlides, duplicateAt, duplicateIndex, moveAt, moveIndex } from '@/control/slideEdit'
 import { itemFingerprint } from '@shared/history'
 
@@ -102,6 +103,8 @@ function commit(mutate: (s: LiveState) => void) {
   const code = channelCode.value
   if (role.value !== 'host' || !code || !hub) return // 리모컨·미연결 상태에선 상태를 바꿀 수 없다
   mutate(state)
+  // 곡 끝 빈 장은 모든 변경 뒤 한 곳에서 맞춘다(곡 추가·기록 불러오기·↻ 최신·장 바꾸기 모두) — shared/endSlide.ts
+  for (const it of state.setlist) if (!hasProperEnd(it.slides)) it.slides = ensureEnd(it.slides)
   state.version = nextVersion(state.version)
   state.origin = ORIGIN
   const snap = snapshot()
@@ -226,10 +229,10 @@ const setlist = {
   },
   replace: setSetlist,
   /** 장 복사(바로 뒤에) — 오늘 선곡만. 송출·FREEZE·미리보기는 같은 장을 계속 가리킨다 */
-  duplicateSlide(key: string, j: number) { reshape(key, (sl) => (j >= 0 && j < sl.length ? duplicateAt(sl, j) : null), (x) => duplicateIndex(x, j)) },
+  duplicateSlide(key: string, j: number) { reshape(key, (sl) => (j >= 0 && j < sl.length && !isEndSlide(sl[j]) ? duplicateAt(sl, j) : null), (x) => duplicateIndex(x, j)) },
   /** 장 순서 바꾸기(끌기) — 오늘 선곡만. 송출·FREEZE·미리보기는 같은 장을 따라간다 */
   moveSlide(key: string, from: number, to: number) {
-    reshape(key, (sl) => (from !== to && from >= 0 && to >= 0 && from < sl.length && to < sl.length ? moveAt(sl, from, to) : null), (x) => moveIndex(x, from, to))
+    reshape(key, (sl) => (from !== to && from >= 0 && to >= 0 && from < realCount(sl) && to < realCount(sl) ? moveAt(sl, from, to) : null) /* 끝 빈 장은 끌 수도, 그 뒤로 놓을 수도 없음 */, (x) => moveIndex(x, from, to))
   },
   /**
    * 선곡 기록을 복사해 새 선곡으로 시작(src/live/history.ts). 송출 대기(빈 화면 — 장을 눌러야 나감), FREEZE 해제
@@ -268,11 +271,11 @@ const setlist = {
     const i = state.setlist.findIndex((x) => x.key === key)
     if (i < 0) return 'stale'
     const it0 = state.setlist[i]!
-    const targets = [...new Set(indexes)].filter((j) => j >= 0 && j < it0.slides.length).sort((a, b) => a - b)
+    const targets = [...new Set(indexes)].filter((j) => j >= 0 && j < it0.slides.length && !isEndSlide(it0.slides[j])).sort((a, b) => a - b)
     if (!targets.length) return 'stale'
     if (pieces.length === 0 && state.frozen?.itemIndex === i && targets.includes(state.frozen.slideIndex)) return 'frozen'
     const next = replaceSlides(it0.slides, targets, pieces)
-    if (!next.length) return 'last'
+    if (!realCount(next)) return 'last' // 끝 빈 장만 남으면 마지막 장을 지운 것
     // 나누기(2026-11-19)·삭제(2026-11-22): 장 수가 바뀌면 송출·FREEZE·미리보기 위치를 '같은 글'로 옮긴다.
     // 송출 중인 장이나 그 뒤를 바꾸면 번호 그대로, 앞을 바꾸면 늘거나 준 만큼(번호를 그대로 두면 화면이 다른 장으로 튐)
     const n = pieces.length

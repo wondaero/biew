@@ -8,6 +8,7 @@ import { isChanged, saveItemToSong, removeItemAsk } from '../setlistChanges'
 import SlideEditDialog from '../SlideEditDialog.vue'
 import MediaImage from '@/components/MediaImage.vue'
 import { isMediaSlide, mediaIdOf } from '@shared/media'
+import { isEndSlide, realCount, posLabel, withoutEnd } from '@shared/endSlide'
 import { VueDraggable } from 'vue-draggable-plus'
 import { useBackClose, backSettled } from '@/lib/backClose'
 import SongEditor from '../SongEditor.vue'
@@ -49,14 +50,17 @@ function onClick(i: number, j: number) {
  */
 interface CardRef { id: string; j: number }
 const models = ref<Record<string, CardRef[]>>({})
-watch(() => live.state.setlist, (list) => {
-  models.value = Object.fromEntries(list.map((it) => [it.key, it.slides.map((_, j) => ({ id: `${it.key}:${j}`, j }))]))
-}, { deep: true, immediate: true })
+function resyncModels() {
+  models.value = Object.fromEntries(live.state.setlist.map((it) => [it.key, it.slides.map((_, j) => ({ id: `${it.key}:${j}`, j }))]))
+}
+watch(() => live.state.setlist, resyncModels, { deep: true, immediate: true })
 let dragEndAt = 0
 function onDragStart() { menu.value = null }
 function onDragEnd(key: string, e: { oldIndex?: number; newIndex?: number }) {
   dragEndAt = Date.now()
   if (e.oldIndex === undefined || e.newIndex === undefined || e.oldIndex === e.newIndex) return
+  const it = live.state.setlist.find((x) => x.key === key)
+  if (it && (e.oldIndex >= realCount(it.slides) || e.newIndex >= realCount(it.slides))) { resyncModels(); return } // 곡 끝 빈 장 뒤로는 못 놓음
   live.setlist.moveSlide(key, e.oldIndex, e.newIndex)
   say('순서를 바꿨습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [원본에 저장]으로)')
 }
@@ -113,7 +117,7 @@ async function editSong(it: SetlistItem) {
   const song = lib.byId.value.get(it.songId)
   if (!song) return say('이 기기의 곡 목록에 없는 곡이라 편집할 수 없습니다 — 곡 목록에서 받거나 찾아서 고치세요', true)
   // 오늘 고친 게 있으면 그 내용으로 열되, 비교 기준은 원본(같은 내용이라 저장이 건너뛰어지고 오늘 변경이 되돌려지는 일이 없게)
-  songEditing.value = { key: it.key, song, initialSlides: isChanged(it) ? [...it.slides] : undefined }
+  songEditing.value = { key: it.key, song, initialSlides: isChanged(it) ? withoutEnd(it.slides) : undefined }
 }
 const savingKey = ref<string | null>(null)
 async function saveItem(it: SetlistItem) {
@@ -231,10 +235,10 @@ defineExpose({ scrollToItem, scrollToLive })
         <svg class="chev" :class="{ open: !isClosed(it.key) }" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5 9 6 4 9.5Z" fill="currentColor" /></svg>
         <span class="no">{{ i + 1 }}</span>
         <span class="name">{{ it.title }}</span>
-        <small>{{ it.slides.length }}장</small>
+        <small>{{ realCount(it.slides) }}장</small>
         <span v-if="i === air.itemIndex && air.slideIndex < 0 && !air.frozen" class="onair idle" title="선곡은 됐지만 아직 아무 장도 안 나감 — 장을 누르거나 ▶">○ 송출 대기</span>
         <span v-else-if="i === air.itemIndex" class="onair" :class="{ blanked: air.blank, frozen: air.frozen }">
-          {{ air.frozen ? '❄ FREEZE' : air.blank ? '● BLANK' : '● 송출 중' }} {{ air.slideIndex < 0 ? '' : `${air.slideIndex + 1}/${it.slides.length}` }}
+          {{ air.frozen ? '❄ FREEZE' : air.blank ? '● BLANK' : '● 송출 중' }} {{ posLabel(it.slides, air.slideIndex) }}
         </span>
         <span v-if="isHost" class="h-acts" @click.stop>
           <template v-if="isChanged(it)">
@@ -257,25 +261,28 @@ defineExpose({ scrollToItem, scrollToLive })
         :delay-on-touch-only="true"
         :force-fallback="true"
         :fallback-tolerance="6"
-        filter=".more, .more-menu"
+        filter=".more, .more-menu, .end-cell"
         :prevent-on-filter="false"
         ghost-class="drag-ghost"
         @start="onDragStart"
         @end="onDragEnd(it.key, $event)"
       >
-        <div v-for="c in models[it.key] ?? []" :key="c.id" class="cell">
+        <div v-for="c in models[it.key] ?? []" :key="c.id" class="cell" :class="{ 'end-cell': isEndSlide(textOf(it, c.j)) }">
         <button
           class="card"
           :class="{ live: isLive(i, c.j), frozen: isLive(i, c.j) && air.frozen, pvw: isPreview(i, c.j), ctl: isCtl(i, c.j), blanked: isLive(i, c.j) && air.blank }"
           @click="onClick(i, c.j)"
           @dblclick="onDbl(i, c.j)"
         >
-          <span class="idx">{{ c.j + 1 }}</span>
-          <span v-if="isMediaSlide(textOf(it, c.j))" class="thumb"><MediaImage :id="mediaIdOf(textOf(it, c.j))" compact /></span>
+          <!-- 곡 끝 빈 장(자동, 번호 없음·세지 않음 — shared/endSlide.ts) -->
+          <span v-if="isEndSlide(textOf(it, c.j))" class="end-label">빈 화면</span>
+          <template v-else><span class="idx">{{ c.j + 1 }}</span></template>
+          <span v-if="isEndSlide(textOf(it, c.j))" />
+          <span v-else-if="isMediaSlide(textOf(it, c.j))" class="thumb"><MediaImage :id="mediaIdOf(textOf(it, c.j))" compact /></span>
           <span v-else v-fit-lines="textOf(it, c.j)" class="txt">{{ textOf(it, c.j) }}</span>
         </button>
         <!-- ⋯ = 카드 밖 형제 버튼(카드 클릭 = 송출). 그림 장은 편집 없이 복사만(그림은 PowerPoint 에서 고쳐 다시 넣기) -->
-        <button v-if="isHost" class="more" :class="{ on: isMenu(it.key, c.j) }" title="더 보기 — 편집·복사·삭제" aria-label="이 슬라이드 더 보기" aria-haspopup="menu" @click.stop="toggleMenu(it.key, c.j)">⋯</button>
+        <button v-if="isHost && !isEndSlide(textOf(it, c.j))" class="more" :class="{ on: isMenu(it.key, c.j) }" title="더 보기 — 편집·복사·삭제" aria-label="이 슬라이드 더 보기" aria-haspopup="menu" @click.stop="toggleMenu(it.key, c.j)">⋯</button>
         <div v-if="isMenu(it.key, c.j)" class="more-menu" role="menu" @click.stop>
           <button v-if="!isMediaSlide(textOf(it, c.j))" role="menuitem" class="m-edit" @click="menuEdit">✎ 이 장 편집</button>
           <button role="menuitem" class="m-copy" @click="menuCopy">⧉ 복사 <small>바로 뒤에</small></button>
@@ -395,6 +402,10 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   padding: 8px 14px; border-radius: 8px; background: #1d2a22; border: 1px solid var(--live); color: #c9f5d9; font-size: 13px;
 }
 .se-notice.warn { background: #2e2614; border-color: var(--warn); color: #ffe7a8; }
+/* 곡 끝 빈 장 카드: 낮게·흐리게(가사 장과 구분) */
+.end-cell .card { aspect-ratio: auto; min-height: 44px; border-style: dashed; background: transparent; }
+.end-cell .card.live { background: var(--live-bg); }
+.end-label { color: var(--muted); font-size: 12px; }
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }
 .card.live .idx { color: var(--live); font-weight: 700; }
 @media (max-width: 768px) {

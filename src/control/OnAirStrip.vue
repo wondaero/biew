@@ -7,6 +7,7 @@
 import { computed } from 'vue'
 import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
+import { posLabel } from '@shared/endSlide'
 
 const live = useLive()
 const air = computed(() => onAir(live.state))
@@ -18,7 +19,7 @@ const tag = computed(() => (kind.value === 'live' && air.value.slideIndex < 0 ? 
 <template>
   <p class="onair-strip" :class="kind" role="status">
     <b>{{ tag }}</b>
-    <span v-if="item">{{ item.title }}{{ air.slideIndex < 0 ? '' : ` · ${air.slideIndex + 1}/${item.slides.length}` }}</span>
+    <span v-if="item">{{ item.title }}{{ air.slideIndex < 0 ? '' : ` · ${posLabel(item.slides, air.slideIndex)}` }}</span>
   </p>
 </template>
 

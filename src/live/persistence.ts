@@ -1,5 +1,6 @@
 import type { LiveState } from '@shared/types'
 import { normalizeStyle } from '@shared/outputStyle'
+import { ensureEnd, hasProperEnd } from '@shared/endSlide'
 
 /** 오프라인 모드(/local)의 '채널' 이름. 실제 채널 번호(6자, A-Z2-9)와 겹치지 않는다 */
 export const LOCAL_CODE = 'LOCAL'
@@ -37,6 +38,8 @@ export function normalizeLive(s: LiveState): LiveState {
   // 새 필드 추가·예전 값 이전(bottom·임시 위 60·background)·잘못된 값은 shared/outputStyle 한 곳에서
   s.style = normalizeStyle(s.style)
   s.frozen ??= null
+  // 곡 끝 빈 장(2026-11-26) — 예전 선곡·옛 앱이 올린 서버 상태에도 붙인다(맨 끝이라 송출 중인 장 번호는 그대로)
+  if (Array.isArray(s.setlist)) s.setlist = s.setlist.map((it) => (it && Array.isArray(it.slides) && !hasProperEnd(it.slides) ? { ...it, slides: ensureEnd(it.slides) } : it))
   return s
 }
 

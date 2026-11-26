@@ -8,6 +8,7 @@
  */
 import type { SetlistItem } from './types'
 import { isMediaItem } from './media'
+import { withoutEnd } from './endSlide'
 
 export const HISTORY_MAX = 100
 export const HISTORY_TITLE_MAX = 60
@@ -35,7 +36,7 @@ export interface HistoryRow {
 
 /** 선곡 내용의 지문(제목 + 슬라이드) — 같은 선곡인지 비교용. 항목 key 는 무시 */
 export function historyFingerprint(setlist: readonly Pick<SetlistItem, 'title' | 'slides'>[]): string {
-  const s = JSON.stringify(setlist.map((it) => [it.title, it.slides]))
+  const s = JSON.stringify(setlist.map((it) => [it.title, withoutEnd(it.slides)])) // 곡 끝 빈 장은 비교에서 뺌(shared/endSlide.ts)
   // FNV-1a 32bit 두 번(앞뒤) — 암호용이 아니라 비교용
   let a = 0x811c9dc5, b = 0x811c9dc5
   for (let i = 0; i < s.length; i++) {

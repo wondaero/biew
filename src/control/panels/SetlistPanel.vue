@@ -4,6 +4,7 @@ import { VueDraggable } from 'vue-draggable-plus'
 import type { SetlistItem } from '@shared/types'
 import { useLive } from '@/live/liveStore'
 import { onAir } from '@/live/nav'
+import { realCount } from '@shared/endSlide'
 import { useLibrary } from '@/library/library'
 import { isMediaItem } from '@shared/media'
 import { removeItemAsk, clearAsk, isChanged, libraryNewer } from '../setlistChanges'
@@ -58,7 +59,7 @@ async function clear() {
         <span class="no">{{ i + 1 }}</span>
         <span class="title"><span v-if="isMediaItem(it)" class="pic" title="그림(PDF·이미지)">🖼</span>{{ it.title }}<span v-if="isChanged(it)" class="chg" title="오늘 바꾼 슬라이드가 곡 원본에 저장되지 않음 — 슬라이드 목록의 곡 제목 줄 [원본에 저장]">•</span></span>
         <button v-if="latest(it)" class="upd" title="라이브러리에서 수정된 최신 가사로 갱신" @click.stop="refresh(it)">↻ 최신</button>
-        <span class="n">{{ it.slides.length }}</span>
+        <span class="n">{{ realCount(it.slides) }}</span>
         <button class="x" title="선곡에서 빼기" @click.stop="remove(it)">✕</button>
       </li>
     </VueDraggable>

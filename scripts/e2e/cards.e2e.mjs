@@ -28,7 +28,7 @@ try {
     await p.evaluate((s) => localStorage.setItem('biew.live.v1:LOCAL', JSON.stringify(s)), seed())
     await p.goto(BASE + '/local', { waitUntil: 'networkidle0' })
     await sleep(800)
-    const info = await p.$$eval('.card', (cards) => cards.map((c) => {
+    const info = await p.$$eval('.cell:not(.end-cell) .card', (cards) => cards.map((c) => {
       const t = c.querySelector('.txt'), idx = c.querySelector('.idx')
       const lh = parseFloat(getComputedStyle(t).lineHeight)
       const range = document.createRange(); range.selectNodeContents(t)

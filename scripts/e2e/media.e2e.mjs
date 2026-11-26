@@ -78,7 +78,7 @@ try {
   const s = await state(p)
   const item = s.setlist[1]
   console.log(`    (변환 ${Date.now() - t0}ms)`)
-  check('제목 = 파일 이름, 장 = 그림 표시 3개', item.title === 'Lorem deck' && item.slides.length === 3 && item.slides.every((x) => x.startsWith('biew-media:')) && new Set(item.slides).size === 3)
+  check('제목 = 파일 이름, 장 = 그림 표시 3개', item.title === 'Lorem deck' && item.slides.length === 4 && item.slides.slice(0, 3).every((x) => x.startsWith('biew-media:')) && new Set(item.slides.slice(0, 3)).size === 3 && item.slides[3] === 'biew-end:') // + 곡 끝 빈 장
   check('추가 알림', ((await p.$eval('.mi-notice', (e) => e.textContent).catch(() => '')) ?? '').includes('그림 3장'))
   check('선곡 목록에 🖼 표시', !!(await p.$('.setlist .pic')))
   check('카드 3장 모두 그림', await until(async () => (await p.$$eval('[data-item="1"] .card .thumb img', (is) => is.filter((i) => i.complete && i.naturalWidth > 0).length)) === 3))
@@ -135,7 +135,7 @@ try {
   const imgItem = (await state(p)).setlist[2]
   const widths = await p.evaluate((ids) => new Promise((res) => {
     const r = indexedDB.open('biew'); r.onsuccess = () => { const st = r.result.transaction('media').objectStore('media'); Promise.all(ids.map((id) => new Promise((ok) => { const g = st.get(id); g.onsuccess = () => ok(g.result?.w) }))).then(res) }
-  }), imgItem.slides.map((x) => x.slice('biew-media:'.length)))
+  }), imgItem.slides.filter((x) => x.startsWith('biew-media:')).map((x) => x.slice('biew-media:'.length)))
   check('그림 순서 = 이름 자연 정렬(1, 2, 10)', widths.join(',') === '100,200,300', widths.join(','))
   check('제목 = 공통 이름 + 장 수', imgItem.title === 'Ipsum (3장)', imgItem.title)
 

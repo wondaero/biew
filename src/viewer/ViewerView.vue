@@ -14,6 +14,7 @@ import { saveVisit } from '@/live/persistence'
 import { SyncHub } from '@/sync/SyncHub'
 import { SupabaseRealtimeTransport } from '@/sync/SupabaseRealtimeTransport'
 import { onAir } from '@/live/nav'
+import { posLabel, isEndSlide } from '@shared/endSlide'
 import { useStylePreview } from '@/live/stylePreview'
 import SlideRender from '@/components/SlideRender.vue'
 import { isMediaSlide, mediaIdOf } from '@shared/media'
@@ -204,7 +205,7 @@ onBeforeUnmount(() => {
     <header>
       <div class="t">
         <strong>{{ item?.title ?? (title || '실시간 가사') }}</strong>
-        <small v-if="item && air">{{ air.slideIndex < 0 ? '대기' : `${air.slideIndex + 1} / ${item.slides.length}` }}</small>
+        <small v-if="item && air">{{ air.slideIndex < 0 ? '대기' : posLabel(item.slides, air.slideIndex, ' / ') }}</small>
       </div>
       <span class="dot" :class="status" :title="status" />
     </header>
@@ -218,12 +219,14 @@ onBeforeUnmount(() => {
 
     <main v-else ref="list" class="slides" :class="{ blank: air?.blank }">
       <p v-if="mediaFetch && mediaFetch.done < mediaFetch.total" class="mfetch">🖼 그림 받는 중 {{ mediaFetch.done }}/{{ mediaFetch.total }}<template v-if="mediaFetch.waiting"> · PC 가 올리는 중</template></p>
+      <!-- 곡 끝 빈 장(shared/endSlide.ts)은 목록에 안 그림 -->
+      <template v-for="(s, j) in item?.slides ?? []" :key="`${air?.itemIndex}-${j}`">
       <p
-        v-for="(s, j) in item?.slides ?? []"
-        :key="`${air?.itemIndex}-${j}`"
+        v-if="!isEndSlide(s)"
         class="slide"
         :class="{ cur: j === air?.slideIndex, past: j < (air?.slideIndex ?? 0) }"
       ><span v-if="isMediaSlide(s)" class="pic"><MediaImage :id="mediaIdOf(s)" compact /></span><template v-else>{{ s }}</template></p>
+      </template>
       <p v-if="!item" class="msg">대기 중</p>
       <footer v-if="nextItem" class="next">다음 곡 · {{ nextItem.title }}</footer>
     </main>

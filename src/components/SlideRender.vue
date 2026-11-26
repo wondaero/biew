@@ -5,6 +5,7 @@ import type { OutputStyle } from '@shared/types'
 import FitText from './FitText.vue'
 import MediaImage from './MediaImage.vue'
 import { isMediaSlide, mediaIdOf } from '@shared/media'
+import { isEndSlide } from '@shared/endSlide'
 import { backdropCss, toBackdrop } from '@shared/backdrop'
 
 const props = withDefaults(
@@ -12,7 +13,7 @@ const props = withDefaults(
   { blank: false, layerKey: 0, animate: true },
 )
 
-const shown = computed(() => (props.blank ? null : props.text))
+const shown = computed(() => (props.blank || isEndSlide(props.text) ? null : props.text)) // 곡 끝 빈 장 = 빈 화면
 // 예전 형식(background: 'black'|'green')이 섞여 들어와도 안전하게
 const bg = computed(() => backdropCss(toBackdrop(props.styleCfg.backdrop, (props.styleCfg as { background?: unknown }).background)))
 const useFade = computed(() => props.animate && props.styleCfg.transition === 'fade')

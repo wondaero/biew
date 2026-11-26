@@ -79,6 +79,8 @@ try {
   await c.bringToFront()
   await c.keyboard.press('Escape')
   await c.click('button[title^="다음"]')
+  check('전환 후 PC 조작 → 곡 끝 빈 장(출력 창 빈 화면)', await until(async () => (await outText()) === ''))
+  await c.click('button[title^="다음"]')
   check('전환 후 PC 조작 → 출력 창 따라감', await until(async () => (await outText()) === 'Lorem one Ipsum B'))
   // 폰 리모컨
   const phone = await (await browser.createBrowserContext()).newPage()

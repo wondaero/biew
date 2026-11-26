@@ -11,6 +11,7 @@ import { ref } from 'vue'
 import type { SetlistItem } from '@shared/types'
 import { itemFingerprint } from '@shared/history'
 import { isMediaItem } from '@shared/media'
+import { withoutEnd } from '@shared/endSlide'
 import { useLive } from '@/live/liveStore'
 import { useLibrary, loadCache, saveSong } from '@/library/library'
 import { unsavedNow, unlinkOnClear } from '@/live/history'
@@ -47,7 +48,7 @@ export async function saveItemToSong(it: SetlistItem): Promise<SaveItemResult> {
     return { ok: false, text: '저장하지 않았습니다', cancelled: true }
   }
   try {
-    await saveSong({ id: song.id, title: song.title, slides: [...it.slides], base: { updated_at: song.updated_at, title: song.title, slides: [...song.slides] } })
+    await saveSong({ id: song.id, title: song.title, slides: withoutEnd(it.slides), base: { updated_at: song.updated_at, title: song.title, slides: [...song.slides] } })
   } catch (e) {
     return { ok: false, text: `저장하지 못했습니다: ${e instanceof Error ? e.message : e}` }
   }

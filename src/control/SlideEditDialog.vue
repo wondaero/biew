@@ -19,6 +19,7 @@ import { parseSlideEdit, sameTextIndexes } from './slideEdit'
 import SlideRender from '@/components/SlideRender.vue'
 import OnAirStrip from './OnAirStrip.vue'
 import { canAutoFocus } from '@/lib/device'
+import { realCount } from '@shared/endSlide'
 
 const props = defineProps<{ itemKey: string; slideIndex: number }>()
 const emit = defineEmits<{ close: []; save: [p: { pieces: string[]; indexes: number[] }] }>()
@@ -27,7 +28,7 @@ const live = useLive()
 const item = computed(() => live.state.setlist.find((x) => x.key === props.itemKey))
 const original = item.value?.slides[props.slideIndex] ?? ''
 const text = ref(original)
-const sameAll = ref(true)
+const sameAll = ref(false) // 기본 꺼짐(2026-11-26 사용자 결정 — 필요할 때 체크해서 같은 글 모두)
 const box = ref<HTMLTextAreaElement>()
 
 /** 고친 글 → 장들(빈 줄 = 나누기) */
@@ -48,7 +49,7 @@ const onAirNote = computed(() => {
 const delTargets = computed(() => [props.slideIndex])
 /** FREEZE 중인 장은 못 지운다(송출은 고정 글인데 목록의 '송출 중' 표시가 옆 장으로 옮겨 가 헷갈림 — liveStore.editSlides) */
 const frozenHit = computed(() => live.state.frozen?.itemIndex === itemIndex.value && delTargets.value.includes(live.state.frozen.slideIndex))
-const canDelete = computed(() => !!item.value && item.value.slides.length > delTargets.value.length && !frozenHit.value)
+const canDelete = computed(() => !!item.value && realCount(item.value.slides) > delTargets.value.length && !frozenHit.value)
 const deleteTitle = computed(() => (frozenHit.value ? 'FREEZE 중인 장은 지울 수 없습니다 — FREEZE 를 풀고 지우세요'
   : canDelete.value ? '이 장 지우기' : '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 선곡에서'))
 function remove() {

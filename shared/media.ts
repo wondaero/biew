@@ -16,7 +16,7 @@ export const mediaIdOf = (t: string) => t.slice(MEDIA_PREFIX.length)
 
 /** 그림 묶음 항목인지(장이 모두 그림) */
 export function isMediaItem(it: { songId: string; slides: readonly string[] } | null | undefined): boolean {
-  return !!it && (it.songId === MEDIA_SONG_ID || (it.slides.length > 0 && it.slides.every(isMediaSlide)))
+  return !!it && (it.songId === MEDIA_SONG_ID || (it.slides.some(isMediaSlide) && it.slides.every((s) => isMediaSlide(s) || s === 'biew-end:')))
 }
 
 /** 상태(여러 채널 저장본)가 가리키는 그림 id 전부 — 안 쓰는 그림 정리용 */

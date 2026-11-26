@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useLive } from '@/live/liveStore'
 import { onAir, textAt } from '@/live/nav'
+import { posLabel } from '@shared/endSlide'
 import SlideRender from '@/components/SlideRender.vue'
 import { useStyleDraft } from '@/live/styleDraft'
 
@@ -16,7 +17,7 @@ const air = computed(() => onAir(s))
 const pgmText = computed(() => air.value.text)
 const nextText = computed(() => textAt(s.setlist, live.upcoming.value))
 const label = (c: { itemIndex: number; slideIndex: number } | null) =>
-  c && s.setlist[c.itemIndex] ? `${s.setlist[c.itemIndex]!.title} · ${c.slideIndex < 0 ? '대기' : `${c.slideIndex + 1}/${s.setlist[c.itemIndex]!.slides.length}`}` : '—'
+  c && s.setlist[c.itemIndex] ? `${s.setlist[c.itemIndex]!.title} · ${c.slideIndex < 0 ? '대기' : posLabel(s.setlist[c.itemIndex]!.slides, c.slideIndex)}` : '—'
 </script>
 
 <template>

@@ -136,6 +136,8 @@ try {
   check('끊긴 동안 PC 송출 계속(Ipsum B 4/4)', await until(async () => (await pgm()).includes('Ipsum B · 4/4')))
   check('끊김 경고 표시', await until(async () => (await text(host, '.netwarn')).includes('인터넷 끊김')))
   await host.click('button[title^="다음"]')
+  await until(async () => (await pgm()).includes('Ipsum B · 빈 화면')) // 곡 끝 빈 장(2026-11-26)
+  await host.click('button[title^="다음"]')
   await until(async () => (await pgm()).includes('Dolor C · 1/4'))
   await host.setOfflineMode(false)
   await host.evaluate(() => window.dispatchEvent(new Event('online')))

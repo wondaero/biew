@@ -15,6 +15,7 @@ import type { SetlistItem } from '@shared/types'
 import type { HistoryRow } from '@shared/history'
 import { HISTORY_TITLE_MAX, overwritesPast } from '@shared/history'
 import { isMediaItem } from '@shared/media'
+import { realCount } from '@shared/endSlide'
 import { useLive } from '@/live/liveStore'
 import { LOCAL_CODE } from '@/live/persistence'
 import {
@@ -196,7 +197,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             <div v-if="open === r.id" class="detail">
               <p v-if="detail?.id !== r.id || !detail.setlist" class="muted">곡 목록 불러오는 중…</p>
               <ol v-else class="songs">
-                <li v-for="(it, i) in detail.setlist" :key="i"><span class="no">{{ i + 1 }}</span><span class="st">{{ isMediaItem(it) ? '🖼 ' : '' }}{{ it.title }}</span><span class="n">{{ it.slides.length }}장</span></li>
+                <li v-for="(it, i) in detail.setlist" :key="i"><span class="no">{{ i + 1 }}</span><span class="st">{{ isMediaItem(it) ? '🖼 ' : '' }}{{ it.title }}</span><span class="n">{{ realCount(it.slides) }}장</span></li>
               </ol>
               <div class="load-row">
                 <button class="primary" :disabled="busy || !detail?.setlist?.length" title="이 기록을 지금 선곡으로 — 이후 [저장]은 이 기록에 덮어씀" @click="load(r)">불러오기</button>

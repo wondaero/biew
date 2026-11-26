@@ -1,4 +1,5 @@
 import type { LiveState, SetlistItem } from '@shared/types'
+import { realCount } from '@shared/endSlide'
 
 export interface Cursor { itemIndex: number; slideIndex: number }
 type S = Pick<LiveState, 'setlist' | 'itemIndex' | 'slideIndex'>
@@ -62,6 +63,6 @@ export function prevSong(s: S): Cursor | null {
 /** 현재 곡의 N번째(1-based) */
 export function nth(s: S, n: number): Cursor | null {
   const cur = s.setlist[s.itemIndex]
-  if (!cur || n < 1 || n > cur.slides.length) return null
+  if (!cur || n < 1 || n > realCount(cur.slides)) return null // 숫자 키는 끝 빈 장 제외
   return { itemIndex: s.itemIndex, slideIndex: n - 1 }
 }
