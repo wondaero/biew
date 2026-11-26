@@ -37,6 +37,7 @@
     "e2e:history-net": "node scripts/e2e/history-net.e2e.mjs",
     "e2e:ime": "node scripts/e2e/ime.e2e.mjs",
     "e2e:media": "node scripts/e2e/media.e2e.mjs",
+    "e2e:addundo": "node scripts/e2e/addundo.e2e.mjs",
     "e2e:media-net": "node scripts/e2e/media-net.e2e.mjs",
     "e2e:offline": "npm run build && node scripts/e2e/offline.e2e.mjs",
     "e2e:upgrade": "npm run build && node scripts/e2e/upgrade.e2e.mjs",

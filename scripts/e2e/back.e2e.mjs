@@ -96,7 +96,7 @@ try {
   // 비교 전환: [적용 전 | 송출 중] — 같은 자리에서 바꿔 보기
   const pvFont = () => m.$eval('.sheet-pv .txt', (e) => parseFloat(getComputedStyle(e).fontSize))
   const fsDraft = await pvFont()
-  check('고친 내용 있으면 비교 전환 [저장 전 | 송출 중] 표시', (await m.$$eval('.sheet-pv .pv-tabs button', (bs) => bs.map((b) => b.textContent?.trim()).join('|'))) === '저장 전|송출 중')
+  check('고친 내용 있으면 비교 전환 [적용 전 | 송출 중] 표시', (await m.$$eval('.sheet-pv .pv-tabs button', (bs) => bs.map((b) => b.textContent?.trim()).join('|'))) === '적용 전|송출 중')
   await m.$$eval('.sheet-pv .pv-tabs button', (bs) => bs[1].click())
   check('[송출 중] → 원래(송출 중) 크기로, 이름 "지금 송출 중"', await until(async () => (await pvFont()) < fsDraft * 0.8) && (await m.$eval('.sheet-pv .pv-bar', (e) => e.textContent ?? '')).startsWith('지금 송출 중'))
   await m.$$eval('.sheet-pv .pv-tabs button', (bs) => bs[0].click())
