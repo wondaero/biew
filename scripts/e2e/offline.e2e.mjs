@@ -4,10 +4,11 @@ import puppeteer from 'puppeteer-core'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
-import { PROJ, CHROME } from './_lib.mjs'
+import { PROJ, CHROME, assertPortFree, isBiew } from './_lib.mjs'
 
 const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
-const PORT = 5180, BASE = `http://localhost:${PORT}`
+// 5180 은 다른 프로젝트 개발 서버가 쓰고 있었음(겪음 — 엉뚱한 앱을 테스트해 멈춤) → 잘 안 쓰는 번호 + 시작 전 비어 있는지 확인
+const PORT = 5197, BASE = `http://localhost:${PORT}`
 
 let pass = 0, fail = 0
 const check = (n, ok, d = '') => { ok ? pass++ : fail++; console.log(`${ok ? '✔' : '✖'} ${n}${!ok && d ? `  — ${d}` : ''}`) }
@@ -22,7 +23,7 @@ async function until(fn, ms = 15000) {
 let server
 const startServer = async () => {
   server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'], { cwd: PROJ, stdio: 'ignore' })
-  return until(async () => (await fetch(BASE + '/').catch(() => null))?.ok, 20000)
+  return (await until(async () => (await fetch(BASE + '/').catch(() => null))?.ok, 20000)) && isBiew(BASE + '/')
 }
 const stopServer = async () => { server?.kill(); server = null; return until(async () => !(await fetch(BASE + '/').catch(() => null)), 10000) }
 
@@ -45,6 +46,7 @@ try {
   if (u.error) throw new Error('임시 계정 생성 실패: ' + u.error.message)
   userId = u.data.user.id
 
+  await assertPortFree(PORT)
   check('배포용 빌드 서버 시작', await startServer())
   browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-first-run'] })
   const ctx = await browser.createBrowserContext()
@@ -91,7 +93,10 @@ try {
   await page.keyboard.press('Enter')
   check('저장된 곡으로 선곡 추가(검색 팝업에 추가 알림)', await until(async () => (await page.$$('.song')).length === 1) && !!(await page.$('.srch .added')))
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape')
-  check('Esc 두 번 → 검색 팝업 닫힘', await until(async () => !(await page.$('.srch'))))
+  // 넣은 곡이 있으면 닫기 전에 묻는다(2026-11-26) → [그대로 두고 닫기]
+  check('Esc 두 번 → 넣은 곡이 있어 닫기 확인', await until(() => page.$('.srch .ask')))
+  await page.click('.srch .ask-keep')
+  check('[그대로 두고 닫기] → 검색 팝업 닫힘', await until(async () => !(await page.$('.srch'))))
   await page.locator('.song .card').click()
   const out = await ctx.newPage()
   await out.goto(BASE + '/output/LOCAL', { waitUntil: 'domcontentloaded' })

@@ -1,9 +1,10 @@
 // 배포 후 문제 재현: (1) 옛 버전 창이 곡 저장소를 붙잡고 있을 때 (2) 새 버전 적용 뒤 옛 화면 파일이 없을 때
 import puppeteer from 'puppeteer-core'
 import { spawn } from 'node:child_process'
-import { PROJ, CHROME } from './_lib.mjs'
+import { PROJ, CHROME, assertPortFree } from './_lib.mjs'
 
-const PORT = 5181, BASE = `http://localhost:${PORT}`
+// 잘 안 쓰는 번호 + 시작 전 비어 있는지 확인(다른 프로젝트 개발 서버가 같은 포트면 엉뚱한 앱을 테스트하게 됨)
+const PORT = 5198, BASE = `http://localhost:${PORT}`
 let pass = 0, fail = 0
 const check = (n, ok, d = '') => { ok ? pass++ : fail++; console.log(`${ok ? '✔' : '✖'} ${n}${!ok && d ? `  — ${d}` : ''}`) }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -12,6 +13,7 @@ async function until(fn, ms = 10000) {
   while (Date.now() - t0 < ms) { try { if (await fn()) return true } catch { /* retry */ } await sleep(200) }
   return false
 }
+await assertPortFree(PORT)
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'], { cwd: PROJ, stdio: 'ignore' })
 let browser
 try {

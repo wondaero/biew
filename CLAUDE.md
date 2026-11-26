@@ -125,6 +125,7 @@ supabase/migrations/  songs, channels(+ live_state·kick_remotes·public_channel
 - 사용자는 한국어로 소통. 실무 권장 방식과 이유를 함께 설명하고 더 나은 구조가 있으면 먼저 제안.
 
 ## 함정
+- **E2E 포트를 다른 프로젝트 개발 서버가 쓰고 있으면 엉뚱한 앱을 테스트한다**(겪음 2026-11-26: game.defense 가 5180 → 오프라인 테스트가 그 앱을 열어 "reading min" 오류·서비스 워커 대기로 멈춤). `_lib.mjs` 의 `ensureServer` 는 그 주소가 Biew(`<title>Biew</title>`)인지 확인하고, 직접 띄우는 테스트(offline 5197·upgrade 5198)는 `assertPortFree` 로 먼저 확인한다. 의심되면 `netstat -ano | grep :<포트>`.
 - **pull 뒤에는 `npm install`** — 새 의존성(예: 송출 글꼴 `pretendard`)이 없으면 빌드가 에러 없이 글꼴을 빼먹는다(겪음 — 오프라인 E2E 글꼴 확인 실패). 운영(Vercel)은 매번 새로 설치하므로 영향 없음.
 - **Vue scoped 스타일은 자식 컴포넌트의 최상위 요소에도 걸린다.** 부모에 `.backdrop { display:none }` 같은 범용 이름을 두면 같은 이름의 자식 대화창이 통째로 숨는다(겪음 — 인터넷 송출 전환 창). 부모 쪽은 접두사(`sheet-`)를 붙일 것.
 - **지연 측정은 바뀐 순간을 그 페이지 안에서 기록**(MutationObserver) — 바깥에서 주기적으로 확인하면 확인 간격만큼 오차(겪음: 실제 0.2초가 0.52초로). 리모컨→PC 지연은 `node scripts/e2e/latency-browser.mjs 30`. 호스트 PC 는 알림을 받으면 타이머 없이 바로 서버를 읽는다(`fetchNow`).

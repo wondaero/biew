@@ -42,9 +42,24 @@ const alive = async (url) => !!(await fetch(url).catch(() => null))?.ok
  * mode 'dev' = vite 개발 서버(서비스 워커 없음), 'preview' = 배포용 빌드(dist) 서버(서비스 워커 동작 — 먼저 npm run build).
  * 이미 떠 있으면 재사용(stop 은 아무것도 안 함).
  */
+/** 그 주소가 Biew 앱인지(같은 PC 의 다른 프로젝트 개발 서버가 같은 포트를 쓰고 있을 수 있다 — 겪음: game.defense 가 5180) */
+export async function isBiew(url) {
+  const html = await fetch(url).then((r) => r.text()).catch(() => '')
+  return html.includes('<title>Biew</title>')
+}
+/** 테스트가 직접 띄우고 끌 서버의 포트가 비어 있는지 — 다른 프로그램이 쓰고 있으면 엉뚱한 앱을 테스트하게 되므로 바로 멈춘다 */
+export async function assertPortFree(port) {
+  const url = `http://localhost:${port}/`
+  if (!(await alive(url))) return
+  throw new Error(`포트 ${port} 을(를) 다른 서버가 쓰고 있습니다${(await isBiew(url)) ? '(Biew — 이전 테스트가 남긴 서버일 수 있음)' : '(Biew 아님 — 다른 프로젝트의 개발 서버)'}. 그 서버를 끄고 다시 실행하세요.`)
+}
+
 export async function ensureServer(mode, port) {
   const url = `http://localhost:${port}/`
-  if (await alive(url)) return { url, stop: async () => {} }
+  if (await alive(url)) {
+    if (!(await isBiew(url))) throw new Error(`포트 ${port} 을(를) Biew 가 아닌 다른 서버(다른 프로젝트의 개발 서버)가 쓰고 있습니다. 그 서버를 끄고 다시 실행하세요.`)
+    return { url, stop: async () => {} }
+  }
   const args = mode === 'preview' ? ['preview', '--port', String(port), '--strictPort'] : ['--port', String(port), '--strictPort']
   const child = spawn(process.execPath, [path.join(PROJ, 'node_modules/vite/bin/vite.js'), ...args], { cwd: PROJ, stdio: 'ignore' })
   for (let i = 0; i < 100 && !(await alive(url)); i++) await sleep(200)
