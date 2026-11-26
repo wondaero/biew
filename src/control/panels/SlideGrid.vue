@@ -28,7 +28,7 @@ const isPreview = (i: number, j: number) =>
   live.pvwMode.value && live.preview.value?.itemIndex === i && live.preview.value?.slideIndex === j
 
 const isHost = computed(() => live.role.value === 'host')
-/** 곡 박스 테두리 색(2026-11-26 — 곡과 슬라이드를 박스로 묶음): 송출 중인 곡만, 상태별 색(송출 초록·BLANK 노랑·FREEZE 하늘·대기 회색) */
+/** 곡 박스 상태(2026-11-26 — 곡과 슬라이드를 박스로 묶음). 화면에 쓰는 건 on live(은은한 빛)뿐 — 나머지는 E2E·검사용 표시 */
 function songState(i: number): string {
   if (i !== air.value.itemIndex) return ''
   if (air.value.frozen) return 'on frz'
@@ -298,15 +298,18 @@ defineExpose({ scrollToItem, scrollToLive })
 .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
  /* 곡 하나 = 박스 하나(제목 줄 + 그 곡의 슬라이드) — 어디까지가 한 곡인지 보이게(2026-11-26 사용자 요청) */
 .song { margin-bottom: 14px; scroll-margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
-.song.on.live { border-color: var(--live); box-shadow: 0 0 0 1px var(--live-glow); }
-.song.on.blk { border-color: var(--warn); }
-.song.on.frz { border-color: var(--freeze); }
-.song.on.idle { border-color: #5a5a68; }
+/*
+ * 2026-11-26 사용자 결정: 송출 중인 곡 = 박스에 은은한 빛(테두리는 그대로 회색), 송출 중인 장 = 카드 테두리(빛 없음).
+ * 빛은 박스 하나에만 — 카드까지 빛나면 초록이 이중으로 번진다. BLANK·FREEZE·대기 곡은 평소 박스(카드 색·제목 글자·버튼으로 충분)
+ */
+.song.on.live { box-shadow: 0 0 18px 2px rgba(34, 197, 94, .22); }
 .tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { font-size: 14px; color: var(--muted); }
 h3 {
   /* 박스 윗부분. 스크롤하면 화면 위에 붙음(긴 곡을 내려도 어느 곡인지 보이게) — 바탕을 칠해 아래 카드가 비치지 않게 */
-  position: sticky; top: 0; z-index: 2; /* ⋯(z-index 1)보다 위 — 스크롤하면 곡 제목 아래로 들어가게 */ margin: 0; padding: 8px 12px; font-size: 14px; cursor: pointer; user-select: none;
-  background: var(--panel); border-bottom: 1px solid var(--line); border-radius: 10px 10px 0 0; display: flex; align-items: baseline; gap: 8px;
+  position: sticky; top: 0; z-index: 2; /* ⋯(z-index 1)보다 위 — 스크롤하면 곡 제목 아래로 들어가게 */ padding: 8px 12px; font-size: 14px; cursor: pointer; user-select: none;
+  /* 박스 테두리 위에 겹쳐(-1px) 자기 테두리를 그린다 — 위에 붙었을 때도 둥근 박스 윗부분으로 보이게(박스 옆선이 모서리 틈으로 비치지 않게) */
+  margin: -1px -1px 0; border: 1px solid var(--line);
+  background: var(--panel); border-radius: 10px 10px 0 0; display: flex; align-items: baseline; gap: 8px;
 }
 h3.closed { border-bottom: 0; border-radius: 10px; }
 h3.live { color: #fff; }
@@ -330,8 +333,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .card:active { transform: none; }
 .card:hover { border-color: #5a5a68; }
 .card.pvw, .card.ctl { border-style: dashed; border-color: var(--preview-soft); }
-.card.live { border-color: var(--live); background: var(--live-bg); box-shadow: 0 0 0 2px var(--live-glow); }
-.card.live.frozen { border-color: var(--freeze); background: #0c2430; box-shadow: 0 0 0 2px rgba(56, 189, 248, .35); }
+.card.live { border-color: var(--live); background: var(--live-bg); }
+.card.live.frozen { border-color: var(--freeze); background: #0c2430; }
 .card.live.frozen .idx { color: var(--freeze); }
 .card.live .txt { color: #fff; }
 .card.blanked .txt, .card.blanked .thumb { opacity: .35; }
@@ -397,7 +400,7 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
   h3 { flex-wrap: wrap; row-gap: 6px; }
   .h-acts { flex-basis: 100%; justify-content: flex-end; margin-left: 0; }
   .se-notice { bottom: 80px; }
-  h3 { margin: 0; padding: 10px 10px; }
+  h3 { padding: 10px 10px; }
   /* 폰: 박스 안쪽 여백을 줄여 카드 폭을 지킨다(280px 에서 글자 크기) */
   .cards { padding: 4px; }
 }
