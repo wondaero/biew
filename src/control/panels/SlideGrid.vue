@@ -294,7 +294,7 @@ defineExpose({ scrollToItem, scrollToLive })
 <style scoped>
 /* 위쪽 padding 0: sticky 헤더가 padding 아래에 붙으면 그 틈으로 스크롤되는 카드가 비쳐 보임 */
 /* 아래 여백 작게(예전 40vh = 마지막 곡도 맨 위로 올리려던 것 — 짧은 마지막 곡일수록 크게 비어 보여서 뺌. 마지막 곡은 맨 끝이라 안 올라가도 다 보인다) */
-.grid-wrap { overflow-y: auto; padding: 0 8px 16px; min-height: 0; }
+.grid-wrap { overflow-y: auto; padding: 0 8px 16px; min-height: 0; background: var(--bg); /* 곡 제목 줄 모서리 메움과 같은 색 */ }
 .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
  /* 곡 하나 = 박스 하나(제목 줄 + 그 곡의 슬라이드) — 어디까지가 한 곡인지 보이게(2026-11-26 사용자 요청) */
 .song { margin-bottom: 14px; scroll-margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
@@ -315,6 +315,14 @@ h3 {
   background: var(--panel); border-radius: 10px 10px 0 0; display: flex; align-items: baseline; gap: 8px;
 }
 h3.closed { border-bottom: 0; border-radius: 10px; }
+/*
+ * 둥근 위 모서리 바깥(투명한 틈)을 목록 바탕색으로 메운다 — 제목 줄이 위에 붙으면 그 틈으로 박스 옆선·아래로 지나가는 카드가
+ * 삐져나와 보였다(2026-11-26 사용자 지적). 붙지 않았을 땐 원래 바탕과 같은 색이라 차이 없음.
+ * (박스에 overflow: clip 으로 자르는 방법은 PC ⋯ 메뉴(카드 아래로 펼쳐짐)까지 잘라서 쓰지 않음)
+ */
+h3::before, h3::after { content: ''; position: absolute; top: -1px; width: 10px; height: 10px; pointer-events: none; }
+h3::before { left: -1px; background: radial-gradient(circle at 100% 100%, transparent 9.5px, var(--bg) 10.5px); }
+h3::after { right: -1px; background: radial-gradient(circle at 0 100%, transparent 9.5px, var(--bg) 10.5px); }
 h3.live { color: #fff; }
 h3 .chev { width: 10px; color: var(--muted); font-size: 11px; }
 h3 .no { color: var(--muted); font-size: 12px; }
