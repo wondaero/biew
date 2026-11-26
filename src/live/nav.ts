@@ -7,7 +7,7 @@ const hasSlides = (it: SetlistItem | undefined) => !!it && it.slides.length > 0
 
 /**
  * 송출 대기(2026-11-25 사용자 결정): 선곡은 있지만 아직 아무 장도 고르지 않은 상태 = slideIndex -1(빈 화면, BLANK 와 다름).
- * 빈 선곡에 첫 곡을 넣거나 기록을 복사해서 시작하면 대기. 장을 누르거나 ▶(다음 = 0번 장)으로 시작한다.
+ * 빈 선곡에 첫 곡을 넣거나 기록을 불러오면 대기. 장을 누르거나 ▶(다음 = 0번 장)으로 시작한다.
  * 서버 _apply_command 도 같은 규칙으로 동작한다(next: -1 + 1 = 0, prev: 이전 곡) — 서버 수정 없음.
  */
 export const isIdle = (c: { slideIndex: number }) => c.slideIndex < 0

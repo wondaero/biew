@@ -15,7 +15,8 @@ import SetlistPanel from './panels/SetlistPanel.vue'
 import HistoryDialog from './HistoryDialog.vue'
 import ExitChangedDialog from './ExitChangedDialog.vue'
 import { exitRequest } from './setlistChanges'
-import { saveHistory, autoSaveStale, flushPending, historyTitleFor } from '@/live/history'
+import { flushPending, unlinkOnClear } from '@/live/history'
+import { unsavedNote } from './setlistChanges'
 import { resolveChanges } from './setlistChanges'
 import SlideGrid from './panels/SlideGrid.vue'
 import MonitorPanel from './panels/MonitorPanel.vue'
@@ -101,24 +102,18 @@ const showChannel = ref(route.query.share === '1')
 const showSwitch = ref(false)
 /** 선곡 기록 창(📜) */
 const showHistory = ref(false)
-// 선곡 기록 자동: 컨트롤러를 열면 남아 있던 선곡이 지난 날짜의 것이면 기록(인터넷 송출은 서버 상태를 받은 뒤 — 3초),
-// 인터넷이 다시 연결되면 이 PC 에 보관해 둔 기록을 서버로(src/live/history.ts)
-onMounted(() => {
-  if (!isHost.value) return
-  window.setTimeout(() => { if (isHost.value && code.value) void autoSaveStale(code.value, live.state) }, 3000)
-})
+// 선곡 기록: 인터넷이 다시 연결되면 이 PC 에 보관해 둔 기록을 서버로(src/live/history.ts).
+// 자동 기록은 없음(2026-11-26 사용자 결정 — 시점을 알 수 없어 준비만 한 선곡이 엉뚱한 날짜로 남음)
 watch(hostLink, (v) => { if (v === 'live' && isHost.value && code.value) void flushPending(code.value) })
 
 /** 로컬 송출 종료: 선곡을 비우고(출력 설정 유지) 출력 창은 검은 화면으로 남긴다 — 다음 예배를 그대로 이어서 */
 async function endLocal() {
-  if (!confirm('이 송출을 끝낼까요?\n선곡은 기록(📜)에 남기고 비웁니다. 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.')) return
+  if (!confirm(`이 송출을 끝낼까요?\n선곡을 비웁니다. 출력 창은 검은 화면이 됩니다(창은 닫지 않음). 출력 설정은 유지됩니다.${unsavedNote()}`)) return
   // 오늘 고친 곡이 있으면 [저장하고][버리고][취소]
   const c = await resolveChanges()
   if (!c.go) { if (c.note?.warn) alert(c.note.text); return }
-  // 선곡 기록(2026-11-25): 비우기 전에 남긴다. 저장소가 막혀 있어도(옛 창이 붙잡음) 송출 종료는 멈추지 않게 1.5초까지만 기다림
-  const r = await Promise.race([saveHistory(code.value, historyTitleFor(code.value), live.state.setlist), new Promise<'timeout'>((res) => setTimeout(() => res('timeout'), 1500))])
   live.actions.endSession()
-  if (r === 'error' || r === 'timeout') alert('송출은 끝냈지만 선곡을 기록하지 못했습니다.')
+  unlinkOnClear(code.value) // 빈 선곡에 [저장]이 옛 기록을 덮어쓰지 않게
 }
 
 /** 리모컨: 이 기기에 저장된 토큰을 지우고 나간다(다음엔 비밀번호를 다시 입력) */

@@ -48,6 +48,32 @@ export function historyFingerprint(setlist: readonly Pick<SetlistItem, 'title' |
 /** 곡 하나(제목 + 슬라이드)의 지문 — 선곡 항목이 원본과 달라졌는지 비교(SetlistItem.base) */
 export const itemFingerprint = (it: Pick<SetlistItem, 'title' | 'slides'>): string => historyFingerprint([it])
 
+/**
+ * 기록과 비교할 지문 — 로컬은 그대로, 채널은 서버에 올라가는 모양(그림 묶음 뺀 것)으로.
+ * "지금 선곡이 연결된 기록과 같은가(저장했나)" 판단에 쓴다.
+ */
+export function recordFingerprint(local: boolean, setlist: readonly SetlistItem[]): string {
+  return historyFingerprint(local ? setlist : stripMedia(setlist).setlist)
+}
+
+/**
+ * 지금 선곡과 연결된 기록(불러왔거나 저장한 것) — [저장]이 덮어쓸 대상. 채널마다 이 PC 에만.
+ * fp = 마지막으로 불러오거나 저장했을 때의 지문(지금 선곡과 다르면 '저장 안 된 변경').
+ */
+export interface HistoryLink { id: string; title: string; savedAt: string; fp: string }
+
+/** 지금 선곡이 기록에 저장되지 않은 상태인지(비우기·불러오기·송출 종료 때 알려 주기) */
+export function isUnsaved(local: boolean, setlist: readonly SetlistItem[], link: HistoryLink | null): boolean {
+  if (!setlist.length) return false
+  if (!local && !stripMedia(setlist).setlist.length) return false // 그림뿐이면 서버 기록엔 남길 게 없음
+  return !link || link.fp !== recordFingerprint(local, setlist)
+}
+
+/** [저장]이 지난 날짜 기록을 덮어쓰는지(확인을 받는다 — 지난주 기록을 이번 주 선곡으로 잃지 않게) */
+export function overwritesPast(link: HistoryLink, now = new Date()): boolean {
+  return !sameLocalDay(new Date(link.savedAt), now)
+}
+
 /** 서버에 올릴 선곡: 그림 묶음은 빼고 개수만 */
 export function stripMedia(setlist: readonly SetlistItem[]): { setlist: SetlistItem[]; skippedMedia: number } {
   const kept = setlist.filter((it) => !isMediaItem(it))

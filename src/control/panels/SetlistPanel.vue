@@ -44,7 +44,7 @@ async function clear() {
   <section class="setlist">
     <header>
       <h2>선곡 <small>{{ list.length }}곡</small></h2>
-      <button v-if="live.role.value === 'host'" class="ghost hist" title="선곡 기록 — 지난 예배 선곡 보기·복사해서 시작, 지금 선곡 기록" @click="emit('history')">📜 기록</button>
+      <button v-if="live.role.value === 'host'" class="ghost hist" title="선곡 기록 — 지금 선곡 저장·다른 이름으로 저장, 지난 기록 보기·불러오기" @click="emit('history')">📜 기록</button>
       <button v-if="list.length" class="ghost danger-line" @click="clear">비우기</button>
     </header>
     <VueDraggable v-model="list" :animation="150" handle=".grip" tag="ol" class="items">

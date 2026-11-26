@@ -228,10 +228,10 @@ export type HistoryStatus = 'ok' | 'dup' | 'not_found' | 'token_rejected' | 'mis
 const hStatus = (s: unknown): HistoryStatus =>
   (['ok', 'dup', 'not_found', 'token_rejected', 'missing', 'invalid'] as const).includes(s as never) ? (s as HistoryStatus) : 'error'
 
-export async function historySave(code: string, token: string, r: { title: string; setlist: unknown; fingerprint: string; skippedMedia: number; savedAt?: string }): Promise<{ status: HistoryStatus; id?: string }> {
+export async function historySave(code: string, token: string, r: { title: string; setlist: unknown; fingerprint: string; skippedMedia: number; savedAt?: string; allowDup?: boolean }): Promise<{ status: HistoryStatus; id?: string }> {
   if (!supabase) return { status: 'error' }
   const { data, error } = await supabase.rpc('host_history_save', {
-    p_code: code, p_token: token, p_title: r.title, p_setlist: r.setlist, p_fingerprint: r.fingerprint, p_skipped: r.skippedMedia, p_saved_at: r.savedAt ?? null,
+    p_code: code, p_token: token, p_title: r.title, p_setlist: r.setlist, p_fingerprint: r.fingerprint, p_skipped: r.skippedMedia, p_saved_at: r.savedAt ?? null, p_allow_dup: !!r.allowDup,
   })
   if (error) return { status: 'error' }
   const row = (data as { status: string; id: string | null }[] | null)?.[0]
@@ -259,6 +259,13 @@ export async function historyGet(code: string, token: string, id: string): Promi
 export async function historyRename(code: string, token: string, id: string, title: string): Promise<HistoryStatus> {
   if (!supabase) return 'error'
   const { data, error } = await supabase.rpc('host_history_rename', { p_code: code, p_token: token, p_id: id, p_title: title })
+  return error ? 'error' : hStatus(data)
+}
+
+/** 덮어쓰기(불러온 기록에 [저장]) — 이름은 그대로, 선곡·저장 시각만 바뀜(마이그레이션 20261126000000) */
+export async function historyUpdate(code: string, token: string, id: string, r: { setlist: unknown; fingerprint: string; skippedMedia: number }): Promise<HistoryStatus> {
+  if (!supabase) return 'error'
+  const { data, error } = await supabase.rpc('host_history_update', { p_code: code, p_token: token, p_id: id, p_setlist: r.setlist, p_fingerprint: r.fingerprint, p_skipped: r.skippedMedia })
   return error ? 'error' : hStatus(data)
 }
 

@@ -13,7 +13,7 @@ import { itemFingerprint } from '@shared/history'
 import { isMediaItem } from '@shared/media'
 import { useLive } from '@/live/liveStore'
 import { useLibrary, loadCache, saveSong } from '@/library/library'
-import { saveHistory, historyTitleFor } from '@/live/history'
+import { unsavedNow, unlinkOnClear } from '@/live/history'
 
 const live = useLive()
 const lib = useLibrary()
@@ -97,7 +97,7 @@ export async function removeItemAsk(it: SetlistItem): Promise<{ text: string; wa
 }
 
 /**
- * 선곡을 통째로 바꾸기 전(비우기·송출 종료·기록 복사해서 시작): 고친 곡이 있으면 [저장하고][버리고][취소]를 묻는다.
+ * 선곡을 통째로 바꾸기 전(비우기·송출 종료·기록 불러오기): 고친 곡이 있으면 [저장하고][버리고][취소]를 묻는다.
  * 계속해도 되면 true(저장 실패도 false — 알림 문구는 note 에).
  */
 export async function resolveChanges(): Promise<{ go: boolean; note?: { text: string; warn?: boolean } }> {
@@ -110,20 +110,22 @@ export async function resolveChanges(): Promise<{ go: boolean; note?: { text: st
   return r.ok ? { go: true, note: { text: r.text } } : { go: false, note: { text: r.text, warn: true } }
 }
 
-/** 지금 선곡을 기록으로 남긴다(비우기 전에 — 지난 예배 자동 기록이 놓친 경우를 대비). 실패는 조용히(비우기를 막지 않음) */
-export async function recordBeforeClear(): Promise<void> {
+/**
+ * 선곡을 비우기 전 안내 한 줄: 기록에 저장 안 된 선곡이면 알린다(2026-11-26 — 자동 기록을 없앰.
+ * 기록을 안 쓰는 사람은 확인창 문구만 한 줄 늘 뿐 예전과 같게).
+ */
+export function unsavedNote(): string {
   const code = live.channelCode.value
-  if (!code || !live.state.setlist.length) return
-  await Promise.race([saveHistory(code, historyTitleFor(code), live.state.setlist), new Promise((r) => setTimeout(r, 1500))])
+  return code && unsavedNow(code, live.state.setlist) ? '\n\n⚠ 지금 선곡은 기록(📜)에 저장되지 않았습니다 — 남기려면 [취소] 후 📜 기록에서 저장하세요.' : ''
 }
 
 /** 선곡 비우기. 변경된 곡이 있으면 묻고, 비우기 전에 기록 */
 export async function clearAsk(): Promise<{ text: string; warn?: boolean } | null> {
   const hasChanged = live.state.setlist.some(isChanged)
-  if (!hasChanged && !confirm('선곡을 모두 비울까요?\n지금 선곡은 기록(📜)에 남습니다.')) return null
+  if (!hasChanged && !confirm(`선곡을 모두 비울까요?${unsavedNote()}`)) return null
   const r = await resolveChanges()
   if (!r.go) return r.note ?? null
-  await recordBeforeClear()
   live.setlist.clear()
+  if (live.channelCode.value) unlinkOnClear(live.channelCode.value) // 빈 선곡에 [저장]이 옛 기록을 덮어쓰지 않게
   return r.note ? { text: `${r.note.text} — 선곡을 비웠습니다`, warn: r.note.warn } : null
 }

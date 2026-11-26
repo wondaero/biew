@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { historyFingerprint, stripMedia, copySetlist, defaultHistoryTitle, sameLocalDay, isSetlist } from '../shared/history'
+import { historyFingerprint, stripMedia, copySetlist, defaultHistoryTitle, sameLocalDay, isSetlist, isUnsaved, recordFingerprint, overwritesPast } from '../shared/history'
 import { mediaSlide, MEDIA_SONG_ID } from '../shared/media'
 
 const song = (key: string, title: string, slides: string[]) => ({ key, songId: 's-' + title, title, slides })
@@ -37,5 +37,29 @@ describe('선곡 기록 규칙', () => {
     expect(isSetlist([song('k', 'L', ['A'])])).toBe(true)
     expect(isSetlist([{ title: 'L', slides: [1] }])).toBe(false)
     expect(isSetlist({})).toBe(false)
+  })
+})
+
+describe('[저장] / [다른 이름으로 저장] 연결(2026-11-26)', () => {
+  const pic = { key: 'm', songId: MEDIA_SONG_ID, title: 'Lorem PDF', slides: [mediaSlide('abcdef12')] }
+  it('저장 안 됨: 연결 없거나 지문이 다르면. 빈 선곡은 아님', () => {
+    const s = [song('k1', 'Lorem', ['A'])]
+    expect(isUnsaved(true, [], null)).toBe(false)
+    expect(isUnsaved(true, s, null)).toBe(true)
+    const link = { id: 'x', title: 'L', savedAt: new Date().toISOString(), fp: recordFingerprint(true, s) }
+    expect(isUnsaved(true, [song('other-key', 'Lorem', ['A'])], link)).toBe(false) // key 만 다르면 같은 선곡
+    expect(isUnsaved(true, [song('k1', 'Lorem', ['B'])], link)).toBe(true)
+  })
+  it('채널: 그림 묶음은 빼고 비교, 그림뿐이면 저장할 게 없음', () => {
+    const s = [song('k1', 'Lorem', ['A'])]
+    const link = { id: 'x', title: 'L', savedAt: new Date().toISOString(), fp: recordFingerprint(false, s) }
+    expect(isUnsaved(false, [...s, pic], link)).toBe(false)
+    expect(isUnsaved(false, [pic], null)).toBe(false)
+    expect(isUnsaved(true, [pic], null)).toBe(true) // 로컬은 그림까지 기록
+  })
+  it('지난 날짜 기록 덮어쓰기는 확인 대상', () => {
+    const now = new Date(2026, 10, 26, 10)
+    expect(overwritesPast({ id: 'x', title: 'L', fp: '', savedAt: new Date(2026, 10, 26, 1).toISOString() }, now)).toBe(false)
+    expect(overwritesPast({ id: 'x', title: 'L', fp: '', savedAt: new Date(2026, 10, 19, 11).toISOString() }, now)).toBe(true)
   })
 })
