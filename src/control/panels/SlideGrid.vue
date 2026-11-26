@@ -320,9 +320,10 @@ h3.closed { border-bottom: 0; border-radius: 10px; }
  * 삐져나와 보였다(2026-11-26 사용자 지적). 붙지 않았을 땐 원래 바탕과 같은 색이라 차이 없음.
  * (박스에 overflow: clip 으로 자르는 방법은 PC ⋯ 메뉴(카드 아래로 펼쳐짐)까지 잘라서 쓰지 않음)
  */
+/* 경계는 둥근 선 안쪽(9~9.6px)에서 끝낸다 — 선 바깥쪽 반투명 픽셀(안티앨리어싱)로 밑의 송출 카드 초록이 점처럼 비쳤다 */
 h3::before, h3::after { content: ''; position: absolute; top: -1px; width: 10px; height: 10px; pointer-events: none; }
-h3::before { left: -1px; background: radial-gradient(circle at 100% 100%, transparent 9.5px, var(--bg) 10.5px); }
-h3::after { right: -1px; background: radial-gradient(circle at 0 100%, transparent 9.5px, var(--bg) 10.5px); }
+h3::before { left: -1px; background: radial-gradient(circle at 100% 100%, transparent 9px, var(--bg) 9.6px); }
+h3::after { right: -1px; background: radial-gradient(circle at 0 100%, transparent 9px, var(--bg) 9.6px); }
 h3.live { color: #fff; }
 h3 .chev { width: 10px; color: var(--muted); font-size: 11px; }
 h3 .no { color: var(--muted); font-size: 12px; }
