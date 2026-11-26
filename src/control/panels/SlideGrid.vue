@@ -295,9 +295,18 @@ defineExpose({ scrollToItem, scrollToLive })
 /* 위쪽 padding 0: sticky 헤더가 padding 아래에 붙으면 그 틈으로 스크롤되는 카드가 비쳐 보임 */
 /* 아래 여백 작게(예전 40vh = 마지막 곡도 맨 위로 올리려던 것 — 짧은 마지막 곡일수록 크게 비어 보여서 뺌. 마지막 곡은 맨 끝이라 안 올라가도 다 보인다) */
 .grid-wrap { overflow-y: auto; padding: 0 8px 16px; min-height: 0; background: var(--bg); /* 곡 제목 줄 모서리 메움과 같은 색 */ }
+/*
+ * 위에 붙은 곡 제목 줄과 화면 위 사이 6px 틈(2026-11-26 사용자 요청 — [전체 접기]와 첫 곡 사이 간격과 같게).
+ * 그 틈으로 지나가는 카드가 보이지 않게, 목록 맨 위 6px 를 바탕색 띠로 덮는다(맨 위에 붙어 다니는 띠 — 처음엔 그 자체가 위 여백).
+ * 목록에 위 padding 을 주면 안 됨: 붙는 위치를 padding 안쪽에서 재서 띠가 6px 내려가고 그 위로 카드가 비친다(겪음).
+ */
+.grid-wrap::before {
+  content: ''; display: block; position: sticky; top: 0; z-index: 3; height: 6px; margin: 0 -8px;
+  background: var(--bg); pointer-events: none;
+}
 .empty { color: var(--muted); text-align: center; margin-top: 30vh; }
  /* 곡 하나 = 박스 하나(제목 줄 + 그 곡의 슬라이드) — 어디까지가 한 곡인지 보이게(2026-11-26 사용자 요청) */
-.song { margin-bottom: 14px; scroll-margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.song { margin-bottom: 14px; scroll-margin-top: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
 /*
  * 2026-11-26 사용자 결정: 송출 중인 곡 = 박스(제목 줄 포함) 바탕을 옅은 초록으로(빛은 너무 옅어 안 보여서 바꿈), 테두리는 회색 그대로.
  * 송출 중인 장 = 카드 초록 테두리 + 더 진한 초록 바탕 — 박스 바탕은 카드보다 한참 옅게 해야 카드가 묻히지 않는다.
@@ -306,10 +315,10 @@ defineExpose({ scrollToItem, scrollToLive })
 .song.on.live, .song.on.live > h3 { background: #1b2a21; }
 .song.on.blk, .song.on.blk > h3 { background: #27231a; } /* BLANK = 옅은 노랑(초록보다 더 옅게 — 진하면 경고처럼 보임) */
 .song.on.frz, .song.on.frz > h3 { background: #1a2530; } /* FREEZE = 옅은 하늘(걸어 둔 걸 잊지 않게) */
-.tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { font-size: 14px; color: var(--muted); }
+.tools { display: flex; justify-content: flex-end; padding: 0 0 6px; } /* 위 6px 는 목록 위 여백 */.tools button { font-size: 14px; color: var(--muted); }
 h3 {
   /* 박스 윗부분. 스크롤하면 화면 위에 붙음(긴 곡을 내려도 어느 곡인지 보이게) — 바탕을 칠해 아래 카드가 비치지 않게 */
-  position: sticky; top: 0; z-index: 2; /* ⋯(z-index 1)보다 위 — 스크롤하면 곡 제목 아래로 들어가게 */ padding: 8px 12px; font-size: 14px; cursor: pointer; user-select: none;
+  position: sticky; top: 6px; z-index: 2; /* ⋯(z-index 1)보다 위 — 스크롤하면 곡 제목 아래로 들어가게 */ padding: 8px 12px; font-size: 14px; cursor: pointer; user-select: none;
   /* 박스 테두리 위에 겹쳐(-1px) 자기 테두리를 그린다 — 위에 붙었을 때도 둥근 박스 윗부분으로 보이게(박스 옆선이 모서리 틈으로 비치지 않게) */
   margin: -1px -1px 0; border: 1px solid var(--line);
   background: var(--panel); border-radius: 10px 10px 0 0; display: flex; align-items: baseline; gap: 8px;
@@ -386,7 +395,8 @@ h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-spac
 .idx { position: absolute; top: 4px; left: 6px; font-size: 11px; color: var(--muted); }
 .card.live .idx { color: var(--live); font-weight: 700; }
 @media (max-width: 768px) {
-  .grid-wrap { padding: 0 4px 16px; } /* 아래 송출 버튼 줄은 겹쳐 뜨지 않고 자기 자리를 차지하므로 큰 여백 불필요 */
+  .grid-wrap { padding: 0 4px 16px; }
+  .grid-wrap::before { margin: 0 -4px; } /* 아래 송출 버튼 줄은 겹쳐 뜨지 않고 자기 자리를 차지하므로 큰 여백 불필요 */
   .empty { margin-top: 24px; } /* 30vh 면 좁은 폰에서 안내 글이 아래로 밀려 잘림 */
   /* 1열 행 목록: 16:9 고정을 풀고 글자 길이에 맞춰 높이가 정해지게 */
   .cards { grid-template-columns: minmax(0, 1fr); gap: 6px; }
