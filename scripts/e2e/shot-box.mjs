@@ -27,6 +27,12 @@ try {
     await p.$eval('.grid-wrap', (g, m) => { g.scrollTop = m ? 260 : 140 }, mobile)
     await sleep(300)
     await p.screenshot({ path: path.join(OUT, `box-${name}-stuck.png`) })
+    // BLANK(노랑) · FREEZE(하늘) 박스 바탕
+    await p.$eval('.grid-wrap', (g) => { g.scrollTop = 0 })
+    await p.keyboard.press('b'); await sleep(300)
+    await p.screenshot({ path: path.join(OUT, `box-${name}-blank.png`) })
+    await p.keyboard.press('b'); await p.keyboard.press('f'); await sleep(300)
+    await p.screenshot({ path: path.join(OUT, `box-${name}-freeze.png`) })
   }
 } finally {
   await b.close()

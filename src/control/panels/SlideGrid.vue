@@ -301,9 +301,11 @@ defineExpose({ scrollToItem, scrollToLive })
 /*
  * 2026-11-26 사용자 결정: 송출 중인 곡 = 박스(제목 줄 포함) 바탕을 옅은 초록으로(빛은 너무 옅어 안 보여서 바꿈), 테두리는 회색 그대로.
  * 송출 중인 장 = 카드 초록 테두리 + 더 진한 초록 바탕 — 박스 바탕은 카드보다 한참 옅게 해야 카드가 묻히지 않는다.
- * 제목 줄도 같은 색(위에 붙었을 때도 어느 곡인지 보이게). BLANK·FREEZE·대기 곡은 평소 바탕
+ * 제목 줄도 같은 색(위에 붙었을 때도 어느 곡인지 보이게). BLANK = 옅은 노랑 · FREEZE = 옅은 하늘(같은 방식, 사용자 결정) · 대기 곡만 평소 바탕
  */
 .song.on.live, .song.on.live > h3 { background: #1b2a21; }
+.song.on.blk, .song.on.blk > h3 { background: #27231a; } /* BLANK = 옅은 노랑(초록보다 더 옅게 — 진하면 경고처럼 보임) */
+.song.on.frz, .song.on.frz > h3 { background: #1a2530; } /* FREEZE = 옅은 하늘(걸어 둔 걸 잊지 않게) */
 .tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { font-size: 14px; color: var(--muted); }
 h3 {
   /* 박스 윗부분. 스크롤하면 화면 위에 붙음(긴 곡을 내려도 어느 곡인지 보이게) — 바탕을 칠해 아래 카드가 비치지 않게 */
