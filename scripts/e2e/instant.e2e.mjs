@@ -52,7 +52,7 @@ try {
   await c.bringToFront()
   await openDialog(c)
   check('기본 모드 = 미리보기 후 저장(바로 적용 꺼짐)', !(await (await instantBox(c)).evaluate((e) => e.checked)))
-  check('버튼 이름 [저장]', (await c.$eval('.sd .sd-foot', (e) => e.textContent ?? '')).includes('바꾸면 여기서 [저장]'))
+  check('버튼 이름 [적용]', (await c.$eval('.sd .sd-foot', (e) => e.textContent ?? '')).includes('바꾸면 여기서 [적용]'))
   await setColor(c, '#ff0000')
   await sleep(700)
   check('미리보기 모드: 바꿔도 출력 창은 그대로', (await txtColor(out)) === WHITE, await txtColor(out))

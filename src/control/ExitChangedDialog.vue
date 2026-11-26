@@ -35,7 +35,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       </p>
       <p v-if="req.onAir && !req.all" class="air">송출 중인 곡입니다 — 빼면 자막이 내려갑니다.</p>
       <div class="acts">
-        <button class="primary save" @click="answer('save')">저장하고 {{ req.all ? '비우기' : '제외' }}</button>
+        <button class="primary save" @click="answer('save')">원본에 저장하고 {{ req.all ? '비우기' : '제외' }}</button>
         <button class="danger-line discard" @click="answer('discard')">버리고 {{ req.all ? '비우기' : '제외' }}</button>
         <button class="cancel" @click="answer('cancel')">취소</button>
       </div>

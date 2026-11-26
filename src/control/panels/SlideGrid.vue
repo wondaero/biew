@@ -58,7 +58,7 @@ function onDragEnd(key: string, e: { oldIndex?: number; newIndex?: number }) {
   dragEndAt = Date.now()
   if (e.oldIndex === undefined || e.newIndex === undefined || e.oldIndex === e.newIndex) return
   live.setlist.moveSlide(key, e.oldIndex, e.newIndex)
-  say('순서를 바꿨습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)')
+  say('순서를 바꿨습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [원본에 저장]으로)')
 }
 
 /** 카드 ⋯ 메뉴(2026-11-25 사용자 요청 — 예전 ✎ 하나였던 자리, 기능이 늘어날 수 있어 메뉴로): 편집 · 복사(바로 뒤에, 오늘 선곡만) */
@@ -80,7 +80,7 @@ function menuCopy() {
   menu.value = null
   if (!m) return
   live.setlist.duplicateSlide(m.key, m.j)
-  say('바로 뒤에 복사했습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)')
+  say('바로 뒤에 복사했습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [원본에 저장]으로)')
 }
 
 /**
@@ -99,7 +99,7 @@ function menuDelete() {
     + (ctlHit ? (live.state.frozen ? '\n\n지금 가리키는 장입니다 — FREEZE 를 풀면 BLANK 가 됩니다.' : '\n\n송출 중인 장입니다 — 지우면 BLANK 가 됩니다.') : '')
   if (!confirm(msg)) return
   const r = live.setlist.editSlides(m.key, [m.j], [])
-  if (r === 'ok') say('1장 지웠습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)')
+  if (r === 'ok') say('1장 지웠습니다 — 오늘 선곡만(곡 원본은 곡 제목 줄 [원본에 저장]으로)')
   else say(r === 'last' ? '곡의 마지막 장은 지울 수 없습니다 — 곡을 빼려면 [선곡 제외]' : r === 'frozen' ? 'FREEZE 중인 장은 지울 수 없습니다 — FREEZE 를 풀고 지우세요' : '그 사이 선곡이 바뀌어 지우지 못했습니다', true)
 }
 
@@ -200,7 +200,7 @@ function saveEdit(p: { pieces: string[]; indexes: number[] }) {
   }
   editing.value = null
   const what = removing ? `${p.indexes.length}장 지웠습니다` : p.pieces.length > 1 ? `${p.pieces.length}장으로 나눴습니다` : '고쳤습니다'
-  say(`${what} — 오늘 선곡만(곡 원본은 곡 제목 줄 [저장]으로)`)
+  say(`${what} — 오늘 선곡만(곡 원본은 곡 제목 줄 [원본에 저장]으로)`)
 }
 
 /** 송출 중인 장으로(모니터를 누르면) — 접혀 있으면 펼치고 가운데로. FREEZE 중이면 고정된 화면 쪽 */
@@ -238,9 +238,9 @@ defineExpose({ scrollToItem, scrollToLive })
         <span v-if="isHost" class="h-acts" @click.stop>
           <template v-if="isChanged(it)">
             <span class="changed" title="오늘 선곡에서 바꾼 슬라이드(순서·가사)가 곡 원본에 저장되지 않음">변경됨</span>
-            <button class="h-btn primary save-item" :disabled="savingKey === it.key" title="지금 슬라이드(순서·가사)를 곡 원본에 저장" @click="saveItem(it)">저장</button>
+            <button class="h-btn primary save-item" :disabled="savingKey === it.key" title="오늘 바꾼 슬라이드(순서·가사)를 이 기기의 곡 원본에 저장 — DB 에는 곡 목록의 ⬆ 업로드로" @click="saveItem(it)">원본에 저장</button>
           </template>
-          <button v-if="!isMediaItem(it)" class="h-btn" title="곡 편집 — 저장하면 곡 원본과 오늘 선곡이 함께 바뀜" @click="editSong(it)">편집</button>
+          <button v-if="!isMediaItem(it)" class="h-btn" title="곡 편집기 — 저장하면 곡 원본과 오늘 선곡이 함께 바뀜" @click="editSong(it)">곡 편집</button>
           <button class="h-btn danger-line exclude" title="선곡에서 빼기(곡 목록의 곡은 그대로)" @click="exclude(it)">선곡 제외</button>
         </span>
       </h3>
@@ -276,7 +276,7 @@ defineExpose({ scrollToItem, scrollToLive })
         <!-- ⋯ = 카드 밖 형제 버튼(카드 클릭 = 송출). 그림 장은 편집 없이 복사만(그림은 PowerPoint 에서 고쳐 다시 넣기) -->
         <button v-if="isHost" class="more" :class="{ on: isMenu(it.key, c.j) }" title="더 보기 — 편집·복사·삭제" aria-label="이 슬라이드 더 보기" aria-haspopup="menu" @click.stop="toggleMenu(it.key, c.j)">⋯</button>
         <div v-if="isMenu(it.key, c.j)" class="more-menu" role="menu" @click.stop>
-          <button v-if="!isMediaSlide(textOf(it, c.j))" role="menuitem" class="m-edit" @click="menuEdit">✎ 편집</button>
+          <button v-if="!isMediaSlide(textOf(it, c.j))" role="menuitem" class="m-edit" @click="menuEdit">✎ 이 장 편집</button>
           <button role="menuitem" class="m-copy" @click="menuCopy">⧉ 복사 <small>바로 뒤에</small></button>
           <button role="menuitem" class="m-del" @click="menuDelete">🗑 삭제 <small>이 장만</small></button>
         </div>

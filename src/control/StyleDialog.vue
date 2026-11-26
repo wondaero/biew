@@ -46,16 +46,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <div class="sd-backdrop" @mousedown.self="close">
     <div class="sd" role="dialog" aria-modal="true" aria-label="출력 설정">
       <header>
-        <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag" :class="{ inst: draft.instant.value }">{{ draft.instant.value ? '저장 전 — 송출 화면에 보이는 중' : '저장 안 된 변경' }}</span></h2>
-        <small class="keys">Ctrl+Enter 저장 · Esc 닫기{{ draft.instant.value ? '(저장 안 한 변경은 되돌아감)' : '(고친 내용은 남음)' }}</small>
+        <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag" :class="{ inst: draft.instant.value }">{{ draft.instant.value ? '적용 전 — 송출 화면에 임시로 보이는 중' : '적용 안 된 변경' }}</span></h2>
+        <small class="keys">Ctrl+Enter 적용 · Esc 닫기{{ draft.instant.value ? '(적용 안 한 변경은 되돌아감)' : '(고친 내용은 남음)' }}</small>
         <span class="spacer" />
-        <button class="quiet" :title="draft.instant.value ? '닫기 (Esc) — 저장 안 한 변경은 되돌아갑니다' : '닫기 (Esc) — 고친 내용은 남습니다'" @click="close">✕</button>
+        <button class="quiet" :title="draft.instant.value ? '닫기 (Esc) — 적용 안 한 변경은 되돌아갑니다' : '닫기 (Esc) — 고친 내용은 남습니다'" @click="close">✕</button>
       </header>
       <div class="sd-body">
         <section class="sd-left">
           <StylePreview class="sd-pv" :actions="false" :toggle="false" />
           <div class="sd-air">
-            <div class="sd-air-bar">{{ draft.instant.value ? '저장된 설정' : '지금 송출 중' }} <small>{{ draft.instant.value ? '(저장 안 하고 닫으면 이걸로 돌아감)' : '(비교용)' }}</small></div>
+            <div class="sd-air-bar">{{ draft.instant.value ? '지금 송출 중인 설정' : '지금 송출 중' }} <small>{{ draft.instant.value ? '(적용 안 하고 닫으면 이걸로 돌아감)' : '(비교용)' }}</small></div>
             <div class="sd-air-screen">
               <SlideRender :text="air.text" :blank="air.blank" :style-cfg="live.state.style" :animate="false" />
             </div>
@@ -64,14 +64,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <section class="sd-right">
           <div class="sd-scroll"><StylePanel /></div>
           <footer class="sd-foot">
-            <button class="danger-line" title="기본값으로 바꾸기([저장]해야 확정)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
+            <button class="danger-line" title="기본값으로 바꾸기([적용]해야 송출)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
             <span class="spacer" />
             <template v-if="draft.dirty.value">
-              <button class="revert" title="고친 것을 버리고 저장된 설정으로" @click="draft.revert()">되돌리기</button>
-              <button class="apply" title="이 설정으로 송출 확정 (Ctrl+Enter)" @click="draft.apply()">저장</button>
+              <button class="revert" title="고친 것을 버리고 지금 송출 중인 설정으로" @click="draft.revert()">되돌리기</button>
+              <button class="apply" title="이 설정을 송출에 적용 (Ctrl+Enter)" @click="draft.apply()">적용</button>
             </template>
-            <button v-else-if="draft.canUndo.value" class="undo" title="방금 저장한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 저장 취소</button>
-            <small v-else class="foot-hint">바꾸면 여기서 [저장]</small>
+            <button v-else-if="draft.canUndo.value" class="undo" title="방금 적용한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 적용 취소</button>
+            <small v-else class="foot-hint">바꾸면 여기서 [적용]</small>
           </footer>
         </section>
       </div>

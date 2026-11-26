@@ -124,11 +124,11 @@ function save() {
 function apply(p: StylePreset) {
   if (sameStyle(p.style, applied.value)) { draft.revert(); say(`"${p.name}" — 이미 송출 중인 설정입니다`); return }
   draft.replace(normalizeStyle(p.style))
-  say(draft.instant.value ? `"${p.name}" 불러옴 — 송출 화면에 보이는 중, [저장]해야 유지됩니다` : `"${p.name}" 불러옴 — 미리보기 확인 후 [저장]을 누르면 송출됩니다`)
+  say(draft.instant.value ? `"${p.name}" 불러옴 — 송출 화면에 임시로 보이는 중, [적용]해야 유지됩니다` : `"${p.name}" 불러옴 — 미리보기 확인 후 [적용]을 누르면 송출됩니다`)
 }
 /** 보관한 설정 표시: 저장된 송출 설정과 같으면 '송출 중', 저장 전 수정본과 같으면 '미리보기'(바로 적용 모드면 '저장 전') */
 const presetTag = (p: StylePreset) =>
-  sameStyle(p.style, applied.value) ? '송출 중' : draft.dirty.value && sameStyle(p.style, st.value) ? (draft.instant.value ? '저장 전' : '미리보기') : null
+  sameStyle(p.style, applied.value) ? '송출 중' : draft.dirty.value && sameStyle(p.style, st.value) ? (draft.instant.value ? '적용 전' : '미리보기') : null
 function remove(p: StylePreset) {
   if (!confirm(`보관한 설정 "${p.name}" 을(를) 지울까요?`)) return
   deletePreset(p.id)
@@ -156,12 +156,12 @@ async function importFile(e: Event) {
 
 <template>
   <section ref="rootEl" class="style" :class="{ guard: touchGuard }" @pointerdown.capture="onGuardDown" @click.capture="onGuardClick">
-    <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag" :class="{ inst: draft.instant.value }">{{ draft.instant.value ? '저장 전 — 송출 화면에 보이는 중' : '저장 안 된 변경' }}</span></h2>
+    <h2>출력 설정 <span v-if="draft.dirty.value" class="dirty-tag" :class="{ inst: draft.instant.value }">{{ draft.instant.value ? '적용 전 — 송출 화면에 임시로 보이는 중' : '적용 안 된 변경' }}</span></h2>
 
     <!-- 모드(기기마다 기억): 미리보기 후 저장(기본) / 바로 적용 -->
     <label class="instant full" :class="{ on: draft.instant.value }">
       <input v-model="draft.instant.value" type="checkbox" />
-      <span><b>바로 적용</b> — 바꾸는 즉시 송출 화면(출력 창·넓은 화면 보기)에 보입니다. <b>[저장]</b>해야 유지되고, 저장 안 하고 닫으면 원래대로 돌아갑니다.</span>
+      <span><b>송출 화면에서 바로 보기</b> — 바꾸는 즉시 송출 화면(출력 창·넓은 화면 보기)에 <b>임시로</b> 보입니다. <b>[적용]</b>해야 유지되고, 적용 안 하고 닫으면 원래대로 돌아갑니다.</span>
     </label>
     <p v-if="touchGuard" class="guard-hint">슬라이더는 <b>한 번 눌러 켠 뒤</b> 움직이세요 — 스크롤하다 값이 바뀌지 않게</p>
 
@@ -171,7 +171,7 @@ async function importFile(e: Event) {
       <!-- 목록 자리는 비어 있어도 상자로 항상 보인다 — 저장하면 여기에 쌓인다는 게 보이게 -->
       <ul v-if="presets.length" class="p-list p-box">
         <li v-for="p in presets" :key="p.id" :class="{ on: p.id === activeId }">
-          <button class="p-apply" :title="`'${p.name}' 불러오기 — [저장]을 눌러야 확정`" @click="apply(p)">
+          <button class="p-apply" :title="`'${p.name}' 불러오기 — [적용]을 눌러야 송출`" @click="apply(p)">
             <span class="p-swatch" :style="{ background: backdropCss(p.style.backdrop), color: p.style.color }">가</span>
             <span class="p-name">{{ p.name }}</span>
             <span v-if="presetTag(p)" class="p-cur" :class="{ pv: presetTag(p) === '미리보기' }">{{ presetTag(p) }}</span>
@@ -186,7 +186,7 @@ async function importFile(e: Event) {
       </form>
       <button type="button" class="p-more" :aria-expanded="showBackup" @click="showBackup = !showBackup">{{ showBackup ? '▾' : '▸' }} 백업·다른 PC 로 옮기기 <small>(JSON 파일)</small></button>
       <div v-if="showBackup" class="p-file">
-        <button type="button" :disabled="!presets.length" title="저장된 설정 전체를 파일로 — 다른 PC 로 옮기거나 백업할 때" @click="exportFile">파일로 내보내기</button>
+        <button type="button" :disabled="!presets.length" title="보관한 설정 전체를 파일로 — 다른 PC 로 옮기거나 백업할 때" @click="exportFile">파일로 내보내기</button>
         <label class="p-import" title="내보낸 파일을 이 PC 의 목록에 추가(같은 이름은 바꿈)">파일에서 가져오기<input type="file" accept="application/json,.json" @change="importFile" /></label>
       </div>
       <p v-if="presetMsg" class="p-msg" :class="{ err: presetMsg.err }">{{ presetMsg.text }}</p>
@@ -268,7 +268,7 @@ async function importFile(e: Event) {
       <input type="range" min="100" max="1000" step="50" :value="st.fadeMs" :style="fill(st.fadeMs, 100, 1000)" @input="set('fadeMs', num($event))" />
     </label>
 
-    <button class="reset full danger-line" title="기본값으로 바꾸기([저장]해야 확정)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
+    <button class="reset full danger-line" title="기본값으로 바꾸기([적용]해야 송출)" @click="draft.replace({ ...DEFAULT_STYLE })">기본값으로</button>
   </section>
 </template>
 

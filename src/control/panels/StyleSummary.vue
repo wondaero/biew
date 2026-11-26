@@ -45,7 +45,7 @@ const detail = computed(() => {
     <span class="ss-k">출력</span>
     <span v-if="presetName" class="ss-preset">● {{ presetName }}</span>
     <span v-else class="ss-line">{{ short }}</span>
-    <button :class="{ dirty: draft.dirty.value }" :title="draft.dirty.value ? '저장 안 된 변경 있음 — 열어서 [저장]' : '출력 설정 열기'" @click="emit('open')">⚙ 설정<i v-if="draft.dirty.value" class="dot" /></button>
+    <button :class="{ dirty: draft.dirty.value }" :title="draft.dirty.value ? '적용 안 된 변경 있음 — 열어서 [적용]' : '출력 설정 열기'" @click="emit('open')">⚙ 설정<i v-if="draft.dirty.value" class="dot" /></button>
   </section>
 </template>
 

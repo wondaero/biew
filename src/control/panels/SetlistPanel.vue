@@ -56,7 +56,7 @@ async function clear() {
       >
         <span class="grip" title="드래그해서 순서 변경" aria-label="순서 바꾸기"><svg viewBox="0 0 14 10" width="14" height="10" aria-hidden="true"><path d="M1 2.5h12M1 7.5h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></span>
         <span class="no">{{ i + 1 }}</span>
-        <span class="title"><span v-if="isMediaItem(it)" class="pic" title="그림(PDF·이미지)">🖼</span>{{ it.title }}<span v-if="isChanged(it)" class="chg" title="오늘 바꾼 슬라이드가 곡 원본에 저장되지 않음 — 슬라이드 목록의 곡 제목 줄 [저장]">•</span></span>
+        <span class="title"><span v-if="isMediaItem(it)" class="pic" title="그림(PDF·이미지)">🖼</span>{{ it.title }}<span v-if="isChanged(it)" class="chg" title="오늘 바꾼 슬라이드가 곡 원본에 저장되지 않음 — 슬라이드 목록의 곡 제목 줄 [원본에 저장]">•</span></span>
         <button v-if="latest(it)" class="upd" title="라이브러리에서 수정된 최신 가사로 갱신" @click.stop="refresh(it)">↻ 최신</button>
         <span class="n">{{ it.slides.length }}</span>
         <button class="x" title="선곡에서 빼기" @click.stop="remove(it)">✕</button>

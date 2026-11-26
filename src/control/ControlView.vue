@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
     <nav v-if="isHost" class="dock">
       <button @click="openSearch()">🔍 곡 목록<b v-if="lib.remoteCount.value" class="badge down">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge">⬆{{ lib.pendingCount.value }}</b></button>
       <button @click="openSheet('set')">☰ 선곡 {{ live.state.setlist.length }}</button>
-      <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="저장 안 된 변경 있음" /></button>
+      <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 출력 설정 있음" /></button>
     </nav>
     <TransportBar v-if="narrow" class="transport" bottom :host="isHost" />
   </div>

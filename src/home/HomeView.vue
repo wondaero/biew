@@ -104,6 +104,11 @@ const ctlTitle = (c: Card) => (isHost(c) ? '이 PC 에서 송출 조작(호스�
  * 내 계정 채널은 PC 에선 바로 호스트(?as=host — 예전 '내 계정의 채널' 규칙). 폰·태블릿은 묻는다(ControlGate 의 호스트/리모컨 고르기) —
  * 버튼 설명(title)이 터치에선 안 보여, 리모컨으로 쓰려던 폰이 모르는 새 두 번째 호스트가 되지 않게.
  */
+/**
+ * 버튼 이름 = 실제로 열리는 역할(2026-11-26 사용자 결정 — [제어]를 누르면 '리모컨'·'호스트'가 떠서 같은 것인지 헷갈림):
+ * 이 PC 가 호스트이거나 PC 에서 내 계정 채널(바로 호스트로 열림) = [송출], 그 밖 = [리모컨](폰의 내 계정 채널은 열 때 호스트/리모컨을 묻는다)
+ */
+const ctlLabel = (c: Card) => (isHost(c) || (c.mine && !mobile) ? '송출' : '리모컨')
 const openCtl = (c: Card) => router.push(api.controlPath(c.code) + (!isHost(c) && c.mine && !mobile ? '?as=host' : ''))
 const recent = (c: Card) => !!c.at && Date.now() - new Date(c.at).getTime() < RECENT_MS
 
@@ -157,7 +162,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
       />
       <div class="row">
         <button type="submit" :disabled="!joinOk">보기</button>
-        <button type="button" :disabled="!joinOk" @click="go('control')">제어 (리모컨)</button>
+        <button type="button" :disabled="!joinOk" @click="go('control')">리모컨</button>
       </div>
     </form>
 
@@ -214,7 +219,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
           </div>
           <div class="ch-go">
             <button @click="router.push(api.viewPath(c.code))">보기</button>
-            <button class="ctl" :class="{ primary: isHost(c) }" :title="ctlTitle(c)" @click="openCtl(c)">제어</button>
+            <button class="ctl" :class="{ primary: isHost(c) }" :title="ctlTitle(c)" @click="openCtl(c)">{{ ctlLabel(c) }}</button>
           </div>
           <div v-if="c.roles.length || (c.mine && session)" class="ch-more">
             <!-- 보통 크기 버튼(14px — 작은 버튼 없애기 규칙). 삭제는 확인창을 거치는 위험 동작이라 danger-line -->
@@ -257,7 +262,7 @@ function closeDialogs() { if (!creating.value) creatingOpen.value = false; joinO
         />
         <div class="row">
           <button type="submit" :disabled="!joinOk">보기</button>
-          <button type="button" :disabled="!joinOk" @click="go('control')">제어 (리모컨)</button>
+          <button type="button" :disabled="!joinOk" @click="go('control')">리모컨</button>
         </div>
       </form>
     </div>

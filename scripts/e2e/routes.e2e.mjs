@@ -38,7 +38,7 @@ try {
   check('홈 번호 입력 → /123456', await until(async () => (await at()) === '/123456'), await at())
   await go('/')
   await p.type('input.code', '123456')
-  await p.$$eval('form.join-inline button', (bs) => bs.find((x) => x.textContent?.includes('제어'))?.click())
+  await p.$$eval('form.join-inline button', (bs) => bs.find((x) => x.textContent?.includes('리모컨'))?.click())
   check('홈 번호 입력 → /123456/control', await until(async () => (await at()) === '/123456/control'), await at())
 } catch (e) { fail++; console.error('✖ 중단:', e.message) } finally {
   await b.close()

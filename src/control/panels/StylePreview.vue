@@ -35,26 +35,26 @@ const view = ref<'draft' | 'air'>('draft')
 watch(() => draft.dirty.value, (d) => { if (!d) view.value = 'draft' })
 const showAir = computed(() => props.toggle && draft.dirty.value && view.value === 'air')
 const styleCfg = computed(() => (showAir.value ? s.style : draft.shown.value))
-const label = computed(() => (showAir.value ? (draft.instant.value ? '저장된 설정 — 저장 안 하면 이걸로 돌아감' : '지금 송출 중')
-  : draft.dirty.value ? (draft.instant.value ? '송출 화면에 보이는 중 — [저장]해야 유지' : '저장 전 미리보기 — 송출엔 아직 안 나감') : '송출 화면'))
+const label = computed(() => (showAir.value ? (draft.instant.value ? '지금 송출 중인 설정 — 적용 안 하면 이걸로 돌아감' : '지금 송출 중')
+  : draft.dirty.value ? (draft.instant.value ? '송출 화면에 임시로 보이는 중 — [적용]해야 유지' : '적용 전 미리보기 — 송출엔 아직 안 나감') : '송출 화면'))
 </script>
 
 <template>
   <div class="style-pv" :class="{ dirty: draft.dirty.value && !showAir, inst: draft.instant.value, air: showAir, compact }">
     <div v-if="toggle && draft.dirty.value" class="pv-tabs" role="tablist" aria-label="비교">
-      <button role="tab" :aria-selected="view === 'draft'" :class="{ on: view === 'draft' }" @click="view = 'draft'">저장 전</button>
-      <button role="tab" :aria-selected="view === 'air'" :class="{ on: view === 'air' }" @click="view = 'air'">{{ draft.instant.value ? '저장된 설정' : '송출 중' }}</button>
+      <button role="tab" :aria-selected="view === 'draft'" :class="{ on: view === 'draft' }" @click="view = 'draft'">적용 전</button>
+      <button role="tab" :aria-selected="view === 'air'" :class="{ on: view === 'air' }" @click="view = 'air'">송출 중</button>
     </div>
     <div v-if="!compact || draft.dirty.value" class="pv-bar">{{ label }}<small>{{ text.note }}</small></div>
     <div v-if="!compact || draft.dirty.value" class="pv-screen">
       <SlideRender :text="text.text" :style-cfg="styleCfg" :animate="false" />
     </div>
     <div v-if="actions && draft.dirty.value" class="pv-actions">
-      <button title="고친 것을 버리고 저장된 설정으로" @click="draft.revert()">되돌리기</button>
-      <button class="apply" title="이 설정으로 송출 확정" @click="draft.apply()">저장</button>
+      <button title="고친 것을 버리고 지금 송출 중인 설정으로" @click="draft.revert()">되돌리기</button>
+      <button class="apply" title="이 설정을 송출에 적용" @click="draft.apply()">적용</button>
     </div>
     <div v-else-if="actions && draft.canUndo.value" class="pv-actions">
-      <button class="undo" title="방금 저장한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 저장 취소 (이전 설정으로)</button>
+      <button class="undo" title="방금 적용한 것을 취소하고 그 전 설정으로(바로 송출)" @click="draft.undo()">↶ 방금 적용 취소 (이전 설정으로)</button>
     </div>
   </div>
 </template>
