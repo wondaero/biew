@@ -301,7 +301,8 @@ onBeforeUnmount(() => {
 
     <!-- 폰: 준비용 버튼(곡 목록·선곡·출력 설정)은 위, 송출 버튼은 맨 아래(사용자 결정 2026-11-19) -->
     <nav v-if="isHost" class="dock">
-      <button @click="openSearch()">🔍 곡 목록<b v-if="lib.remoteCount.value" class="badge down">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge">⬆{{ lib.pendingCount.value }}</b></button>
+      <!-- 숫자(받을 곡·올릴 곡)는 버튼 오른쪽 위 모서리에 작은 표시로 — 글자 옆에 두면 좁은 폰에서 버튼 밖으로 삐져나옴(2026-11-26) -->
+      <button class="dock-lib" @click="openSearch()">🔍 곡 목록<span v-if="lib.remoteCount.value || lib.pendingCount.value" class="dock-badges"><b v-if="lib.remoteCount.value" class="badge down" title="DB 에서 받을 곡">⬇{{ lib.remoteCount.value }}</b><b v-if="lib.pendingCount.value" class="badge" title="DB 에 올릴 곡">⬆{{ lib.pendingCount.value }}</b></span></button>
       <button @click="openSheet('set')">☰ 선곡 {{ live.state.setlist.length }}</button>
       <button :class="{ dirty: styleDraft.dirty.value }" @click="openSheet('style')">⚙ 출력 설정<i v-if="styleDraft.dirty.value" class="dock-dot" title="적용 안 된 출력 설정 있음" /></button>
     </nav>
@@ -456,6 +457,10 @@ kbd { margin-left: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; colo
   /* 준비용 버튼 줄(위). 예배 전에 한 번 맞추면 거의 안 쓰므로 송출 버튼보다 낮게 */
   .dock { grid-area: dock; display: flex; gap: 6px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); }
   .dock button { flex: 1; min-width: 0; padding: 8px 4px; font-size: 13px; white-space: nowrap; margin-bottom: var(--lift); }
+  .dock .dock-lib { position: relative; overflow: visible; }
+  .dock-badges { position: absolute; top: -7px; right: -4px; display: flex; gap: 2px; pointer-events: none; }
+  .dock-badges .badge { margin: 0; padding: 0 5px; line-height: 16px; font-size: 10px; border: 1px solid var(--panel); }
+  .dock-badges .badge.down { background: #2f4f86; color: #fff; }
 }
 .out-stale {
   position: fixed; left: 50%; top: 56px; transform: translateX(-50%); z-index: 41; max-width: min(640px, calc(100vw - 24px)); margin: 0;

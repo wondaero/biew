@@ -24,24 +24,47 @@ const lib = ref<InstanceType<typeof LibraryPanel>>()
  */
 const before = new Set(live.state.setlist.map((it) => it.key))
 const added = computed(() => live.state.setlist.filter((it) => !before.has(it.key)))
+const addedOnAir = computed(() => added.value.some((it) => live.state.setlist[live.state.itemIndex]?.key === it.key && live.state.slideIndex >= 0))
+function dropAdded() {
+  const drop = new Set(added.value.map((it) => it.key))
+  live.setlist.replace(live.state.setlist.filter((it) => !drop.has(it.key)))
+}
 function undoAdded() {
   const list = added.value
   if (!list.length) return
-  const onAir = list.some((it) => live.state.setlist[live.state.itemIndex]?.key === it.key && live.state.slideIndex >= 0)
   const names = list.map((it) => `· ${it.title}`).join('\n')
-  const warn = onAir ? '\n\n송출 중인 곡이 있어 자막이 내려갑니다.' : ''
+  const warn = addedOnAir.value ? '\n\n송출 중인 곡이 있어 자막이 내려갑니다.' : ''
   if (!confirm(`이번에 추가한 ${list.length}곡을 선곡에서 뺄까요?\n${names}${warn}`)) return
-  const drop = new Set(list.map((it) => it.key))
-  live.setlist.replace(live.state.setlist.filter((it) => !drop.has(it.key)))
+  dropAdded()
+}
+
+/**
+ * ✕·Esc·뒤로가기·바깥 누르기로 닫을 때 이번에 넣은 곡이 있으면 묻는다(2026-11-26 사용자 요청 — ✕ 가 그냥 닫혀서).
+ * [그대로 두고 닫기] [추가한 곡 빼고 닫기] [계속 고르기]. [완료] 는 묻지 않고 닫는다(넣은 곡 확정).
+ */
+const askClose = ref(false)
+function requestClose() {
+  if (askClose.value) return
+  if (added.value.length) askClose.value = true
+  else emit('close')
+}
+function closeDropping() {
+  dropAdded()
+  emit('close')
 }
 
 usePauseHotkeys()
-// 안에 편집기·서버 올리기 창이 떠 있으면 그 창이 먼저 닫힌다(뒤로가기 스택·Esc 모두)
-useBackClose(() => true, () => { if (!lib.value?.hasModal()) emit('close') })
+// 안에 편집기·서버 올리기 창이 떠 있으면 그 창이 먼저 닫힌다(뒤로가기 스택·Esc 모두). 묻는 창이 떠 있으면 그 창만 닫는다
+useBackClose(() => true, () => {
+  if (lib.value?.hasModal()) return
+  if (askClose.value) askClose.value = false
+  else requestClose()
+})
 function onKey(e: KeyboardEvent) {
   if (e.key !== 'Escape' || e.defaultPrevented || lib.value?.hasModal()) return
   e.preventDefault()
-  emit('close')
+  if (askClose.value) askClose.value = false
+  else requestClose()
 }
 onMounted(() => {
   window.addEventListener('keydown', onKey)
@@ -51,14 +74,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <div class="srch-backdrop" @mousedown.self="emit('close')">
+  <div class="srch-backdrop" @mousedown.self="requestClose">
     <div class="srch m-full" role="dialog" aria-modal="true" aria-label="곡 목록">
       <header>
         <h2>곡 목록</h2>
         <small class="keys">곡 누르기 = 보기·수정 · [+ 선곡] 또는 Enter = 선곡에 추가 · Esc = 지우기/닫기</small>
         <span class="spacer" />
         <small class="cnt">선곡 {{ live.state.setlist.length }}곡</small>
-        <button class="x" title="닫기 (Esc)" @click="emit('close')">✕</button>
+        <button class="x" title="닫기 (Esc)" @click="requestClose">✕</button>
       </header>
       <OnAirStrip />
       <LibraryPanel ref="lib" class="srch-lib" />
@@ -70,6 +93,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <button v-if="added.length" class="danger-line undo-added" title="이 창을 연 동안 선곡에 넣은 곡만 다시 빼기" @click="undoAdded">되돌리기</button>
         <button class="primary done" @click="emit('close')">{{ added.length ? '완료' : '닫기' }}</button>
       </footer>
+      <!-- 이번에 넣은 곡이 있는데 ✕·Esc·뒤로가기로 닫을 때 -->
+      <div v-if="askClose" class="ask-backdrop" @mousedown.self="askClose = false">
+        <div class="ask" role="alertdialog" aria-modal="true" aria-label="닫기 확인">
+          <b>이번에 추가한 {{ added.length }}곡이 선곡에 들어가 있습니다</b>
+          <p class="ask-names">{{ added.map((it) => it.title).join(', ') }}</p>
+          <p v-if="addedOnAir" class="ask-warn">그중 송출 중인 곡이 있어 빼면 자막이 내려갑니다.</p>
+          <div class="ask-acts">
+            <button class="primary ask-keep" @click="emit('close')">그대로 두고 닫기</button>
+            <button class="danger-line ask-drop" @click="closeDropping">추가한 곡 빼고 닫기</button>
+            <button class="ask-back" @click="askClose = false">계속 고르기</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -92,11 +128,21 @@ h2 { margin: 0; font-size: 16px; }
 .added.none { color: var(--muted); }
 .srch-foot button { font-size: 14px; white-space: nowrap; }
 .done { min-width: 76px; }
+/* 닫기 확인: 곡 목록 창 안에 덮어 띄움(폰은 아래 시트처럼 아래에 붙음) */
+.srch { position: relative; }
+.ask-backdrop { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .55); }
+.ask { width: min(420px, 100%); display: grid; gap: 8px; padding: 16px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 12px 36px rgba(0, 0, 0, .6); }
+.ask-names { margin: 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.ask-warn { margin: 0; color: var(--warn); font-size: 13px; }
+.ask-acts { display: grid; gap: 6px; margin-top: 4px; }
+.ask-acts button { font-size: 14px; }
 /* 모바일: 전체 화면(.m-full, src/style.css) */
 @media (max-width: 768px) {
   .keys { display: none; }
   .srch-lib { padding: 10px 12px; }
   .srch-foot { padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
+  .ask-backdrop { place-items: end stretch; padding: 0; }
+  .ask { width: 100%; border-radius: 14px 14px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
 }
 /* 좁은 폰: 곡 수가 잘리지 않게 "추가 N곡"만(곡 이름은 위 알림·선곡에서 보임) */
 @media (max-width: 400px) {
