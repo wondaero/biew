@@ -181,7 +181,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <li v-for="r in rows" :key="r.id" :class="{ linked: link?.id === r.id, open: open === r.id }">
             <div class="head">
               <button class="info" :aria-expanded="open === r.id" title="눌러서 곡 목록 보기" @click="toggle(r)">
-                <span class="t"><span class="chev">{{ open === r.id ? '▾' : '▸' }}</span>{{ r.title }}<span v-if="link?.id === r.id" class="now">지금 선곡</span></span>
+                <span class="t"><svg class="chev" :class="{ open: open === r.id }" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5 9 6 4 9.5Z" fill="currentColor" /></svg>{{ r.title }}<span v-if="link?.id === r.id" class="now">지금 선곡</span></span>
                 <span class="d">{{ when(r.savedAt) }} · {{ r.songs }}곡</span>
                 <span v-if="r.skippedMedia || r.pending" class="tags">
                   <span v-if="r.skippedMedia" class="tag" title="서버 기록엔 그림 슬라이드를 넣지 않습니다">그림 {{ r.skippedMedia }}묶음 빠짐</span>
@@ -248,7 +248,8 @@ h2 { margin: 0; font-size: 16px; }
 .info:hover { background: rgba(255, 255, 255, .04); }
 .info:active { transform: none; }
 .t { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chev { display: inline-block; width: 14px; color: var(--muted); font-size: 11px; }
+.chev { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 2px; color: var(--muted); transition: transform .15s; }
+.chev.open { transform: rotate(90deg); }
 .now { margin-left: 6px; padding: 0 6px; font-size: 11px; font-weight: 600; border-radius: 4px; background: rgba(79, 140, 255, .2); color: #dbe7ff; }
 .d { font-size: 12px; color: var(--muted); padding-left: 14px; }
 .tags { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 14px; }

@@ -227,7 +227,8 @@ defineExpose({ scrollToItem, scrollToLive })
         :aria-expanded="!isClosed(it.key)"
         @click="toggle(it.key)"
       >
-        <span class="chev">{{ isClosed(it.key) ? '▸' : '▾' }}</span>
+        <!-- 접기 표시: 글자(▸▾)는 작은 삼각형이라 그림으로(2026-11-26 사용자 요청 — 너무 작음). 펼치면 90° 돌아감 -->
+        <svg class="chev" :class="{ open: !isClosed(it.key) }" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5 9 6 4 9.5Z" fill="currentColor" /></svg>
         <span class="no">{{ i + 1 }}</span>
         <span class="name">{{ it.title }}</span>
         <small>{{ it.slides.length }}장</small>
@@ -334,7 +335,9 @@ h3::before, h3::after { content: ''; position: absolute; top: -1px; width: 10px;
 h3::before { left: -1px; background: radial-gradient(circle at 100% 100%, transparent 9px, var(--bg) 9.6px); }
 h3::after { right: -1px; background: radial-gradient(circle at 0 100%, transparent 9px, var(--bg) 9.6px); }
 h3.live { color: #fff; }
-h3 .chev { width: 10px; color: var(--muted); font-size: 11px; }
+h3 .chev { flex: none; width: 14px; height: 14px; align-self: center; color: var(--muted); transition: transform .15s; }
+h3 .chev.open { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { h3 .chev { transition: none; } }
 h3 .no { color: var(--muted); font-size: 12px; }
 h3 .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 h3 small { color: var(--muted); font-weight: normal; font-size: 12px; white-space: nowrap; }
