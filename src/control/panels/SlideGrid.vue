@@ -299,10 +299,11 @@ defineExpose({ scrollToItem, scrollToLive })
  /* 곡 하나 = 박스 하나(제목 줄 + 그 곡의 슬라이드) — 어디까지가 한 곡인지 보이게(2026-11-26 사용자 요청) */
 .song { margin-bottom: 14px; scroll-margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
 /*
- * 2026-11-26 사용자 결정: 송출 중인 곡 = 박스에 은은한 빛(테두리는 그대로 회색), 송출 중인 장 = 카드 테두리(빛 없음).
- * 빛은 박스 하나에만 — 카드까지 빛나면 초록이 이중으로 번진다. BLANK·FREEZE·대기 곡은 평소 박스(카드 색·제목 글자·버튼으로 충분)
+ * 2026-11-26 사용자 결정: 송출 중인 곡 = 박스(제목 줄 포함) 바탕을 옅은 초록으로(빛은 너무 옅어 안 보여서 바꿈), 테두리는 회색 그대로.
+ * 송출 중인 장 = 카드 초록 테두리 + 더 진한 초록 바탕 — 박스 바탕은 카드보다 한참 옅게 해야 카드가 묻히지 않는다.
+ * 제목 줄도 같은 색(위에 붙었을 때도 어느 곡인지 보이게). BLANK·FREEZE·대기 곡은 평소 바탕
  */
-.song.on.live { box-shadow: 0 0 18px 2px rgba(34, 197, 94, .22); }
+.song.on.live, .song.on.live > h3 { background: #1b2a21; }
 .tools { display: flex; justify-content: flex-end; padding: 6px 0; }.tools button { font-size: 14px; color: var(--muted); }
 h3 {
   /* 박스 윗부분. 스크롤하면 화면 위에 붙음(긴 곡을 내려도 어느 곡인지 보이게) — 바탕을 칠해 아래 카드가 비치지 않게 */
