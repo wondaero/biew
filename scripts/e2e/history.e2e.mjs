@@ -26,7 +26,7 @@ const cur = (p) => p.$eval('.hi .cur-info', (e) => e.textContent?.replace(/\s+/g
 const msg = (p) => p.$eval('.hi .msg', (e) => e.textContent).catch(() => '')
 const openHist = async (p) => { await p.click('.setlist .hist'); await p.waitForSelector('.hi'); await until(async () => !(await p.$('.hi .muted:not(.empty)')) || (await p.$$('.hi .list > li')).length > 0) }
 const closeHist = async (p) => { await p.keyboard.press('Escape'); await until(async () => !(await p.$('.hi'))) }
-const setName = async (p, t) => { await p.$eval('.hi .save input', (e) => { e.value = '' }); await p.type('.hi .save input', t) }
+const setName = async (p, t) => { await p.$eval('.hi .save input', (e) => { e.value = ''; e.dispatchEvent(new Event('input')) }); await p.type('.hi .save input', t) }
 
 const b = await puppeteer.launch({ executablePath: CHROME, headless: true })
 try {

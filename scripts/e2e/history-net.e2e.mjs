@@ -49,7 +49,7 @@ try {
 
   // [저장](연결 없음) → 새 기록 — 그림 묶음은 빼고 개수만
   await p.click('.setlist .hist'); await p.waitForSelector('.hi')
-  await p.$eval('.hi .save input', (e) => { e.value = '' }); await p.type('.hi .save input', 'Lorem 첫 저장')
+  await p.$eval('.hi .save input', (e) => { e.value = ''; e.dispatchEvent(new Event('input')) }); await p.type('.hi .save input', 'Lorem 첫 저장')
   await p.click('.hi .save-btn')
   check('[저장] → 서버에 새 기록', await until(async () => (await serverRows()).length === 1, 10000))
   const rows = await serverRows()
@@ -83,7 +83,7 @@ try {
 
   // [다른 이름으로 저장](같은 내용이어도 새로) → [저장](그 기록에 덮어쓰기)
   await p.click('.setlist .hist'); await p.waitForSelector('.hi')
-  await p.$eval('.hi .save input', (e) => { e.value = '' }); await p.type('.hi .save input', 'Lorem 둘째')
+  await p.$eval('.hi .save input', (e) => { e.value = ''; e.dispatchEvent(new Event('input')) }); await p.type('.hi .save input', 'Lorem 둘째')
   await p.click('.hi .save-as')
   check('[다른 이름으로 저장] → 서버 기록 2개(같은 내용이어도)', await until(async () => (await serverRows()).length === 2, 10000))
   await sleep(300)
@@ -95,7 +95,7 @@ try {
   await p.setOfflineMode(true)
   await p.evaluate(() => window.dispatchEvent(new Event('offline')))
   await p.click('.setlist .hist'); await p.waitForSelector('.hi')
-  await p.$eval('.hi .save input', (e) => { e.value = '' }); await p.type('.hi .save input', 'Lorem 오프라인')
+  await p.$eval('.hi .save input', (e) => { e.value = ''; e.dispatchEvent(new Event('input')) }); await p.type('.hi .save input', 'Lorem 오프라인')
   await p.click('.hi .save-as')
   check('인터넷 끊김 → "이 PC 에 보관"', await until(async () => (await p.$eval('.hi .msg', (e) => e.textContent)).includes('이 PC 에 보관')))
   check('목록에 "이 PC 에 보관 중" 표시', await until(async () => (await p.$eval('.hi .list', (e) => e.textContent).catch(() => '')).includes('이 PC 에 보관 중')))
